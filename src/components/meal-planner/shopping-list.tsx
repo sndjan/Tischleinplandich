@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { ShoppingListItem } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { isBasicIngredient } from "@/lib/shopping-list";
+import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
@@ -12,6 +13,7 @@ interface ShoppingListProps {
 
 const CHECKED_ITEMS_STORAGE_KEY =
   "weekly-meal-planner:shopping-list:checked-items";
+const HIDE_BASICS_STORAGE_KEY = "weekly-meal-planner:shopping-list:hide-basics";
 
 function getItemStorageKey(item: ShoppingListItem): string {
   return `${item.ingredient.trim().toLowerCase()}|${item.unit.trim().toLowerCase()}`;
@@ -22,6 +24,29 @@ export function ShoppingList({ items }: ShoppingListProps) {
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [isEditMode, setIsEditMode] = useState(false);
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
+  const [hideBasics, setHideBasics] = useState(false);
+
+  useEffect(() => {
+    try {
+      setHideBasics(
+        window.localStorage.getItem(HIDE_BASICS_STORAGE_KEY) === "true",
+      );
+    } catch {
+      // Storage unavailable; keep the default.
+    }
+  }, []);
+
+  const toggleHideBasics = () => {
+    setHideBasics((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(HIDE_BASICS_STORAGE_KEY, String(next));
+      } catch {
+        // Storage unavailable; the toggle still works for this session.
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     try {
@@ -158,8 +183,15 @@ export function ShoppingList({ items }: ShoppingListProps) {
     };
   });
 
-  const uncheckedViewRows = viewRows.filter((row) => !row.isChecked);
-  const checkedViewRows = viewRows.filter((row) => row.isChecked);
+  // Basic ingredients are only hidden in view mode; edit mode shows everything.
+  const visibleViewRows = hideBasics
+    ? viewRows.filter((row) => !isBasicIngredient(row.item.ingredient))
+    : viewRows;
+  const hiddenBasicRows = hideBasics
+    ? viewRows.filter((row) => isBasicIngredient(row.item.ingredient))
+    : [];
+  const uncheckedViewRows = visibleViewRows.filter((row) => !row.isChecked);
+  const checkedViewRows = visibleViewRows.filter((row) => row.isChecked);
 
   return (
     <div>
@@ -169,6 +201,22 @@ export function ShoppingList({ items }: ShoppingListProps) {
           Einkaufsliste
         </h2>
         <div className="flex-1" />
+        <Button
+          variant={hideBasics ? "default" : "outline"}
+          size="icon"
+          onClick={toggleHideBasics}
+          aria-label="Grundzutaten ausblenden"
+          aria-pressed={hideBasics}
+          title={
+            hideBasics ? "Grundzutaten einblenden" : "Grundzutaten ausblenden"
+          }
+        >
+          {hideBasics ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
+        </Button>
         <Button
           variant="outline"
           size="icon"
@@ -210,6 +258,38 @@ export function ShoppingList({ items }: ShoppingListProps) {
                 </li>
               ))}
             </ul>
+
+            {hiddenBasicRows.length > 0 && (
+              <details className="border-brand-card-border py-2">
+                <summary className="cursor-pointer select-none text-xs text-brand-tertiary">
+                  Grundzutaten ({hiddenBasicRows.length})
+                </summary>
+                <ul className="mt-2 space-y-1">
+                  {hiddenBasicRows.map((row) => (
+                    <li
+                      key={row.key}
+                      className={`flex items-center gap-2 text-sm leading-5 ${row.isChecked ? "opacity-50" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={row.isChecked}
+                        onChange={() => toggleItem(row.checkKey)}
+                        className="w-4 h-4"
+                      />
+                      <span
+                        className={
+                          row.isChecked
+                            ? "text-brand-disabled line-through"
+                            : ""
+                        }
+                      >
+                        {row.itemLabel.trim()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
 
             {checkedViewRows.length > 0 && (
               <details className=" border-brand-card-border py-2">

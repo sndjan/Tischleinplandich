@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
-import {
-  getRecipeImagePathFromUrl,
-  RECIPE_IMAGE_BUCKET,
-} from "../../lib/recipe-images";
 import { Button } from "@/components/ui/button";
 import type { Recipe } from "@/types/database";
 import { Plus, Sparkles } from "lucide-react";
@@ -95,36 +91,6 @@ export function RecipeLibrary() {
     fetchRecipes();
   }, []);
 
-  const handleDelete = async (recipe: Recipe) => {
-    try {
-      const { error } = await supabase
-        .from("recipes")
-        .delete()
-        .eq("id", recipe.id);
-
-      if (error) throw error;
-
-      const imagePath = getRecipeImagePathFromUrl(recipe.image_url);
-
-      if (imagePath) {
-        await supabase.storage.from(RECIPE_IMAGE_BUCKET).remove([imagePath]);
-      }
-
-      setRecipes((currentRecipes) =>
-        currentRecipes.filter((r) => r.id !== recipe.id),
-      );
-      setRecipeTagsById((currentTagsById) => {
-        const nextTagsById = { ...currentTagsById };
-        delete nextTagsById[recipe.id];
-        return nextTagsById;
-      });
-
-      toast.success("Rezept gelöscht");
-    } catch (err) {
-      toast.error("Löschen fehlgeschlagen");
-    }
-  };
-
   const toolbarActions = (
     <>
       <Button
@@ -154,8 +120,6 @@ export function RecipeLibrary() {
       recipes={recipes}
       recipeTagsById={recipeTagsById}
       loading={loading}
-      onRecipeEdit={(recipe) => openScreen({ kind: "recipe-form", recipe })}
-      onRecipeDelete={handleDelete}
       toolbarActions={toolbarActions}
     />
   );

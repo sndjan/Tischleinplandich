@@ -8,6 +8,8 @@ interface SubPageProps {
   description?: string;
   onBack: () => void;
   backDisabled?: boolean;
+  // Rendered at the right end of the header, e.g. edit/delete buttons.
+  actions?: React.ReactNode;
   // Pinned to the bottom of the viewport, e.g. the primary action of the page.
   footer?: React.ReactNode;
   onPaste?: React.ClipboardEventHandler<HTMLDivElement>;
@@ -19,6 +21,7 @@ export function SubPage({
   description,
   onBack,
   backDisabled = false,
+  actions,
   footer,
   onPaste,
   children,
@@ -40,6 +43,7 @@ export function SubPage({
           <h1 className="font-heading min-w-0 flex-1 truncate text-lg font-bold text-brand-ink">
             {title}
           </h1>
+          {actions && <div className="flex items-center gap-1">{actions}</div>}
         </div>
       </header>
 

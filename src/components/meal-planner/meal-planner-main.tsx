@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChefHat, Settings2 } from "lucide-react";
+import { ChefHat, Pencil, Settings2, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { MealWeekView } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
 import { RecipeForm } from "./recipe-form";
@@ -13,11 +14,13 @@ import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
 import { SubPage } from "./sub-page";
 import { ScreenStackProvider, useScreenStack, type Screen } from "./screen-stack";
+import type { Recipe } from "@/types/database";
 import {
   NutritionTargetsScreen,
   useNutritionTargets,
 } from "./nutrition-target-settings";
 import { generateShoppingListFromPlannedMeals } from "@/lib/shopping-list";
+import { deleteRecipe } from "@/lib/recipes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -58,6 +61,22 @@ function MealPlanner() {
     mealPlanData.reload();
   };
 
+  const handleRecipeDelete = async (recipe: Recipe) => {
+    if (!window.confirm(`„${recipe.name}“ wirklich löschen?`)) {
+      return;
+    }
+
+    try {
+      await deleteRecipe(recipe);
+      closeScreen();
+      setRecipeLibraryRefreshKey((prev) => prev + 1);
+      mealPlanData.reload();
+      toast.success("Rezept gelöscht");
+    } catch {
+      toast.error("Löschen fehlgeschlagen");
+    }
+  };
+
   const renderScreen = (screen: Screen) => {
     switch (screen.kind) {
       case "recipe-form":
@@ -81,6 +100,33 @@ function MealPlanner() {
           <SubPage
             title="Rezept"
             onBack={closeScreen}
+            actions={
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={() =>
+                    // Replace so saving the form returns to the list, not a stale preview.
+                    replaceScreen({ kind: "recipe-form", recipe: screen.recipe })
+                  }
+                  aria-label="Rezept bearbeiten"
+                  title="Bearbeiten"
+                >
+                  <Pencil className="size-5 text-brand-tertiary" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={() => handleRecipeDelete(screen.recipe)}
+                  aria-label="Rezept löschen"
+                  title="Löschen"
+                >
+                  <Trash2 className="size-5 text-red-500" />
+                </Button>
+              </>
+            }
             footer={
               <Button
                 className="h-12 w-full"

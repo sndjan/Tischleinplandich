@@ -255,7 +255,7 @@ export function AddMealScreen({
         recipeTagsById={recipeTagsById}
         loading={loadingRecipes}
         onRecipeSelect={(recipe) => setSelectedRecipe(recipe.id)}
-        showActions={false}
+        selectionMode
         disableDrag
         selectedRecipeId={selectedRecipe || null}
       />

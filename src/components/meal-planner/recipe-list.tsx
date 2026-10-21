@@ -19,9 +19,8 @@ import {
   ExternalLink,
   Flame,
   Info,
-  Pencil,
   SlidersHorizontal,
-  Trash2,
+  UtensilsCrossed,
   Zap,
 } from "lucide-react";
 
@@ -47,13 +46,6 @@ const formatNumber = (value: number | null) => {
     ? value.toString()
     : value.toFixed(1).replace(/\.0$/, "");
 };
-
-const RECIPE_TITLE_MAX_LENGTH = 30;
-
-const truncateTitle = (name: string) =>
-  name.length > RECIPE_TITLE_MAX_LENGTH
-    ? `${name.slice(0, RECIPE_TITLE_MAX_LENGTH)}...`
-    : name;
 
 export const getTextLines = (text: string | null) =>
   (text ?? "")
@@ -228,10 +220,9 @@ interface RecipeListProps {
   recipes: Recipe[];
   recipeTagsById: Record<string, string[]>;
   loading: boolean;
-  onRecipeEdit?: (recipe: Recipe) => void;
-  onRecipeDelete?: (recipe: Recipe) => void;
   onRecipeSelect?: (recipe: Recipe) => void;
-  showActions?: boolean;
+  // Clicking a card selects it instead of opening the recipe.
+  selectionMode?: boolean;
   disableDrag?: boolean;
   selectedRecipeId?: string | null;
   toolbarActions?: React.ReactNode;
@@ -241,10 +232,8 @@ export function RecipeList({
   recipes,
   recipeTagsById,
   loading,
-  onRecipeEdit,
-  onRecipeDelete,
   onRecipeSelect,
-  showActions = true,
+  selectionMode = false,
   disableDrag = false,
   selectedRecipeId = null,
   toolbarActions,
@@ -440,139 +429,122 @@ export function RecipeList({
           Keine Treffer
         </p>
       ) : (
-        filteredRecipes.map((recipe) => {
-          const recipeTags = recipeTagsById[recipe.id] ?? [];
-          const primaryNutritionItems = getPrimaryNutritionItems(recipe);
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
+          {filteredRecipes.map((recipe) => {
+            const recipeTags = recipeTagsById[recipe.id] ?? [];
+            const primaryNutritionItems = getPrimaryNutritionItems(recipe);
+            const isSelected = selectedRecipeId === recipe.id;
 
-          const rowContent = (
-            <>
-              <div className="min-w-0 flex-1">
-                <h3
-                  className="truncate text-sm font-bold text-brand-ink"
-                  title={recipe.name}
-                >
-                  {truncateTitle(recipe.name)}
-                </h3>
+            const openPreview = () =>
+              openScreen({ kind: "recipe-preview", recipe, tags: recipeTags });
 
-                {primaryNutritionItems.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {primaryNutritionItems.map((item) => (
-                      <div
-                        key={item.label}
-                        className={`inline-flex items-center gap-1 rounded-md py-0.5 text-xs font-bold ${item.textClassName}`}
-                      >
-                        <item.Icon
-                          className={item.iconClassName}
-                          strokeWidth={2.5}
-                        />
-                        <span>
-                          {formatNumber(item.value)}
-                          {item.suffix}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+            return (
+              <div
+                key={recipe.id}
+                draggable={!disableDrag}
+                onDragStart={(e) => {
+                  if (disableDrag) {
+                    return;
+                  }
+
+                  e.dataTransfer.effectAllowed = "copy";
+                  e.dataTransfer.setData(
+                    "application/json",
+                    JSON.stringify({
+                      type: "recipe",
+                      recipe,
+                    }),
+                  );
+                }}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border bg-white transition-shadow hover:shadow-md",
+                  isSelected
+                    ? "border-brand-accent-dark ring-2 ring-brand-accent-dark"
+                    : "border-brand-card-border",
+                  disableDrag ? "cursor-pointer" : "cursor-move",
                 )}
+              >
+                <button
+                  type="button"
+                  className="block w-full text-left"
+                  aria-label={
+                    selectionMode
+                      ? `${recipe.name} auswählen`
+                      : `${recipe.name} anzeigen`
+                  }
+                  aria-pressed={selectionMode ? isSelected : undefined}
+                  onClick={() => {
+                    onRecipeSelect?.(recipe);
 
-                {recipeTags.length > 0 && (
-                  <div className="mt-2">
-                    <TagBadges tags={recipeTags} />
-                  </div>
-                )}
-              </div>
-            </>
-          );
-
-          const openPreview = () =>
-            openScreen({ kind: "recipe-preview", recipe, tags: recipeTags });
-
-          return (
-            <div
-              key={recipe.id}
-              draggable={!disableDrag}
-              onDragStart={(e) => {
-                if (disableDrag) {
-                  return;
-                }
-
-                e.dataTransfer.effectAllowed = "copy";
-                e.dataTransfer.setData(
-                  "application/json",
-                  JSON.stringify({
-                    type: "recipe",
-                    recipe,
-                  }),
-                );
-              }}
-              onClick={() => {
-                if (!showActions) {
-                  onRecipeSelect?.(recipe);
-                }
-              }}
-              className={`group rounded-lg border p-3 transition-colors hover:bg-brand-app-bg ${
-                selectedRecipeId === recipe.id
-                  ? "border-blue-300 bg-blue-50/40"
-                  : "border-brand-card-border"
-              } ${disableDrag ? "cursor-pointer" : "cursor-move"}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                {showActions ? (
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                    aria-label={`${recipe.name} als Vorschau anzeigen`}
-                    onClick={() => {
-                      onRecipeSelect?.(recipe);
+                    if (!selectionMode) {
                       openPreview();
-                    }}
-                  >
-                    {rowContent}
-                  </button>
-                ) : (
-                  <div className="flex flex-1 items-start gap-3">
-                    {rowContent}
+                    }
+                  }}
+                >
+                  <div className="aspect-[4/3] w-full overflow-hidden bg-brand-chip-neutral">
+                    {recipe.image_url ? (
+                      <Image
+                        src={recipe.image_url}
+                        alt=""
+                        width={360}
+                        height={270}
+                        draggable={false}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <UtensilsCrossed className="size-8 text-brand-muted" />
+                      </div>
+                    )}
                   </div>
-                )}
-                {showActions && (
-                  <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => onRecipeEdit?.(recipe)}
-                      aria-label={`${recipe.name} bearbeiten`}
+
+                  <div className="space-y-1.5 p-2.5">
+                    <h3
+                      className="line-clamp-2 text-sm font-bold leading-tight text-brand-ink"
+                      title={recipe.name}
                     >
-                      <Pencil className="h-4 w-4 text-brand-tertiary" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => onRecipeDelete?.(recipe)}
-                      aria-label={`${recipe.name} löschen`}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+                      {recipe.name}
+                    </h3>
+
+                    {primaryNutritionItems.length > 0 && (
+                      <div className="flex flex-wrap gap-x-2 gap-y-1">
+                        {primaryNutritionItems.map((item) => (
+                          <div
+                            key={item.label}
+                            className={`inline-flex items-center gap-1 text-xs font-bold ${item.textClassName}`}
+                          >
+                            <item.Icon
+                              className={item.iconClassName}
+                              strokeWidth={2.5}
+                            />
+                            <span>
+                              {formatNumber(item.value)}
+                              {item.suffix}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-                {!showActions && (
+                </button>
+
+                {selectionMode && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
+                    className="absolute right-1.5 top-1.5 rounded-full bg-white/90 shadow-sm hover:bg-white"
                     aria-label={`Details für ${recipe.name} anzeigen`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openPreview();
-                    }}
+                    onClick={openPreview}
                   >
-                    <Info className="h-4 w-4 text-brand-muted" />
+                    <Info className="h-4 w-4 text-brand-ink" />
                   </Button>
                 )}
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );
