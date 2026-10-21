@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans, Nunito } from "next/font/google";
 import { AuthProvider } from "@/lib/auth/context";
 import { Toaster } from "react-hot-toast";
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -19,12 +20,19 @@ export const metadata: Metadata = {
   title: "Wochen-Essensplaner",
   description:
     "Plane deine wöchentlichen Mahlzeiten und erstelle automatisch Einkaufslisten",
+  applicationName: "Essensplaner",
+  appleWebApp: {
+    capable: true,
+    title: "Essensplaner",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#4f9c6e",
 };
 
 export default function RootLayout({
@@ -35,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="de" className={`${nunito.variable} ${dmSans.variable}`}>
       <body>
+        <ServiceWorkerRegistration />
         <AuthProvider>
           {children}
           <Toaster

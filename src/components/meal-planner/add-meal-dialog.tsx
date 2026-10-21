@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSessionUser } from "@/lib/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -58,9 +58,7 @@ export function AddMealDialog({
         try {
           setLoadingRecipes(true);
 
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
+          const user = await getSessionUser();
 
           if (!user) return;
 
@@ -137,9 +135,7 @@ export function AddMealDialog({
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) {
         toast.error("Du musst angemeldet sein");

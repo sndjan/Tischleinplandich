@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSessionUser } from "@/lib/supabase/client";
 import type { HealthTargets, UserPreferences } from "@/types/database";
 import { DEFAULT_HEALTH_TARGETS, type HealthTargetValues } from "@/lib/health-metrics";
 import { Settings2 } from "lucide-react";
@@ -147,9 +147,7 @@ export function NutritionTargetSettings({
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getSessionUser();
 
         if (!user) {
           setPreferences(null);
@@ -231,9 +229,7 @@ export function NutritionTargetSettings({
     try {
       setIsSavingTargets(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) {
         toast.error("Du musst angemeldet sein, um Ziele zu speichern");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSessionUser } from "@/lib/supabase/client";
 import {
   getRecipeImagePathFromUrl,
   RECIPE_IMAGE_BUCKET,
@@ -227,9 +227,7 @@ export function RecipeLibrary({
 
   const fetchRecipes = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) return;
 
@@ -342,9 +340,7 @@ export function RecipeLibrary({
     setIsImporting(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) {
         toast.error("Du musst angemeldet sein, um Rezepte zu importieren");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSessionUser } from "@/lib/supabase/client";
 import type { FoodItem, PlannedMeal, Recipe, RecipeIngredient } from "@/types/database";
 
 export function getCurrentWeekStartDateString(): string {
@@ -41,9 +41,7 @@ export function useMealPlanData(): MealPlanData {
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) return;
 

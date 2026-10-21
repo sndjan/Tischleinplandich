@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, getSessionUser } from '@/lib/supabase/client';
 import type { UserPreferences } from '@/types/database';
 
 interface NutritionalSummaryProps {
@@ -15,9 +15,7 @@ export function NutritionalSummary({ plannedRecipes }: NutritionalSummaryProps) 
   useEffect(() => {
     const fetchPreferences = async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getSessionUser();
 
         if (!user) return;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -51,9 +51,7 @@ export function RecipeIngredientEditor({ rows, onChange }: RecipeIngredientEdito
 
   useEffect(() => {
     const loadFoodItems = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) return;
 
@@ -106,9 +104,7 @@ export function RecipeIngredientEditor({ rows, onChange }: RecipeIngredientEdito
     setIsSavingQuickAdd(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSessionUser();
 
       if (!user) {
         toast.error("Du musst angemeldet sein");
