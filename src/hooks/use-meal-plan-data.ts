@@ -30,9 +30,9 @@ export function useMealPlanData(): MealPlanData {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  // `loading` only covers the initial fetch. Reloads after adding/removing a meal keep
+  // showing the current data until the fresh rows arrive, so the week view doesn't flash.
   const load = useCallback(async () => {
-    setLoading(true);
-
     try {
       const user = await getSessionUser();
 

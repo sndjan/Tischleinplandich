@@ -180,6 +180,7 @@ function MealPlanner() {
         <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white">
           <div className="flex items-center justify-between px-4 py-4">
             <h1 className="font-heading text-2xl font-extrabold text-brand-ink">
+              <span aria-hidden="true" className="mr-2">🥗</span>
               <span className="sm:hidden">WMP</span>
               <span className="hidden sm:inline">Wochen-Essensplaner</span>
             </h1>
