@@ -17,6 +17,7 @@ export type Screen =
   | { kind: "recipe-form"; recipe?: Recipe; draft?: RecipeDraft }
   | { kind: "recipe-ai-import" }
   | { kind: "recipe-preview"; recipe: Recipe; tags: string[] }
+  | { kind: "cooking-mode"; recipe: Recipe }
   | { kind: "add-meal"; dayIndex: number; mealType: MealType }
   | { kind: "nutrition-targets" };
 

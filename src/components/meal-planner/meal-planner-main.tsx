@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Settings2 } from "lucide-react";
+import { ChefHat, Settings2 } from "lucide-react";
 import { MealWeekView } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
 import { RecipeForm } from "./recipe-form";
 import { RecipeAiImport } from "./recipe-ai-import";
 import { RecipePreview } from "./recipe-list";
+import { CookingMode } from "./cooking-mode";
 import { AddMealScreen } from "./add-meal-screen";
 import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
@@ -77,10 +78,24 @@ function MealPlanner() {
         );
       case "recipe-preview":
         return (
-          <SubPage title="Rezept" onBack={closeScreen}>
+          <SubPage
+            title="Rezept"
+            onBack={closeScreen}
+            footer={
+              <Button
+                className="h-12 w-full"
+                onClick={() => openScreen({ kind: "cooking-mode", recipe: screen.recipe })}
+              >
+                <ChefHat className="size-5" />
+                Kochen starten
+              </Button>
+            }
+          >
             <RecipePreview recipe={screen.recipe} tags={screen.tags} />
           </SubPage>
         );
+      case "cooking-mode":
+        return <CookingMode recipe={screen.recipe} onBack={closeScreen} />;
       case "add-meal":
         return (
           <AddMealScreen

@@ -55,7 +55,7 @@ const truncateTitle = (name: string) =>
     ? `${name.slice(0, RECIPE_TITLE_MAX_LENGTH)}...`
     : name;
 
-const getTextLines = (text: string | null) =>
+export const getTextLines = (text: string | null) =>
   (text ?? "")
     .split(/\r?\n/)
     .map((line) => line.trim())
