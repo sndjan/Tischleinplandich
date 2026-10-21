@@ -163,7 +163,12 @@ export function ShoppingList({ items }: ShoppingListProps) {
 
   return (
     <div>
-      <div className="flex justify-end gap-2">
+      <div className="flex items-center gap-2">
+        {/* On desktop the panel tabs above already say "Einkaufsliste". */}
+        <h2 className="font-heading text-lg font-bold text-brand-ink lg:hidden">
+          Einkaufsliste
+        </h2>
+        <div className="flex-1" />
         <Button
           variant="outline"
           size="icon"
@@ -186,7 +191,7 @@ export function ShoppingList({ items }: ShoppingListProps) {
       </div>
       <div className="mt-3">
         {editableItems.length === 0 ? (
-          <p className="text-sm text-brand-tertiary">Keine Artikel auf der Einkaufsliste</p>
+          <p className="text-sm text-brand-tertiary">Liste ist leer</p>
         ) : !isEditMode ? (
           <div className="space-y-2">
             <ul className="space-y-1">

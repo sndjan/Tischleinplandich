@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AddMealDialog } from "./add-meal-dialog";
+import { AddMealButton } from "./add-meal-screen";
 import { MealSlotCard } from "./meal-slot-card";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
@@ -11,12 +11,12 @@ import type { NutritionTargetSettings } from "./nutrition-target-settings";
 const FIXED_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
 interface DayCardProps {
-  dayLabel: string;
+  // Omitted on mobile, where the day pager above the card already shows the day.
+  dayLabel?: string;
   dayIndex: number;
   recipesById: Map<string, Recipe>;
   plannedMealsForDay: PlannedMeal[];
   nutritionTargets: NutritionTargetSettings;
-  onMealAdded: () => void;
   onRemoveMeal: (mealId: string) => void;
   onDropRecipe: (
     event: React.DragEvent<HTMLDivElement>,
@@ -31,7 +31,6 @@ export function DayCard({
   recipesById,
   plannedMealsForDay,
   nutritionTargets,
-  onMealAdded,
   onRemoveMeal,
   onDropRecipe,
 }: DayCardProps) {
@@ -83,10 +82,12 @@ export function DayCard({
   );
 
   return (
-    <div className="w-full shrink-0 space-y-3 rounded-2xl bg-white p-3 ring-1 ring-brand-card-border sm:w-72">
-      <h3 className="font-heading text-center text-sm font-bold uppercase tracking-wide text-brand-muted">
-        {dayLabel}
-      </h3>
+    <div className="w-full shrink-0 space-y-3 rounded-2xl bg-white p-3 ring-1 ring-brand-card-border lg:w-72">
+      {dayLabel && (
+        <h3 className="font-heading text-center text-sm font-bold uppercase tracking-wide text-brand-muted">
+          {dayLabel}
+        </h3>
+      )}
 
       <div className="rounded-xl bg-brand-stat-bg p-3">
         <div className="font-heading flex items-center gap-1.5 text-sm font-bold">
@@ -136,11 +137,7 @@ export function DayCard({
                   onRemove={() => onRemoveMeal(meal.id)}
                 />
               ) : (
-                <AddMealDialog
-                  dayOfWeek={dayIndex}
-                  mealType={mealType}
-                  onMealAdded={onMealAdded}
-                />
+                <AddMealButton dayOfWeek={dayIndex} mealType={mealType} />
               ),
             )}
           </div>
@@ -166,12 +163,7 @@ export function DayCard({
                 />
               );
             })}
-            <AddMealDialog
-              dayOfWeek={dayIndex}
-              mealType="extra"
-              onMealAdded={onMealAdded}
-              label="Extras"
-            />
+            <AddMealButton dayOfWeek={dayIndex} mealType="extra" label="Extras" />
           </div>,
         )}
       </div>

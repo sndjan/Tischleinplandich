@@ -1,4 +1,4 @@
-import type { FoodItem, PlannedMeal, Recipe, RecipeIngredient, ShoppingListItem } from '@/types/database';
+import type { PlannedMeal, Recipe, ShoppingListItem } from '@/types/database';
 
 type Conversion = {
   group: 'weight' | 'volume';
@@ -347,20 +347,11 @@ export function generateShoppingListFromRecipes(
 }
 
 /**
- * Generate shopping list from current planned meals and recipes.
- *
- * Recipes with structured ingredients (recipe_ingredients rows linked to the food
- * database) use those directly; recipes that haven't been migrated yet fall back to
- * parsing their legacy free-text `ingredients` field.
+ * Generate shopping list from current planned meals and recipes
  */
 export function generateShoppingListFromPlannedMeals(
   plannedMeals: Array<Pick<PlannedMeal, 'recipe_id' | 'serving_size'>>,
   recipes: Array<Pick<Recipe, 'id' | 'ingredients' | 'serving_size'>>,
-  recipeIngredientsByRecipeId: Record<
-    string,
-    Array<Pick<RecipeIngredient, 'food_item_id' | 'quantity' | 'unit'>>
-  > = {},
-  foodItemsById: Record<string, Pick<FoodItem, 'id' | 'name'>> = {},
 ): ShoppingListItem[] {
   if (plannedMeals.length === 0 || recipes.length === 0) {
     return [];
@@ -383,24 +374,7 @@ export function generateShoppingListFromPlannedMeals(
       : 1;
 
     const multiplier = plannedServings / recipeServings;
-    const structuredIngredients = recipeIngredientsByRecipeId[recipe.id];
-
-    if (structuredIngredients && structuredIngredients.length > 0) {
-      for (const ingredient of structuredIngredients) {
-        const foodItem = foodItemsById[ingredient.food_item_id];
-        if (!foodItem) {
-          continue;
-        }
-
-        items.push({
-          ingredient: foodItem.name,
-          quantity: roundQuantity(ingredient.quantity * multiplier),
-          unit: ingredient.unit ?? '',
-        });
-      }
-    } else {
-      items.push(...parseIngredientLines(recipe.ingredients, multiplier));
-    }
+    items.push(...parseIngredientLines(recipe.ingredients, multiplier));
   }
 
   return mergeShoppingList(items);

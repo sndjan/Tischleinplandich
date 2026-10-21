@@ -67,10 +67,10 @@ export function MealWeekView({
 
       if (error) throw error;
 
-      toast.success("Mahlzeit entfernt");
+      toast.success("Entfernt");
       onDataChanged();
     } catch (err) {
-      toast.error("Mahlzeit konnte nicht entfernt werden");
+      toast.error("Entfernen fehlgeschlagen");
       console.error(err);
     }
   };
@@ -145,12 +145,12 @@ export function MealWeekView({
       onDataChanged();
     } catch (err) {
       console.error(err);
-      toast.error("Mahlzeit konnte nicht hinzugefügt werden");
+      toast.error("Hinzufügen fehlgeschlagen");
     }
   };
 
   if (loading) {
-    return <div className="py-8 text-center">Wochenansicht wird geladen...</div>;
+    return <div className="py-8 text-center">Lädt…</div>;
   }
 
   return (
@@ -178,12 +178,10 @@ export function MealWeekView({
         </div>
 
         <DayCard
-          dayLabel={DAYS[mobileDayIndex]}
           dayIndex={mobileDayIndex}
           recipesById={recipesById}
           plannedMealsForDay={plannedMealsByDay.get(mobileDayIndex) ?? []}
           nutritionTargets={nutritionTargets}
-          onMealAdded={onDataChanged}
           onRemoveMeal={handleRemoveMeal}
           onDropRecipe={handleDropRecipe}
         />
@@ -213,8 +211,7 @@ export function MealWeekView({
             recipesById={recipesById}
             plannedMealsForDay={plannedMealsByDay.get(index) ?? []}
             nutritionTargets={nutritionTargets}
-            onMealAdded={onDataChanged}
-            onRemoveMeal={handleRemoveMeal}
+              onRemoveMeal={handleRemoveMeal}
             onDropRecipe={handleDropRecipe}
           />
         ))}

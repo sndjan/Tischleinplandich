@@ -99,9 +99,9 @@ export function NutritionalSummary({ plannedRecipes }: NutritionalSummaryProps) 
     <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
       <h4 className="font-medium text-sm mb-3">Tagesübersicht</h4>
       <NutritionBar label="Protein (g)" actual={totals.protein || 0} target={targets.protein} />
-      <NutritionBar label="Kohlenhydrate (g)" actual={totals.carbs || 0} target={targets.carbs} />
+      <NutritionBar label="Carbs (g)" actual={totals.carbs || 0} target={targets.carbs} />
       <NutritionBar label="Fett (g)" actual={totals.fats || 0} target={targets.fats} />
-      <NutritionBar label="Kalorien" actual={totals.calories || 0} target={targets.calories} />
+      <NutritionBar label="kcal" actual={totals.calories || 0} target={targets.calories} />
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Recipe } from "@/types/database";
+import { useScreenStack } from "./screen-stack";
 import {
   ExternalLink,
   Flame,
@@ -64,7 +64,7 @@ const getTextLines = (text: string | null) =>
 const getPrimaryNutritionItems = (recipe: Recipe) => {
   return [
     {
-      label: "Kalorien",
+      label: "kcal",
       value: recipe.calories,
       suffix: "",
       Icon: Flame,
@@ -98,13 +98,13 @@ function TagBadges({ tags }: { tags: string[] }) {
   );
 }
 
-function RecipePreview({ recipe, tags }: { recipe: Recipe; tags: string[] }) {
+export function RecipePreview({ recipe, tags }: { recipe: Recipe; tags: string[] }) {
   const ingredientLines = getTextLines(recipe.ingredients);
   const preparationLines = getTextLines(recipe.preparation_steps);
   const nutritionItems = [
-    { label: "Kalorien", value: recipe.calories, suffix: "" },
+    { label: "kcal", value: recipe.calories, suffix: "" },
     { label: "Protein", value: recipe.protein, suffix: "g" },
-    { label: "Kohlenhydrate", value: recipe.carbs, suffix: "g" },
+    { label: "Carbs", value: recipe.carbs, suffix: "g" },
     { label: "Fett", value: recipe.fats, suffix: "g" },
   ].filter((item) => item.value !== null);
 
@@ -197,7 +197,7 @@ function RecipePreview({ recipe, tags }: { recipe: Recipe; tags: string[] }) {
             </ul>
           ) : (
             <p className="mt-2 text-sm text-brand-tertiary">
-              Keine Zutaten aufgeführt.
+              Keine Zutaten
             </p>
           )}
         </div>
@@ -228,9 +228,9 @@ interface RecipeListProps {
   recipes: Recipe[];
   recipeTagsById: Record<string, string[]>;
   loading: boolean;
-  onRecipeEdit: (recipe: Recipe) => void;
-  onRecipeDelete: (recipe: Recipe) => void;
-  onRecipeSelect: (recipe: Recipe) => void;
+  onRecipeEdit?: (recipe: Recipe) => void;
+  onRecipeDelete?: (recipe: Recipe) => void;
+  onRecipeSelect?: (recipe: Recipe) => void;
   showActions?: boolean;
   disableDrag?: boolean;
   selectedRecipeId?: string | null;
@@ -249,7 +249,7 @@ export function RecipeList({
   selectedRecipeId = null,
   toolbarActions,
 }: RecipeListProps) {
-  const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
+  const { openScreen } = useScreenStack();
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] =
     useState<VisibilityFilter>("all");
@@ -357,7 +357,7 @@ export function RecipeList({
         <Input
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Rezepte, Zutaten oder Tags suchen"
+          placeholder="Suchen…"
           aria-label="Rezepte suchen"
         />
         <Button
@@ -387,7 +387,7 @@ export function RecipeList({
             }
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Sichtbarkeit filtern" />
+              <SelectValue placeholder="Sichtbarkeit" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle</SelectItem>
@@ -401,7 +401,7 @@ export function RecipeList({
             onValueChange={(value) => setSelectedTag(value)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Nach Tag filtern" />
+              <SelectValue placeholder="Tag" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL_TAGS_FILTER_VALUE}>Alle Tags</SelectItem>
@@ -432,12 +432,12 @@ export function RecipeList({
       )}
 
       {loading ? (
-        <p className="text-sm text-brand-tertiary">Rezepte werden geladen...</p>
+        <p className="text-sm text-brand-tertiary">Lädt…</p>
       ) : recipes.length === 0 ? (
-        <p className="text-sm text-brand-tertiary">Noch keine Rezepte vorhanden</p>
+        <p className="text-sm text-brand-tertiary">Noch keine Rezepte</p>
       ) : filteredRecipes.length === 0 ? (
         <p className="text-sm text-brand-tertiary">
-          Keine Rezepte entsprechen deiner aktuellen Suche und den Filtern.
+          Keine Treffer
         </p>
       ) : (
         filteredRecipes.map((recipe) => {
@@ -483,41 +483,8 @@ export function RecipeList({
             </>
           );
 
-          const previewDialog = (
-            <Dialog
-              open={openRecipeId === recipe.id}
-              onOpenChange={(open: boolean) =>
-                setOpenRecipeId(open ? recipe.id : null)
-              }
-            >
-              <DialogTrigger asChild>
-                {showActions ? (
-                  <button
-                    type="button"
-                    className="flex flex-1 items-start gap-3 text-left"
-                    aria-label={`${recipe.name} als Vorschau anzeigen`}
-                    onClick={() => onRecipeSelect(recipe)}
-                  >
-                    {rowContent}
-                  </button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Details für ${recipe.name} anzeigen`}
-                  >
-                    <Info className="h-4 w-4 text-brand-muted" />
-                  </Button>
-                )}
-              </DialogTrigger>
-              <DialogContent className="p-0 sm:max-h-[80vh] sm:max-w-[28rem]">
-                <div className="p-4">
-                  <RecipePreview recipe={recipe} tags={recipeTags} />
-                </div>
-              </DialogContent>
-            </Dialog>
-          );
+          const openPreview = () =>
+            openScreen({ kind: "recipe-preview", recipe, tags: recipeTags });
 
           return (
             <div
@@ -539,7 +506,7 @@ export function RecipeList({
               }}
               onClick={() => {
                 if (!showActions) {
-                  onRecipeSelect(recipe);
+                  onRecipeSelect?.(recipe);
                 }
               }}
               className={`group rounded-lg border p-3 transition-colors hover:bg-brand-app-bg ${
@@ -550,7 +517,17 @@ export function RecipeList({
             >
               <div className="flex items-start justify-between gap-2">
                 {showActions ? (
-                  previewDialog
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    aria-label={`${recipe.name} als Vorschau anzeigen`}
+                    onClick={() => {
+                      onRecipeSelect?.(recipe);
+                      openPreview();
+                    }}
+                  >
+                    {rowContent}
+                  </button>
                 ) : (
                   <div className="flex flex-1 items-start gap-3">
                     {rowContent}
@@ -562,10 +539,7 @@ export function RecipeList({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => {
-                        setOpenRecipeId(null);
-                        onRecipeEdit(recipe);
-                      }}
+                      onClick={() => onRecipeEdit?.(recipe)}
                       aria-label={`${recipe.name} bearbeiten`}
                     >
                       <Pencil className="h-4 w-4 text-brand-tertiary" />
@@ -574,7 +548,7 @@ export function RecipeList({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => onRecipeDelete(recipe)}
+                      onClick={() => onRecipeDelete?.(recipe)}
                       aria-label={`${recipe.name} löschen`}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
@@ -582,9 +556,18 @@ export function RecipeList({
                   </div>
                 )}
                 {!showActions && (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    {previewDialog}
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Details für ${recipe.name} anzeigen`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPreview();
+                    }}
+                  >
+                    <Info className="h-4 w-4 text-brand-muted" />
+                  </Button>
                 )}
               </div>
             </div>

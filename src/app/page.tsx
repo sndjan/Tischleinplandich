@@ -20,7 +20,7 @@ export default async function Home() {
           Wochen-Essensplaner
         </h1>
         <p className="text-gray-600 mb-8 text-lg">
-          Plane deine Mahlzeiten für die Woche und erstelle automatisch Einkaufslisten
+          Mahlzeiten planen, Einkaufsliste automatisch
         </p>
         <div className="space-y-4">
           <Link href="/auth/signup">

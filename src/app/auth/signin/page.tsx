@@ -30,7 +30,7 @@ export default function SignIn() {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success('Erfolgreich angemeldet!');
+        toast.success('Angemeldet');
         console.log("User signed in:", email);
         // Wait a moment for session to be stored before redirecting
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -48,7 +48,7 @@ export default function SignIn() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Anmelden</CardTitle>
-          <CardDescription>Willkommen zurück beim Wochen-Essensplaner</CardDescription>
+          <CardDescription>Willkommen zurück</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
@@ -75,7 +75,7 @@ export default function SignIn() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Anmeldung läuft...' : 'Anmelden'}
+              {loading ? 'Anmelden…' : 'Anmelden'}
             </Button>
           </form>
           <p className="text-center text-sm text-gray-600 mt-4">

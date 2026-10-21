@@ -31,7 +31,7 @@ export default function SignUp() {
         toast.error(error.message);
       } else if (data?.user) {
         // User record is automatically created by the database trigger on auth.users
-        toast.success('Registrierung erfolgreich! Bitte überprüfe deine E-Mails.');
+        toast.success('Bitte bestätige deine E-Mail');
         router.push('/auth/signin');
       }
     } catch (err) {
@@ -46,7 +46,7 @@ export default function SignUp() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Konto erstellen</CardTitle>
-          <CardDescription>Registriere dich, um deine Mahlzeiten zu planen</CardDescription>
+          <CardDescription>Plane deine Woche</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp} className="space-y-4">
@@ -73,7 +73,7 @@ export default function SignUp() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Konto wird erstellt...' : 'Registrieren'}
+              {loading ? 'Registrieren…' : 'Registrieren'}
             </Button>
           </form>
           <p className="text-center text-sm text-gray-600 mt-4">
