@@ -399,89 +399,23 @@ export function generateShoppingListFromPlannedMeals(
   return mergeShoppingList(items);
 }
 
-// Pantry staples most households already have at home (German + English).
-const BASIC_INGREDIENTS = [
-  // Salt & pepper
-  "salz",
-  "meersalz",
-  "pfeffer",
-  "salz und pfeffer",
-  "salt",
-  "sea salt",
-  "black pepper",
-  "ground pepper",
-  "salt and pepper",
-  // Oils & vinegar
-  "öl",
-  "olivenöl",
-  "sonnenblumenöl",
-  "rapsöl",
-  "pflanzenöl",
-  "speiseöl",
-  "oil",
-  "olive oil",
-  "sunflower oil",
-  "canola oil",
-  "vegetable oil",
-  "essig",
-  "balsamico",
-  "balsamicoessig",
-  "vinegar",
-  "balsamic vinegar",
-  // Dried herbs & spices
-  "oregano",
-  "thymian",
-  "paprikapulver",
-  "kreuzkümmel",
-  "kümmel",
-  "zimt",
-  "muskat",
-  "muskatnuss",
-  "currypulver",
-  "chiliflocken",
-  "chilipulver",
-  "cayennepfeffer",
-  "kurkuma",
-  "lorbeerblatt",
-  "lorbeerblätter",
-  "knoblauchpulver",
-  "italienische kräuter",
-  "thyme",
-  "cumin",
-  "cinnamon",
-  "nutmeg",
-  "curry powder",
-  "chili flakes",
-  "chili powder",
-  "cayenne",
-  "cayenne pepper",
-  "turmeric",
-  "bay leaf",
-  "bay leaves",
-  "garlic powder",
-  "italian seasoning",
-  // Baking & basics
-  "zucker",
-  "mehl",
-  "backpulver",
-  "natron",
-  "wasser",
-  "sojasauce",
-  "sojasoße",
-  "sugar",
-  "flour",
-  "baking powder",
-  "baking soda",
-  "water",
-  "soy sauce",
-];
+/**
+ * Normalizes a pantry staple the way it is stored in the pantry_staples table
+ * (lowercase, single spaces), so user input matches ingredient names.
+ */
+export function normalizePantryStapleName(name: string): string {
+  return normalizeIngredientName(name);
+}
 
 /**
- * Whether an ingredient is a pantry staple (olive oil, oregano, salt, ...).
- * Matches on the trailing words so "getrockneter oregano" counts, but
+ * Whether an ingredient is one of the user's pantry staples (olive oil, oregano,
+ * salt, ...). Matches on the trailing words so "getrockneter oregano" counts, but
  * "flour tortillas" or "red bell pepper" do not.
  */
-export function isBasicIngredient(ingredient: string): boolean {
+export function isBasicIngredient(
+  ingredient: string,
+  pantryStaples: readonly string[],
+): boolean {
   const name = normalizeIngredientName(ingredient)
     .split(/[,(]/)[0]
     ?.replace(/\s+(zum|zur|für|nach|to|for)\s.*$/, "")
@@ -491,7 +425,7 @@ export function isBasicIngredient(ingredient: string): boolean {
     return false;
   }
 
-  return BASIC_INGREDIENTS.some(
+  return pantryStaples.some(
     (staple) => name === staple || name.endsWith(` ${staple}`),
   );
 }

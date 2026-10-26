@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChefHat, Pencil, Settings2, Trash2 } from "lucide-react";
+import { ChefHat, MessageSquarePlus, Pencil, Settings2, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { MealWeekView } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
@@ -13,6 +13,8 @@ import { AddMealScreen } from "./add-meal-screen";
 import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
 import { SubPage } from "./sub-page";
+import { FeedbackScreen } from "./feedback-screen";
+import { PantryStaplesScreen, usePantryStaples } from "./pantry-staples-settings";
 import { ScreenStackProvider, useScreenStack, type Screen } from "./screen-stack";
 import type { Recipe } from "@/types/database";
 import {
@@ -40,6 +42,7 @@ function MealPlanner() {
   const { stack, openScreen, replaceScreen, closeScreen } = useScreenStack();
   const [recipeLibraryRefreshKey, setRecipeLibraryRefreshKey] = useState(0);
   const [nutritionTargets, setNutritionTargets] = useNutritionTargets();
+  const [pantryStaples, setPantryStaples] = usePantryStaples();
   const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
   const [desktopRightPanelTab, setDesktopRightPanelTab] =
     useState<DesktopRightPanelTab>("recipes");
@@ -84,6 +87,7 @@ function MealPlanner() {
           <RecipeForm
             recipe={screen.recipe}
             draft={screen.draft}
+            draftImage={screen.draftImage}
             onBack={closeScreen}
             onRecipeSaved={handleRecipeSaved}
           />
@@ -92,7 +96,9 @@ function MealPlanner() {
         return (
           <RecipeAiImport
             onBack={closeScreen}
-            onDraftReady={(draft) => replaceScreen({ kind: "recipe-form", draft })}
+            onDraftReady={(draft, draftImage) =>
+              replaceScreen({ kind: "recipe-form", draft, draftImage })
+            }
           />
         );
       case "recipe-preview":
@@ -165,6 +171,22 @@ function MealPlanner() {
             }}
           />
         );
+      case "pantry-staples":
+        return (
+          <PantryStaplesScreen
+            staples={pantryStaples}
+            onBack={closeScreen}
+            onChange={setPantryStaples}
+          />
+        );
+      case "feedback":
+        return (
+          <FeedbackScreen
+            context={screen.context}
+            onBack={closeScreen}
+            onSent={closeScreen}
+          />
+        );
     }
   };
 
@@ -184,15 +206,33 @@ function MealPlanner() {
               <span className="sm:hidden">WMP</span>
               <span className="hidden sm:inline">Wochen-Essensplaner</span>
             </h1>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-brand-accent-dark"
-              onClick={() => openScreen({ kind: "nutrition-targets" })}
-            >
-              <Settings2 className="mr-1.5 h-4 w-4" />
-              Ziele
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() =>
+                  openScreen({
+                    kind: "feedback",
+                    context: window.matchMedia("(min-width: 1024px)").matches
+                      ? `Desktop · ${desktopRightPanelTab}`
+                      : `Mobil · ${mobileTab}`,
+                  })
+                }
+                aria-label="Feedback senden"
+                title="Feedback senden"
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-brand-accent-dark"
+                onClick={() => openScreen({ kind: "nutrition-targets" })}
+              >
+                <Settings2 className="mr-1.5 h-4 w-4" />
+                Ziele
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -243,7 +283,7 @@ function MealPlanner() {
                   {desktopRightPanelTab === "recipes" ? (
                     <RecipeLibrary key={recipeLibraryRefreshKey} />
                   ) : (
-                    <ShoppingList items={shoppingListItems} />
+                    <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
                   )}
                 </div>
               </Card>
@@ -263,7 +303,7 @@ function MealPlanner() {
             )}
             {mobileTab === "shopping" && (
               <Card className="p-3">
-                <ShoppingList items={shoppingListItems} />
+                <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
               </Card>
             )}
             {mobileTab === "recipes" && (

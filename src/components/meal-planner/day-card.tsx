@@ -10,10 +10,35 @@ import type { NutritionTargetSettings } from "./nutrition-target-settings";
 
 const FIXED_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
+/**
+ * Calories and protein of the given planned meals, scaled by their serving size.
+ */
+export function sumMealNutrition(
+  meals: PlannedMeal[],
+  recipesById: Map<string, Recipe>,
+): { calories: number; protein: number } {
+  return meals.reduce(
+    (acc, meal) => {
+      const recipe = recipesById.get(meal.recipe_id);
+      if (!recipe) return acc;
+
+      const multiplier = meal.serving_size || 1;
+
+      return {
+        calories: acc.calories + (recipe.calories ?? 0) * multiplier,
+        protein: acc.protein + (recipe.protein ?? 0) * multiplier,
+      };
+    },
+    { calories: 0, protein: 0 },
+  );
+}
+
 interface DayCardProps {
   // Omitted on mobile, where the day pager above the card already shows the day.
   dayLabel?: string;
   dayIndex: number;
+  // Fill the available width instead of the fixed desktop column width.
+  fullWidth?: boolean;
   recipesById: Map<string, Recipe>;
   plannedMealsForDay: PlannedMeal[];
   nutritionTargets: NutritionTargetSettings;
@@ -28,6 +53,7 @@ interface DayCardProps {
 export function DayCard({
   dayLabel,
   dayIndex,
+  fullWidth = false,
   recipesById,
   plannedMealsForDay,
   nutritionTargets,
@@ -36,20 +62,7 @@ export function DayCard({
 }: DayCardProps) {
   const [dragOverSlot, setDragOverSlot] = useState<MealType | null>(null);
 
-  const totals = plannedMealsForDay.reduce(
-    (acc, meal) => {
-      const recipe = recipesById.get(meal.recipe_id);
-      if (!recipe) return acc;
-
-      const multiplier = meal.serving_size || 1;
-
-      return {
-        calories: acc.calories + (recipe.calories ?? 0) * multiplier,
-        protein: acc.protein + (recipe.protein ?? 0) * multiplier,
-      };
-    },
-    { calories: 0, protein: 0 },
-  );
+  const totals = sumMealNutrition(plannedMealsForDay, recipesById);
 
   const extraMeals = plannedMealsForDay.filter(
     (meal) => meal.meal_type === "extra",
@@ -82,7 +95,12 @@ export function DayCard({
   );
 
   return (
-    <div className="w-full shrink-0 space-y-3 rounded-2xl bg-white p-3 ring-1 ring-brand-card-border lg:w-72">
+    <div
+      className={cn(
+        "w-full shrink-0 space-y-3 rounded-2xl bg-white p-3 ring-1 ring-brand-card-border",
+        !fullWidth && "lg:w-72",
+      )}
+    >
       {dayLabel && (
         <h3 className="font-heading text-center text-sm font-bold uppercase tracking-wide text-brand-muted">
           {dayLabel}

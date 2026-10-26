@@ -352,6 +352,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      pantry_staples: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      feedback: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          category: FeedbackCategory;
+          message: string;
+          context: string | null;
+          user_agent: string | null;
+          status: 'new' | 'seen' | 'done';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          category?: FeedbackCategory;
+          message: string;
+          context?: string | null;
+          user_agent?: string | null;
+          status?: 'new' | 'seen' | 'done';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          category?: FeedbackCategory;
+          message?: string;
+          context?: string | null;
+          user_agent?: string | null;
+          status?: 'new' | 'seen' | 'done';
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -377,9 +431,12 @@ export type UserPreferences = Database['public']['Tables']['user_preferences']['
 export type FoodItem = Database['public']['Tables']['food_items']['Row'];
 export type RecipeIngredient = Database['public']['Tables']['recipe_ingredients']['Row'];
 export type HealthTargets = Database['public']['Tables']['health_targets']['Row'];
+export type PantryStaple = Database['public']['Tables']['pantry_staples']['Row'];
+export type Feedback = Database['public']['Tables']['feedback']['Row'];
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'extra';
 export type FoodColor = 'red' | 'yellow' | 'green' | 'purple' | 'brown';
+export type FeedbackCategory = 'bug' | 'idea' | 'other';
 
 export type NutritionValues = {
   calories: number;

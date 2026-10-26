@@ -14,12 +14,16 @@ import type { MealType, Recipe } from "@/types/database";
 import type { RecipeDraft } from "@/lib/recipe-draft";
 
 export type Screen =
-  | { kind: "recipe-form"; recipe?: Recipe; draft?: RecipeDraft }
+  // draftImage: a cover photo picked during AI import, preselected in the form.
+  | { kind: "recipe-form"; recipe?: Recipe; draft?: RecipeDraft; draftImage?: File }
   | { kind: "recipe-ai-import" }
   | { kind: "recipe-preview"; recipe: Recipe; tags: string[] }
   | { kind: "cooking-mode"; recipe: Recipe }
   | { kind: "add-meal"; dayIndex: number; mealType: MealType }
-  | { kind: "nutrition-targets" };
+  | { kind: "nutrition-targets" }
+  | { kind: "pantry-staples" }
+  // context: where the user was, stored with the feedback to help reproduce bugs.
+  | { kind: "feedback"; context?: string };
 
 export type ScreenEntry = {
   key: number;

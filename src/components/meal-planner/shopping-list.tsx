@@ -5,10 +5,12 @@ import { ShoppingListItem } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isBasicIngredient } from "@/lib/shopping-list";
-import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Pencil, Plus, Settings2, Trash2 } from "lucide-react";
+import { useScreenStack } from "./screen-stack";
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
+  pantryStaples: string[];
 }
 
 const CHECKED_ITEMS_STORAGE_KEY =
@@ -19,7 +21,8 @@ function getItemStorageKey(item: ShoppingListItem): string {
   return `${item.ingredient.trim().toLowerCase()}|${item.unit.trim().toLowerCase()}`;
 }
 
-export function ShoppingList({ items }: ShoppingListProps) {
+export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
+  const { openScreen } = useScreenStack();
   const [editableItems, setEditableItems] = useState<ShoppingListItem[]>(items);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [isEditMode, setIsEditMode] = useState(false);
@@ -185,10 +188,10 @@ export function ShoppingList({ items }: ShoppingListProps) {
 
   // Basic ingredients are only hidden in view mode; edit mode shows everything.
   const visibleViewRows = hideBasics
-    ? viewRows.filter((row) => !isBasicIngredient(row.item.ingredient))
+    ? viewRows.filter((row) => !isBasicIngredient(row.item.ingredient, pantryStaples))
     : viewRows;
   const hiddenBasicRows = hideBasics
-    ? viewRows.filter((row) => isBasicIngredient(row.item.ingredient))
+    ? viewRows.filter((row) => isBasicIngredient(row.item.ingredient, pantryStaples))
     : [];
   const uncheckedViewRows = visibleViewRows.filter((row) => !row.isChecked);
   const checkedViewRows = visibleViewRows.filter((row) => row.isChecked);
@@ -201,6 +204,15 @@ export function ShoppingList({ items }: ShoppingListProps) {
           Einkaufsliste
         </h2>
         <div className="flex-1" />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => openScreen({ kind: "pantry-staples" })}
+          aria-label="Grundzutaten verwalten"
+          title="Grundzutaten verwalten"
+        >
+          <Settings2 className="h-4 w-4" />
+        </Button>
         <Button
           variant={hideBasics ? "default" : "outline"}
           size="icon"

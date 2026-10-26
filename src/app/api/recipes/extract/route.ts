@@ -7,6 +7,7 @@ import {
   RECIPE_EXTRACT_IMAGE_TYPES,
   RECIPE_EXTRACT_MAX_IMAGE_BYTES,
   RECIPE_EXTRACT_MAX_IMAGES,
+  RECIPE_EXTRACT_MAX_PDF_BYTES,
   type RecipeDraft,
 } from '@/lib/recipe-draft';
 
@@ -39,7 +40,7 @@ const ExtractedRecipeSchema = z.object({
   source_url: z.string().nullable(),
 });
 
-const SYSTEM_PROMPT = `Du extrahierst Kochrezepte aus Screenshots, Fotos, kopiertem Text und Webseiten für eine Wochen-Essensplaner-App.
+const SYSTEM_PROMPT = `Du extrahierst Kochrezepte aus Screenshots, Fotos, PDFs, kopiertem Text und Webseiten für eine Wochen-Essensplaner-App.
 
 Alle Eingaben des Nutzers gehören zu EINEM Rezept (z. B. Zutaten auf einem Screenshot, Zubereitung auf einem anderen, plus eine Notiz). Führe sie zusammen. Enthält die Eingabe mehrere verschiedene Rezepte, nimm nur das erste. Enthält sie gar kein Rezept, setze recipe_found auf false und lasse die übrigen Felder leer bzw. null.
 
@@ -79,9 +80,11 @@ export async function POST(request: Request) {
     const text = String(formData.get('text') ?? '').trim();
     const url = String(formData.get('url') ?? '').trim();
     const images = formData.getAll('images').filter((entry): entry is File => entry instanceof File);
+    const pdfEntry = formData.get('pdf');
+    const pdf = pdfEntry instanceof File && pdfEntry.size > 0 ? pdfEntry : null;
 
-    if (!text && !url && images.length === 0) {
-      throw new UserFacingError('Text, Bild oder Link fehlt', 400);
+    if (!text && !url && images.length === 0 && !pdf) {
+      throw new UserFacingError('Text, Bild, PDF oder Link fehlt', 400);
     }
 
     if (images.length > RECIPE_EXTRACT_MAX_IMAGES) {
@@ -109,6 +112,27 @@ export async function POST(request: Request) {
       });
     }
 
+    const documentBlocks: Anthropic.DocumentBlockParam[] = [];
+
+    if (pdf) {
+      if (pdf.type !== 'application/pdf') {
+        throw new UserFacingError('Nur PDF-Dateien', 400);
+      }
+
+      if (pdf.size > RECIPE_EXTRACT_MAX_PDF_BYTES) {
+        throw new UserFacingError('PDF darf höchstens 4 MB groß sein', 400);
+      }
+
+      documentBlocks.push({
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: 'application/pdf',
+          data: Buffer.from(await pdf.arrayBuffer()).toString('base64'),
+        },
+      });
+    }
+
     const [pageContent, tagsResult] = await Promise.all([
       url ? fetchRecipePage(url) : Promise.resolve(null),
       supabase.from('tags').select('name').eq('user_id', user.id).order('name'),
@@ -124,7 +148,7 @@ export async function POST(request: Request) {
       '</vorhandene_tags>',
       pageContent ? `<webseite url="${url}">\n${pageContent}\n</webseite>` : '',
       text ? `<nutzereingabe>\n${text}\n</nutzereingabe>` : '',
-      'Extrahiere das Rezept aus den Bildern und Texten oben.',
+      'Extrahiere das Rezept aus den Bildern, Dokumenten und Texten oben.',
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -136,7 +160,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: 'user',
-          content: [...imageBlocks, { type: 'text', text: contextText }],
+          content: [...documentBlocks, ...imageBlocks, { type: 'text', text: contextText }],
         },
       ],
       output_config: {

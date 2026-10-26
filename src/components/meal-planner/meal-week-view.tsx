@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import { DayCard } from "./day-card";
+import { WeekOverviewList, WeekSummary } from "./week-overview";
+import { cn } from "@/lib/utils";
 import { getCurrentWeekStartDateString } from "@/hooks/use-meal-plan-data";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { DEFAULT_NUTRITION_TARGETS } from "./nutrition-target-settings";
@@ -19,6 +21,15 @@ const DAYS = [
   "Freitag",
   "Samstag",
   "Sonntag",
+];
+
+type ViewMode = "day" | "week";
+
+const VIEW_MODE_STORAGE_KEY = "weekly-meal-planner:planner:view-mode";
+
+const VIEW_MODES: { value: ViewMode; label: string }[] = [
+  { value: "day", label: "Tag" },
+  { value: "week", label: "Woche" },
 ];
 
 function getTodayDayIndex(): number {
@@ -41,8 +52,35 @@ export function MealWeekView({
   nutritionTargets = DEFAULT_NUTRITION_TARGETS,
   onDataChanged,
 }: MealWeekViewProps) {
-  const [mobileDayIndex, setMobileDayIndex] = useState(getTodayDayIndex);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayDayIndex);
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
   const supabase = createClient();
+
+  // Without a saved choice, keep the previous layout: one day on phones, the whole
+  // week on desktop.
+  useEffect(() => {
+    let storedMode: string | null = null;
+    try {
+      storedMode = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    } catch {
+      // Storage unavailable; fall back to the screen-size default.
+    }
+
+    if (storedMode === "day" || storedMode === "week") {
+      setViewMode(storedMode);
+    } else if (window.matchMedia("(min-width: 1024px)").matches) {
+      setViewMode("week");
+    }
+  }, []);
+
+  const changeViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Storage unavailable; the toggle still works for this session.
+    }
+  };
 
   const recipesById = useMemo(
     () => new Map(recipes.map((recipe) => [recipe.id, recipe])),
@@ -155,67 +193,117 @@ export function MealWeekView({
 
   return (
     <div className="space-y-4">
-      {/* Mobile: single day card with prev/next pager */}
-      <div className="lg:hidden">
-        <div className="mb-3 flex items-center justify-between">
+      <div
+        role="radiogroup"
+        aria-label="Ansicht"
+        className="mx-auto flex w-full max-w-xs gap-1 rounded-xl bg-brand-chip-neutral p-1 lg:mx-0"
+      >
+        {VIEW_MODES.map(({ value, label }) => (
           <button
+            key={value}
             type="button"
-            onClick={() => setMobileDayIndex((prev) => (prev + 6) % 7)}
-            className="rounded-full p-2 hover:bg-brand-chip-neutral"
-            aria-label="Vorheriger Tag"
+            role="radio"
+            aria-checked={viewMode === value}
+            onClick={() => changeViewMode(value)}
+            className={cn(
+              "flex-1 rounded-full px-3 py-1.5 text-sm font-medium text-brand-secondary transition-colors",
+              viewMode === value && "bg-white text-brand-accent-dark shadow-sm",
+            )}
           >
-            <ChevronLeft className="h-5 w-5" />
+            {label}
           </button>
-          <h2 className="font-heading text-lg font-bold">{DAYS[mobileDayIndex]}</h2>
-          <button
-            type="button"
-            onClick={() => setMobileDayIndex((prev) => (prev + 1) % 7)}
-            className="rounded-full p-2 hover:bg-brand-chip-neutral"
-            aria-label="Nächster Tag"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-
-        <DayCard
-          dayIndex={mobileDayIndex}
-          recipesById={recipesById}
-          plannedMealsForDay={plannedMealsByDay.get(mobileDayIndex) ?? []}
-          nutritionTargets={nutritionTargets}
-          onRemoveMeal={handleRemoveMeal}
-          onDropRecipe={handleDropRecipe}
-        />
-
-        <div className="mt-3 flex justify-center gap-1.5">
-          {DAYS.map((day, index) => (
-            <button
-              key={day}
-              type="button"
-              onClick={() => setMobileDayIndex(index)}
-              aria-label={`Zu ${day} wechseln`}
-              className={`size-1.5 rounded-full transition-colors ${
-                index === mobileDayIndex ? "bg-brand-accent" : "bg-brand-disabled"
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Desktop: horizontally-scrollable row of day cards */}
-      <div className="hidden gap-3 overflow-x-auto pb-2 lg:flex">
-        {DAYS.map((day, index) => (
-          <DayCard
-            key={day}
-            dayLabel={day}
-            dayIndex={index}
-            recipesById={recipesById}
-            plannedMealsForDay={plannedMealsByDay.get(index) ?? []}
-            nutritionTargets={nutritionTargets}
-              onRemoveMeal={handleRemoveMeal}
-            onDropRecipe={handleDropRecipe}
-          />
         ))}
       </div>
+
+      {viewMode === "day" ? (
+        // Single day card with prev/next pager
+        <div className="mx-auto max-w-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSelectedDayIndex((prev) => (prev + 6) % 7)}
+              className="rounded-full p-2 hover:bg-brand-chip-neutral"
+              aria-label="Vorheriger Tag"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="font-heading text-lg font-bold">{DAYS[selectedDayIndex]}</h2>
+            <button
+              type="button"
+              onClick={() => setSelectedDayIndex((prev) => (prev + 1) % 7)}
+              className="rounded-full p-2 hover:bg-brand-chip-neutral"
+              aria-label="Nächster Tag"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+
+          <DayCard
+            dayIndex={selectedDayIndex}
+            fullWidth
+            recipesById={recipesById}
+            plannedMealsForDay={plannedMealsByDay.get(selectedDayIndex) ?? []}
+            nutritionTargets={nutritionTargets}
+            onRemoveMeal={handleRemoveMeal}
+            onDropRecipe={handleDropRecipe}
+          />
+
+          <div className="mt-3 flex justify-center gap-1.5">
+            {DAYS.map((day, index) => (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedDayIndex(index)}
+                aria-label={`Zu ${day} wechseln`}
+                className={`size-1.5 rounded-full transition-colors ${
+                  index === selectedDayIndex ? "bg-brand-accent" : "bg-brand-disabled"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          <WeekSummary
+            plannedMeals={plannedMeals}
+            recipesById={recipesById}
+            nutritionTargets={nutritionTargets}
+          />
+
+          {/* Mobile: compact list, tapping a day opens it in the day view */}
+          <div className="lg:hidden">
+            <WeekOverviewList
+              days={DAYS}
+              todayIndex={getTodayDayIndex()}
+              plannedMealsByDay={plannedMealsByDay}
+              recipesById={recipesById}
+              nutritionTargets={nutritionTargets}
+              onSelectDay={(dayIndex) => {
+                setSelectedDayIndex(dayIndex);
+                // Drilling into a day keeps the saved preference, so the
+                // planner opens in the week view again next time.
+                setViewMode("day");
+              }}
+            />
+          </div>
+
+          {/* Desktop: horizontally-scrollable row of day cards */}
+          <div className="hidden gap-3 overflow-x-auto pb-2 lg:flex">
+            {DAYS.map((day, index) => (
+              <DayCard
+                key={day}
+                dayLabel={day}
+                dayIndex={index}
+                recipesById={recipesById}
+                plannedMealsForDay={plannedMealsByDay.get(index) ?? []}
+                nutritionTargets={nutritionTargets}
+                onRemoveMeal={handleRemoveMeal}
+                onDropRecipe={handleDropRecipe}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -20,6 +20,8 @@ interface RecipeFormProps {
   onRecipeSaved: () => void;
   recipe?: Recipe | null;
   draft?: RecipeDraft | null;
+  // Cover photo picked during AI import; preselected like a manually chosen image.
+  draftImage?: File | null;
 }
 
 type RecipeFormData = {
@@ -87,8 +89,9 @@ const getFormDataFromRecipe = (recipe?: Recipe | null): RecipeFormData => ({
   is_public: recipe?.is_public || false,
 });
 
-export function RecipeForm({ onBack, onRecipeSaved, recipe, draft }: RecipeFormProps) {
+export function RecipeForm({ onBack, onRecipeSaved, recipe, draft, draftImage }: RecipeFormProps) {
   const activeDraft = recipe ? null : draft ?? null;
+  const activeDraftImage = activeDraft ? draftImage ?? null : null;
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(() =>
     activeDraft ? getFormDataFromDraft(activeDraft) : getFormDataFromRecipe(recipe),
@@ -114,9 +117,17 @@ export function RecipeForm({ onBack, onRecipeSaved, recipe, draft }: RecipeFormP
   useEffect(() => {
     clearPreviewObjectUrl();
     setFormData(activeDraft ? getFormDataFromDraft(activeDraft) : getFormDataFromRecipe(recipe));
-    setSelectedImage(null);
-    setImagePreviewUrl(recipe?.image_url || null);
     setRemoveImage(false);
+
+    if (activeDraftImage) {
+      const objectUrl = URL.createObjectURL(activeDraftImage);
+      previewObjectUrlRef.current = objectUrl;
+      setSelectedImage(activeDraftImage);
+      setImagePreviewUrl(objectUrl);
+    } else {
+      setSelectedImage(null);
+      setImagePreviewUrl(recipe?.image_url || null);
+    }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
