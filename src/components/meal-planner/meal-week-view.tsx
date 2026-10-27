@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import { DayCard } from "./day-card";
-import { WeekOverviewList, WeekSummary } from "./week-overview";
+import { WeekAgenda, WeekSummary } from "./week-overview";
 import { cn } from "@/lib/utils";
 import { useAddMeal, useRemoveMeal } from "@/hooks/use-planner-mutations";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -110,6 +110,16 @@ function getWeekDates() {
 
 const SHORT_DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
+function getWeekRange() {
+  const monday = new Date();
+  monday.setDate(monday.getDate() - getTodayDayIndex());
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const format = (date: Date) =>
+    date.toLocaleDateString("de-DE", { day: "numeric", month: "short" }).replace(/\.$/, "");
+  return `${format(monday)} – ${format(sunday)}`;
+}
+
 interface MealWeekViewProps {
   recipes: Recipe[];
   plannedMeals: PlannedMeal[];
@@ -131,6 +141,15 @@ export function MealWeekView({
   const addMeal = useAddMeal();
   const todayIndex = getTodayDayIndex();
   const weekDates = useMemo(getWeekDates, []);
+  const weekRange = useMemo(getWeekRange, []);
+
+  // Drilling into a day keeps the saved preference, so the planner opens in
+  // the week view again next time.
+  const openDay = (dayIndex: number) => {
+    setSelectedDayIndex(dayIndex);
+    onViewModeChange("day", false);
+    window.scrollTo({ top: 0 });
+  };
 
   const recipesById = useMemo(
     () => new Map(recipes.map((recipe) => [recipe.id, recipe])),
@@ -262,22 +281,20 @@ export function MealWeekView({
             plannedMeals={plannedMeals}
             recipesById={recipesById}
             nutritionTargets={nutritionTargets}
+            todayIndex={todayIndex}
+            weekRange={weekRange}
+            onSelectDay={openDay}
           />
 
-          {/* Mobile: compact list, tapping a day opens it in the day view */}
+          {/* Mobile: agenda; the date or "Planen" opens the day to add meals */}
           <div className="lg:hidden">
-            <WeekOverviewList
-              days={DAYS}
+            <WeekAgenda
               todayIndex={todayIndex}
+              weekDates={weekDates}
               plannedMealsByDay={plannedMealsByDay}
               recipesById={recipesById}
               nutritionTargets={nutritionTargets}
-              onSelectDay={(dayIndex) => {
-                setSelectedDayIndex(dayIndex);
-                // Drilling into a day keeps the saved preference, so the
-                // planner opens in the week view again next time.
-                onViewModeChange("day", false);
-              }}
+              onSelectDay={openDay}
             />
           </div>
 
