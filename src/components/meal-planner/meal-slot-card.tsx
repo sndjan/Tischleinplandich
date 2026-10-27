@@ -5,33 +5,16 @@ import { Droplets, Flame, Wheat, X, Zap } from "lucide-react";
 import type { MealType, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
-import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { useScreenStack } from "./screen-stack";
-
-async function fetchRecipeTags(recipeId: string): Promise<string[]> {
-  const { data, error } = await createClient()
-    .from("recipe_tags")
-    .select("tags(name)")
-    .eq("recipe_id", recipeId);
-
-  if (error) throw error;
-
-  const tagNames = (data ?? [])
-    .map((entry: any) =>
-      Array.isArray(entry.tags)
-        ? (entry.tags[0]?.name as string | undefined)
-        : (entry.tags?.name as string | undefined),
-    )
-    .filter((name): name is string => Boolean(name));
-
-  return [...new Set(tagNames)].sort((a, b) => a.localeCompare(b));
-}
 
 interface MealSlotCardProps {
   recipe: Recipe;
   mealType: MealType;
   servingSize: number;
   nutritionTargets: NutritionTargetSettings;
+  // Added a moment ago and still being saved.
+  pending?: boolean;
   onRemove: () => void;
 }
 
@@ -40,20 +23,12 @@ export function MealSlotCard({
   mealType,
   servingSize,
   nutritionTargets,
+  pending = false,
   onRemove,
 }: MealSlotCardProps) {
   const { openScreen } = useScreenStack();
 
-  const openRecipePreview = async () => {
-    let tags: string[] = [];
-    try {
-      tags = await fetchRecipeTags(recipe.id);
-    } catch (err) {
-      // Tags are optional in the preview; show the recipe without them.
-      console.error(err);
-    }
-    openScreen({ kind: "recipe-preview", recipe, tags });
-  };
+  const openRecipePreview = () => openScreen({ kind: "recipe-preview", recipe });
 
   return (
     <div
@@ -68,8 +43,19 @@ export function MealSlotCard({
           openRecipePreview();
         }
       }}
-      className="group relative cursor-pointer rounded-xl bg-brand-accent-bg-light ring-1 ring-brand-accent/15 transition-colors hover:bg-brand-accent/10"
+      className={cn(
+        "group relative cursor-pointer rounded-xl bg-brand-accent-bg-light ring-1 ring-brand-accent/15 transition-all duration-150 hover:bg-brand-accent/10 active:scale-[0.98]",
+        pending && "animate-fade-up",
+      )}
     >
+      {pending ? (
+        <span
+          role="status"
+          aria-label="Wird gespeichert"
+          title="Wird gespeichert"
+          className="absolute right-3 top-3 size-2 animate-pulse rounded-full bg-brand-orange"
+        />
+      ) : (
       <button
         type="button"
         onClick={(e) => {
@@ -81,6 +67,7 @@ export function MealSlotCard({
       >
         <X className="h-3.5 w-3.5 text-brand-tertiary" />
       </button>
+      )}
       <div className="flex items-center gap-3 p-3">
         {recipe.image_url && (
           <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-brand-chip-neutral">

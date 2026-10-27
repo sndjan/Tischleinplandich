@@ -47,12 +47,28 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <Toaster
-            position="top-right"
+            position="bottom-center"
+            // Above the mobile tab bar and the sticky page footers.
+            containerStyle={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
             toastOptions={{
+              style: {
+                background: "#1c2b22",
+                color: "#ffffff",
+                borderRadius: "16px",
+                fontSize: "14px",
+                padding: "10px 14px",
+              },
               success: {
                 iconTheme: {
-                  primary: "#15803d",
-                  secondary: "white",
+                  primary: "#9fe0b7",
+                  secondary: "#1c2b22",
+                },
+              },
+              error: {
+                duration: 5000,
+                iconTheme: {
+                  primary: "#f2a3a3",
+                  secondary: "#1c2b22",
                 },
               },
             }}

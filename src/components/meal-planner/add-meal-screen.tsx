@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient, getSessionUser } from "@/lib/supabase/client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
-import type { Recipe, MealType } from "@/types/database";
+import type { MealType } from "@/types/database";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
-import toast from "react-hot-toast";
+import { useRecipesQuery } from "@/hooks/use-planner-data";
+import { useAddMeal } from "@/hooks/use-planner-mutations";
 import { RecipeList } from "./recipe-list";
 import { SubPage } from "./sub-page";
 import { useScreenStack } from "./screen-stack";
@@ -40,7 +40,7 @@ export function AddMealButton({
     <button
       type="button"
       onClick={() => openScreen({ kind: "add-meal", dayIndex: dayOfWeek, mealType })}
-      className="flex w-full items-center justify-between rounded-xl border border-dashed border-brand-disabled px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-muted transition-colors hover:border-brand-secondary hover:text-brand-secondary"
+      className="flex w-full items-center justify-between rounded-xl border border-dashed border-brand-disabled px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-muted transition-all duration-150 hover:border-brand-secondary hover:text-brand-secondary active:scale-[0.98] active:bg-brand-accent-bg active:text-brand-accent-dark"
     >
       {label}
       <Plus className="h-4 w-4 text-brand-icon-muted" />
@@ -61,165 +61,22 @@ export function AddMealScreen({
   onBack,
   onMealAdded,
 }: AddMealScreenProps) {
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [recipeTagsById, setRecipeTagsById] = useState<
-    Record<string, string[]>
-  >({});
+  const { data, isPending } = useRecipesQuery();
+  const addMeal = useAddMeal();
   const [selectedRecipe, setSelectedRecipe] = useState<string>("");
   const [servingSize, setServingSize] = useState("1");
-  const [loading, setLoading] = useState(false);
-  const [loadingRecipes, setLoadingRecipes] = useState(true);
-  const supabase = createClient();
 
-  useEffect(() => {
-    const fetchRecipes = async () => {
-      try {
-        setLoadingRecipes(true);
+  // The meal shows up in the plan right away; saving continues in the background.
+  const handleAddMeal = () => {
+    if (!selectedRecipe) return;
 
-        const user = await getSessionUser();
-
-        if (!user) return;
-
-        const { data } = await supabase
-          .from("recipes")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (data) setRecipes(data);
-
-        const recipeIds = (data ?? []).map((recipe) => recipe.id);
-        if (recipeIds.length === 0) {
-          setRecipeTagsById({});
-          return;
-        }
-
-        const { data: recipeTagsData, error: recipeTagsError } =
-          await supabase
-            .from("recipe_tags")
-            .select("recipe_id, tags(name)")
-            .in("recipe_id", recipeIds);
-
-        if (recipeTagsError) throw recipeTagsError;
-
-        const nextRecipeTagsById: Record<string, string[]> = {};
-
-        (recipeTagsData ?? []).forEach((entry: any) => {
-          const recipeId = entry.recipe_id as string;
-          const tagName = Array.isArray(entry.tags)
-            ? (entry.tags[0]?.name as string | undefined)
-            : (entry.tags?.name as string | undefined);
-
-          if (!recipeId || !tagName) {
-            return;
-          }
-
-          if (!nextRecipeTagsById[recipeId]) {
-            nextRecipeTagsById[recipeId] = [];
-          }
-
-          const alreadyExists = nextRecipeTagsById[recipeId].some(
-            (existingTag) =>
-              existingTag.toLowerCase() === tagName.toLowerCase(),
-          );
-
-          if (!alreadyExists) {
-            nextRecipeTagsById[recipeId].push(tagName);
-          }
-        });
-
-        Object.values(nextRecipeTagsById).forEach((tags) => {
-          tags.sort((a, b) => a.localeCompare(b));
-        });
-
-        setRecipeTagsById(nextRecipeTagsById);
-      } catch (err) {
-        toast.error("Laden fehlgeschlagen");
-      } finally {
-        setLoadingRecipes(false);
-      }
-    };
-
-    fetchRecipes();
-  }, [supabase]);
-
-  const handleAddMeal = async () => {
-    if (!selectedRecipe) {
-      toast.error("Wähle ein Rezept");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const user = await getSessionUser();
-
-      if (!user) {
-        toast.error("Nicht angemeldet");
-        return;
-      }
-
-      // Get or create meal plan for this week
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-      weekStart.setHours(0, 0, 0, 0);
-      const dateStr = weekStart.toISOString().split("T")[0];
-
-      const { data: mealPlanData } = await supabase
-        .from("meal_plans")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("week_start_date", dateStr)
-        .maybeSingle();
-
-      // @ts-ignore - TypeScript server not inferring Database types correctly
-      let mealPlanId: string | undefined = mealPlanData?.id;
-
-      if (!mealPlanId) {
-        // @ts-ignore - TypeScript server not inferring Database types correctly
-        const { data: newMealPlan, error: createError } = await supabase
-          .from("meal_plans")
-          // @ts-ignore - TypeScript server not inferring Database types correctly
-          .insert({
-            user_id: user.id,
-            week_start_date: dateStr,
-          })
-          .select("*")
-          .single();
-
-        if (createError) throw createError;
-        // @ts-ignore - TypeScript server not inferring Database types correctly
-        mealPlanId = newMealPlan?.id;
-      }
-
-      if (!mealPlanId) {
-        toast.error("Plan konnte nicht erstellt werden");
-        return;
-      }
-
-      // Add the meal
-      // @ts-ignore - TypeScript server not inferring Database types correctly
-      const { error: insertError } = await supabase
-        .from("planned_meals")
-        // @ts-ignore - TypeScript server not inferring Database types correctly
-        .insert({
-          meal_plan_id: mealPlanId,
-          recipe_id: selectedRecipe,
-          day_of_week: dayOfWeek,
-          meal_type: mealType,
-          serving_size: parseFloat(servingSize) || 1,
-        });
-
-      if (insertError) throw insertError;
-
-      toast.success("Hinzugefügt");
-      onMealAdded();
-    } catch (err) {
-      toast.error("Hinzufügen fehlgeschlagen");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    addMeal({
+      recipeId: selectedRecipe,
+      dayIndex: dayOfWeek,
+      mealType,
+      servingSize: parseFloat(servingSize.replace(",", ".")) || 1,
+    });
+    onMealAdded();
   };
 
   return (
@@ -242,18 +99,18 @@ export function AddMealScreen({
           </div>
           <Button
             onClick={handleAddMeal}
-            disabled={loading || !selectedRecipe}
-            className="flex-1"
+            disabled={!selectedRecipe}
+            className="h-10 flex-1 rounded-xl font-bold"
           >
-            {loading ? "Fügt hinzu…" : "Hinzufügen"}
+            Hinzufügen
           </Button>
         </div>
       }
     >
       <RecipeList
-        recipes={recipes}
-        recipeTagsById={recipeTagsById}
-        loading={loadingRecipes}
+        recipes={data?.recipes ?? []}
+        recipeTagsById={data?.tagsById ?? {}}
+        loading={isPending}
         onRecipeSelect={(recipe) => setSelectedRecipe(recipe.id)}
         selectionMode
         disableDrag

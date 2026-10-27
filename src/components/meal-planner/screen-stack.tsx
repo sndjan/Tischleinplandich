@@ -12,12 +12,14 @@ import {
 } from "react";
 import type { MealType, Recipe } from "@/types/database";
 import type { RecipeDraft } from "@/lib/recipe-draft";
+import type { SharedContent } from "@/lib/share-target";
 
 export type Screen =
-  // draftImage: a cover photo picked during AI import, preselected in the form.
+  // draftImage: the cover photo the AI picked from the import images.
   | { kind: "recipe-form"; recipe?: Recipe; draft?: RecipeDraft; draftImage?: File }
-  | { kind: "recipe-ai-import" }
-  | { kind: "recipe-preview"; recipe: Recipe; tags: string[] }
+  // sharedContent: shared into the app from another app; reading starts right away.
+  | { kind: "recipe-create"; sharedContent?: SharedContent }
+  | { kind: "recipe-preview"; recipe: Recipe }
   | { kind: "cooking-mode"; recipe: Recipe }
   | { kind: "add-meal"; dayIndex: number; mealType: MealType }
   | { kind: "nutrition-targets" }

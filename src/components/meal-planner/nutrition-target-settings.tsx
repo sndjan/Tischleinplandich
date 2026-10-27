@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
+import { queryKeys, useUserId } from "@/hooks/use-planner-data";
 import type { UserPreferences } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -69,38 +71,36 @@ const toNutritionTargets = (
  * Loads the user's saved nutrition targets, falling back to the defaults.
  */
 export function useNutritionTargets() {
-  const [targets, setTargets] = useState<NutritionTargetSettings>(
-    DEFAULT_NUTRITION_TARGETS,
-  );
-  const supabase = createClient();
+  const userId = useUserId();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.nutritionTargets(userId ?? "");
 
-  useEffect(() => {
-    const loadPreferences = async () => {
-      try {
-        const user = await getSessionUser();
+  const { data } = useQuery({
+    queryKey,
+    enabled: Boolean(userId),
+    queryFn: async () => {
+      const { data: preferencesData, error } = await createClient()
+        .from("user_preferences")
+        .select("*")
+        .eq("user_id", userId!)
+        .maybeSingle();
 
-        if (!user) {
-          setTargets(DEFAULT_NUTRITION_TARGETS);
-          return;
-        }
-
-        const { data: preferencesData } = await supabase
-          .from("user_preferences")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        setTargets(toNutritionTargets(preferencesData));
-      } catch (err) {
-        console.error(err);
+      if (error) {
         toast.error("Ziele konnten nicht geladen werden");
+        throw error;
       }
-    };
 
-    loadPreferences();
-  }, [supabase]);
+      return toNutritionTargets(preferencesData);
+    },
+  });
 
-  return [targets, setTargets] as const;
+  const setTargets = useCallback(
+    (targets: NutritionTargetSettings) => queryClient.setQueryData(queryKey, targets),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queryClient, userId],
+  );
+
+  return [data ?? DEFAULT_NUTRITION_TARGETS, setTargets] as const;
 }
 
 interface NutritionTargetsScreenProps {

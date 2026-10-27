@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
@@ -8,8 +9,11 @@ import { normalizePantryStapleName } from "@/lib/shopping-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SubPage } from "./sub-page";
+import { queryKeys, useUserId } from "@/hooks/use-planner-data";
 
 const FORM_ID = "pantry-staple-form";
+
+const EMPTY_STAPLES: string[] = [];
 
 const sortStaples = (staples: string[]) =>
   [...staples].sort((a, b) => a.localeCompare(b, "de"));
@@ -18,34 +22,35 @@ const sortStaples = (staples: string[]) =>
  * Loads the user's pantry staples, the basic ingredients the shopping list can hide.
  */
 export function usePantryStaples() {
-  const [staples, setStaples] = useState<string[]>([]);
-  const supabase = createClient();
+  const userId = useUserId();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.pantryStaples(userId ?? "");
 
-  useEffect(() => {
-    const loadStaples = async () => {
-      try {
-        const user = await getSessionUser();
+  const { data } = useQuery({
+    queryKey,
+    enabled: Boolean(userId),
+    queryFn: async () => {
+      const { data: rows, error } = await createClient()
+        .from("pantry_staples")
+        .select("name")
+        .eq("user_id", userId!);
 
-        if (!user) return;
-
-        const { data, error } = await supabase
-          .from("pantry_staples")
-          .select("name")
-          .eq("user_id", user.id);
-
-        if (error) throw error;
-
-        setStaples(sortStaples((data ?? []).map((row) => row.name)));
-      } catch (err) {
-        console.error(err);
+      if (error) {
         toast.error("Grundzutaten konnten nicht geladen werden");
+        throw error;
       }
-    };
 
-    loadStaples();
-  }, []);
+      return sortStaples((rows ?? []).map((row) => row.name));
+    },
+  });
 
-  return [staples, setStaples] as const;
+  const setStaples = useCallback(
+    (staples: string[]) => queryClient.setQueryData(queryKey, staples),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queryClient, userId],
+  );
+
+  return [data ?? EMPTY_STAPLES, setStaples] as const;
 }
 
 interface PantryStaplesScreenProps {

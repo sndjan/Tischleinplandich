@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import { DayCard } from "./day-card";
 import { WeekOverviewList, WeekSummary } from "./week-overview";
 import { cn } from "@/lib/utils";
-import { getCurrentWeekStartDateString } from "@/hooks/use-meal-plan-data";
+import { useAddMeal, useRemoveMeal } from "@/hooks/use-planner-mutations";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { DEFAULT_NUTRITION_TARGETS } from "./nutrition-target-settings";
-import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
-import toast from "react-hot-toast";
 
 const DAYS = [
   "Montag",
@@ -42,7 +40,6 @@ interface MealWeekViewProps {
   plannedMeals: PlannedMeal[];
   loading: boolean;
   nutritionTargets?: NutritionTargetSettings;
-  onDataChanged: () => void;
 }
 
 export function MealWeekView({
@@ -50,11 +47,10 @@ export function MealWeekView({
   plannedMeals,
   loading,
   nutritionTargets = DEFAULT_NUTRITION_TARGETS,
-  onDataChanged,
 }: MealWeekViewProps) {
   const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayDayIndex);
   const [viewMode, setViewMode] = useState<ViewMode>("day");
-  const supabase = createClient();
+  const addMeal = useAddMeal();
 
   // Without a saved choice, keep the previous layout: one day on phones, the whole
   // week on desktop.
@@ -99,21 +95,9 @@ export function MealWeekView({
     return grouped;
   }, [plannedMeals]);
 
-  const handleRemoveMeal = async (mealId: string) => {
-    try {
-      const { error } = await supabase.from("planned_meals").delete().eq("id", mealId);
+  const handleRemoveMeal = useRemoveMeal(recipesById);
 
-      if (error) throw error;
-
-      toast.success("Entfernt");
-      onDataChanged();
-    } catch (err) {
-      toast.error("Entfernen fehlgeschlagen");
-      console.error(err);
-    }
-  };
-
-  const handleDropRecipe = async (
+  const handleDropRecipe = (
     e: React.DragEvent<HTMLDivElement>,
     dayIndex: number,
     mealType: MealType,
@@ -121,74 +105,47 @@ export function MealWeekView({
     e.preventDefault();
     e.stopPropagation();
 
+    let recipe: Recipe | undefined;
     try {
-      const data = e.dataTransfer.getData("application/json");
-      const { type, recipe } = JSON.parse(data);
-
-      if (type !== "recipe") return;
-
-      const user = await getSessionUser();
-
-      if (!user) return;
-
-      // Fixed slots hold exactly one meal; dropping onto a filled slot replaces it.
-      // The 'extra' section holds unlimited meals, so drops there always add a new one.
-      if (mealType !== "extra") {
-        const existingMeal = plannedMealsByDay
-          .get(dayIndex)
-          ?.find((meal) => meal.meal_type === mealType);
-
-        if (existingMeal) {
-          await supabase.from("planned_meals").delete().eq("id", existingMeal.id);
-        }
-      }
-
-      const dateStr = getCurrentWeekStartDateString();
-
-      let mealPlanId: string;
-      const { data: existingPlan } = await supabase
-        .from("meal_plans")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("week_start_date", dateStr)
-        .single<{ id: string }>();
-
-      if (existingPlan) {
-        mealPlanId = existingPlan.id;
-      } else {
-        const { data: newPlan, error: createError } = await supabase
-          .from("meal_plans")
-          .insert({
-            user_id: user.id,
-            week_start_date: dateStr,
-          })
-          .select("id")
-          .single<{ id: string }>();
-
-        if (createError || !newPlan) throw createError;
-        mealPlanId = newPlan.id;
-      }
-
-      const { error: mealError } = await supabase.from("planned_meals").insert({
-        meal_plan_id: mealPlanId,
-        recipe_id: recipe.id,
-        day_of_week: dayIndex,
-        meal_type: mealType,
-        serving_size: 1,
-      });
-
-      if (mealError) throw mealError;
-
-      toast.success(`${recipe.name} zu ${MEAL_TYPE_LABELS[mealType]} hinzugefügt`);
-      onDataChanged();
-    } catch (err) {
-      console.error(err);
-      toast.error("Hinzufügen fehlgeschlagen");
+      const { type, recipe: droppedRecipe } = JSON.parse(
+        e.dataTransfer.getData("application/json"),
+      );
+      if (type === "recipe") recipe = droppedRecipe;
+    } catch {
+      return;
     }
+
+    if (!recipe) return;
+
+    // Fixed slots hold exactly one meal; dropping onto a filled slot replaces it.
+    // The 'extra' section holds unlimited meals, so drops there always add a new one.
+    const replacedMeal =
+      mealType === "extra"
+        ? undefined
+        : plannedMealsByDay.get(dayIndex)?.find((meal) => meal.meal_type === mealType);
+
+    addMeal({
+      recipeId: recipe.id,
+      dayIndex,
+      mealType,
+      servingSize: 1,
+      replaceMealId: replacedMeal?.id,
+    });
   };
 
   if (loading) {
-    return <div className="py-8 text-center">Lädt…</div>;
+    return (
+      <div className="mx-auto max-w-xl space-y-3" aria-busy="true" aria-label="Lädt">
+        <Skeleton className="mx-auto h-9 w-full max-w-xs rounded-xl" />
+        <Skeleton className="mx-auto h-7 w-32" />
+        <div className="space-y-3 rounded-2xl bg-white p-3 ring-1 ring-brand-card-border">
+          <Skeleton className="h-16 rounded-xl" />
+          {[0, 1, 2, 3].map((index) => (
+            <Skeleton key={index} className="h-[88px] rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -7,6 +7,7 @@ import { AddMealButton } from "./add-meal-screen";
 import { MealSlotCard } from "./meal-slot-card";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
+import { isPendingId } from "@/hooks/use-planner-data";
 
 const FIXED_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -42,7 +43,7 @@ interface DayCardProps {
   recipesById: Map<string, Recipe>;
   plannedMealsForDay: PlannedMeal[];
   nutritionTargets: NutritionTargetSettings;
-  onRemoveMeal: (mealId: string) => void;
+  onRemoveMeal: (meal: PlannedMeal) => void;
   onDropRecipe: (
     event: React.DragEvent<HTMLDivElement>,
     dayIndex: number,
@@ -152,7 +153,8 @@ export function DayCard({
                   mealType={mealType}
                   servingSize={meal.serving_size}
                   nutritionTargets={nutritionTargets}
-                  onRemove={() => onRemoveMeal(meal.id)}
+                  pending={isPendingId(meal.id)}
+                  onRemove={() => onRemoveMeal(meal)}
                 />
               ) : (
                 <AddMealButton dayOfWeek={dayIndex} mealType={mealType} />
@@ -177,7 +179,8 @@ export function DayCard({
                   mealType="extra"
                   servingSize={meal.serving_size}
                   nutritionTargets={nutritionTargets}
-                  onRemove={() => onRemoveMeal(meal.id)}
+                  pending={isPendingId(meal.id)}
+                  onRemove={() => onRemoveMeal(meal)}
                 />
               );
             })}

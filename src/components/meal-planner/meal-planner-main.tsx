@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChefHat, MessageSquarePlus, Pencil, Settings2, Trash2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { useEffect, useMemo, useState } from "react";
+import { ChefHat, MessageSquarePlus, Pencil, Settings2, Trash2, WifiOff } from "lucide-react";
 import { MealWeekView } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
-import { RecipeForm } from "./recipe-form";
-import { RecipeAiImport } from "./recipe-ai-import";
+import { RecipeEditor } from "./recipe-editor";
+import { RecipeCreateScreen } from "./recipe-create-screen";
 import { RecipePreview } from "./recipe-list";
 import { CookingMode } from "./cooking-mode";
 import { AddMealScreen } from "./add-meal-screen";
@@ -22,32 +21,59 @@ import {
   useNutritionTargets,
 } from "./nutrition-target-settings";
 import { generateShoppingListFromPlannedMeals } from "@/lib/shopping-list";
-import { deleteRecipe } from "@/lib/recipes";
+import { collectIngredientNames } from "@/lib/editable-recipe";
+import { takeSharedContent } from "@/lib/share-target";
+import { QueryProvider } from "@/lib/query-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useMealPlanData } from "@/hooks/use-meal-plan-data";
+import { useMealPlanData } from "@/hooks/use-planner-data";
+import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
+import { sumMealNutrition } from "./day-card";
 
 type DesktopRightPanelTab = "recipes" | "shopping";
 
 export function MealPlannerMain() {
   return (
-    <ScreenStackProvider>
-      <MealPlanner />
-    </ScreenStackProvider>
+    <QueryProvider>
+      <ScreenStackProvider>
+        <MealPlanner />
+      </ScreenStackProvider>
+    </QueryProvider>
   );
 }
 
+function useIsOnline() {
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  return online;
+}
+
+// day_of_week in this app is Monday=0..Sunday=6.
+const getTodayDayIndex = () => (new Date().getDay() + 6) % 7;
+
 function MealPlanner() {
   const { stack, openScreen, replaceScreen, closeScreen } = useScreenStack();
-  const [recipeLibraryRefreshKey, setRecipeLibraryRefreshKey] = useState(0);
   const [nutritionTargets, setNutritionTargets] = useNutritionTargets();
   const [pantryStaples, setPantryStaples] = usePantryStaples();
   const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
   const [desktopRightPanelTab, setDesktopRightPanelTab] =
     useState<DesktopRightPanelTab>("recipes");
+  const isOnline = useIsOnline();
 
   const mealPlanData = useMealPlanData();
+  const deleteRecipe = useDeleteRecipe();
 
   const shoppingListItems = useMemo(
     () =>
@@ -58,46 +84,90 @@ function MealPlanner() {
     [mealPlanData.plannedMeals, mealPlanData.recipes],
   );
 
-  const handleRecipeSaved = () => {
+  const ingredientSuggestions = useMemo(
+    () => collectIngredientNames(mealPlanData.recipes),
+    [mealPlanData.recipes],
+  );
+
+  const existingTags = useMemo(
+    () =>
+      [...new Set(Object.values(mealPlanData.tagsById).flat())].sort((a, b) =>
+        a.localeCompare(b, "de"),
+      ),
+    [mealPlanData.tagsById],
+  );
+
+  // What is left of today's targets, so "Aus Idee" can fit a recipe into the day.
+  const targetHint = useMemo(() => {
+    const recipesById = new Map(mealPlanData.recipes.map((recipe) => [recipe.id, recipe]));
+    const todayMeals = mealPlanData.plannedMeals.filter(
+      (meal) => meal.day_of_week === getTodayDayIndex(),
+    );
+    const planned = sumMealNutrition(todayMeals, recipesById);
+    const parts: string[] = [];
+
+    if (nutritionTargets.calories_target_enabled) {
+      const left = Math.round(nutritionTargets.calories_target - planned.calories);
+      if (left < 150) return null;
+      parts.push(`${left} kcal`);
+    }
+
+    if (nutritionTargets.protein_target_enabled) {
+      const left = Math.round(nutritionTargets.protein_target - planned.protein);
+      if (left > 0) parts.push(`${left} g Protein`);
+    }
+
+    return parts.length > 0 ? parts.join(" · ") : null;
+  }, [mealPlanData.recipes, mealPlanData.plannedMeals, nutritionTargets]);
+
+  // Content shared into the app from another app (see public/sw.js).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("shared")) return;
+
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+
+    void takeSharedContent().then((sharedContent) => {
+      const fallback = {
+        url: params.get("url") ?? "",
+        text: [params.get("title"), params.get("text")].filter(Boolean).join("\n"),
+        files: [],
+      };
+      const content = sharedContent ?? (fallback.url || fallback.text ? fallback : null);
+
+      if (content) openScreen({ kind: "recipe-create", sharedContent: content });
+    });
+  }, [openScreen]);
+
+  const handleRecipeDelete = (recipe: Recipe) => {
     closeScreen();
-    setRecipeLibraryRefreshKey((prev) => prev + 1);
-    mealPlanData.reload();
-  };
-
-  const handleRecipeDelete = async (recipe: Recipe) => {
-    if (!window.confirm(`„${recipe.name}“ wirklich löschen?`)) {
-      return;
-    }
-
-    try {
-      await deleteRecipe(recipe);
-      closeScreen();
-      setRecipeLibraryRefreshKey((prev) => prev + 1);
-      mealPlanData.reload();
-      toast.success("Rezept gelöscht");
-    } catch {
-      toast.error("Löschen fehlgeschlagen");
-    }
+    deleteRecipe(recipe);
   };
 
   const renderScreen = (screen: Screen) => {
     switch (screen.kind) {
       case "recipe-form":
         return (
-          <RecipeForm
+          <RecipeEditor
             recipe={screen.recipe}
+            recipeTags={screen.recipe ? mealPlanData.tagsById[screen.recipe.id] : undefined}
             draft={screen.draft}
             draftImage={screen.draftImage}
+            ingredientSuggestions={ingredientSuggestions}
+            existingTags={existingTags}
             onBack={closeScreen}
-            onRecipeSaved={handleRecipeSaved}
+            onSaved={closeScreen}
           />
         );
-      case "recipe-ai-import":
+      case "recipe-create":
         return (
-          <RecipeAiImport
+          <RecipeCreateScreen
+            sharedContent={screen.sharedContent}
+            targetHint={targetHint}
             onBack={closeScreen}
-            onDraftReady={(draft, draftImage) =>
-              replaceScreen({ kind: "recipe-form", draft, draftImage })
+            onManual={() => replaceScreen({ kind: "recipe-form" })}
+            onDraftReady={(draft, cover) =>
+              replaceScreen({ kind: "recipe-form", draft, draftImage: cover })
             }
           />
         );
@@ -143,7 +213,10 @@ function MealPlanner() {
               </Button>
             }
           >
-            <RecipePreview recipe={screen.recipe} tags={screen.tags} />
+            <RecipePreview
+              recipe={screen.recipe}
+              tags={mealPlanData.tagsById[screen.recipe.id] ?? []}
+            />
           </SubPage>
         );
       case "cooking-mode":
@@ -154,10 +227,7 @@ function MealPlanner() {
             dayOfWeek={screen.dayIndex}
             mealType={screen.mealType}
             onBack={closeScreen}
-            onMealAdded={() => {
-              closeScreen();
-              mealPlanData.reload();
-            }}
+            onMealAdded={closeScreen}
           />
         );
       case "nutrition-targets":
@@ -236,6 +306,16 @@ function MealPlanner() {
           </div>
         </header>
 
+        {!isOnline && (
+          <div
+            role="status"
+            className="mx-4 mt-3 flex items-center gap-2 rounded-full bg-[#fdf0d5] px-4 py-2 text-[13px] font-semibold text-[#7a4f0e]"
+          >
+            <WifiOff className="size-4 shrink-0" />
+            Offline · Änderungen werden gespeichert, sobald du wieder online bist
+          </div>
+        )}
+
         <main className="p-4">
           {/* Desktop layout: week view next to the recipe-library-or-shopping-list panel */}
           <div className="hidden lg:block">
@@ -246,7 +326,6 @@ function MealPlanner() {
                   plannedMeals={mealPlanData.plannedMeals}
                   loading={mealPlanData.loading}
                   nutritionTargets={nutritionTargets}
-                  onDataChanged={mealPlanData.reload}
                 />
               </div>
               <Card className="p-3">
@@ -281,7 +360,7 @@ function MealPlanner() {
 
                 <div>
                   {desktopRightPanelTab === "recipes" ? (
-                    <RecipeLibrary key={recipeLibraryRefreshKey} />
+                    <RecipeLibrary />
                   ) : (
                     <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
                   )}
@@ -298,7 +377,6 @@ function MealPlanner() {
                 plannedMeals={mealPlanData.plannedMeals}
                 loading={mealPlanData.loading}
                 nutritionTargets={nutritionTargets}
-                onDataChanged={mealPlanData.reload}
               />
             )}
             {mobileTab === "shopping" && (
@@ -308,7 +386,7 @@ function MealPlanner() {
             )}
             {mobileTab === "recipes" && (
               <Card className="p-3">
-                <RecipeLibrary key={recipeLibraryRefreshKey} />
+                <RecipeLibrary />
               </Card>
             )}
           </div>

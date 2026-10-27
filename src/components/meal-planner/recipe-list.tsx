@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
 import {
@@ -421,9 +422,21 @@ export function RecipeList({
       )}
 
       {loading ? (
-        <p className="text-sm text-brand-tertiary">Lädt…</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2" aria-busy="true" aria-label="Lädt">
+          {[0, 1, 2, 3].map((index) => (
+            <div key={index} className="overflow-hidden rounded-xl border border-brand-card-border bg-white">
+              <Skeleton className="aspect-[4/3] w-full rounded-none" />
+              <div className="space-y-2 p-2.5">
+                <Skeleton className="h-3.5 w-4/5" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : recipes.length === 0 ? (
-        <p className="text-sm text-brand-tertiary">Noch keine Rezepte</p>
+        <p className="py-6 text-center text-sm text-brand-secondary">
+          Noch keine Rezepte. Tippe auf „Neu“, um eins zu importieren oder schreiben zu lassen.
+        </p>
       ) : filteredRecipes.length === 0 ? (
         <p className="text-sm text-brand-tertiary">
           Keine Treffer
@@ -431,12 +444,11 @@ export function RecipeList({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
           {filteredRecipes.map((recipe) => {
-            const recipeTags = recipeTagsById[recipe.id] ?? [];
             const primaryNutritionItems = getPrimaryNutritionItems(recipe);
             const isSelected = selectedRecipeId === recipe.id;
 
             const openPreview = () =>
-              openScreen({ kind: "recipe-preview", recipe, tags: recipeTags });
+              openScreen({ kind: "recipe-preview", recipe });
 
             return (
               <div
@@ -457,7 +469,7 @@ export function RecipeList({
                   );
                 }}
                 className={cn(
-                  "group relative overflow-hidden rounded-xl border bg-white transition-shadow hover:shadow-md",
+                  "group relative overflow-hidden rounded-xl border bg-white transition-all duration-150 hover:shadow-md active:scale-[0.97]",
                   isSelected
                     ? "border-brand-accent-dark ring-2 ring-brand-accent-dark"
                     : "border-brand-card-border",

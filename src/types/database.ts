@@ -411,7 +411,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      consume_ai_quota: {
+        Args: { daily_limit: number };
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;
