@@ -6,8 +6,6 @@ import { Plus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { normalizePantryStapleName } from "@/lib/shopping-list";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { SubPage } from "./sub-page";
 import { queryKeys, useUserId } from "@/hooks/use-planner-data";
 
@@ -141,25 +139,32 @@ export function PantryStaplesScreen({
   return (
     <SubPage
       title="Grundzutaten"
-      description="Zutaten, die du immer zu Hause hast. Die Einkaufsliste kann sie ausblenden."
+      description="Zutaten, die du immer zu Hause hast. Die Einkaufsliste blendet sie aus."
+      tone="muted"
       onBack={onBack}
     >
-      <form id={FORM_ID} onSubmit={handleAdd} className="flex gap-2">
-        <Input
+      <form
+        id={FORM_ID}
+        onSubmit={handleAdd}
+        className="flex items-center gap-2 rounded-[18px] bg-white p-2 pl-4 ring-1 ring-brand-card-border"
+      >
+        <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="z. B. Senf"
           aria-label="Grundzutat hinzufügen oder suchen"
           disabled={isSaving}
+          enterKeyHint="done"
+          className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
         />
-        <Button
+        <button
           type="submit"
           disabled={isSaving || !normalizedInput}
-          aria-label="Hinzufügen"
+          className="flex h-10 items-center gap-1 rounded-xl bg-brand-accent-dark px-3.5 text-sm font-bold text-white transition-transform active:scale-95 disabled:opacity-40"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="size-4" strokeWidth={2.5} />
           Hinzufügen
-        </Button>
+        </button>
       </form>
 
       {visibleStaples.length === 0 ? (
@@ -171,13 +176,13 @@ export function PantryStaplesScreen({
           {visibleStaples.map((staple) => (
             <li
               key={staple}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-chip-neutral py-1 pl-3 pr-1 text-sm text-brand-ink"
+              className="inline-flex h-9 animate-fade-up items-center gap-0.5 rounded-full bg-white pl-3.5 pr-1 text-sm font-semibold text-brand-ink ring-1 ring-brand-card-border"
             >
               <span className="capitalize">{staple}</span>
               <button
                 type="button"
                 onClick={() => handleRemove(staple)}
-                className="rounded-full p-1 hover:bg-black/5"
+                className="flex size-7 items-center justify-center rounded-full transition-colors hover:bg-black/5 active:bg-black/10"
                 aria-label={`${staple} entfernen`}
               >
                 <X className="h-3.5 w-3.5 text-brand-tertiary" />

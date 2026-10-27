@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Camera,
   Clock,
+  Crop,
   ImagePlus,
   Link2,
   Minus,
@@ -35,7 +36,8 @@ import { refineRecipe } from "@/lib/recipe-ai-client";
 import { queryKeys, useUserId } from "@/hooks/use-planner-data";
 import { IngredientRowsEditor } from "./ingredient-rows-editor";
 import { RecipeRefineSheet, type RefineExchange } from "./recipe-refine-sheet";
-import { Switch } from "./recipe-create-screen";
+import { Switch } from "@/components/ui/controls";
+import { ImageCropper } from "@/components/ui/image-cropper";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const HINT_DISMISSED_KEY = "weekly-meal-planner:editor-hint-dismissed";
@@ -43,7 +45,11 @@ const HINT_DISMISSED_KEY = "weekly-meal-planner:editor-hint-dismissed";
 type CoverState =
   | { kind: "keep"; previewUrl: string | null }
   | { kind: "remove"; previewUrl: null }
-  | { kind: "replace"; file: File; previewUrl: string; suggested: boolean };
+  // original: the photo before cropping, so cropping again starts from all of it.
+  | { kind: "replace"; file: File; previewUrl: string; suggested: boolean; original?: File };
+
+// A photo waiting in the cropper; objectUrl is set when src was made for it.
+type CropTarget = { src: string; original: File | null; objectUrl: boolean };
 
 interface RecipeEditorProps {
   recipe?: Recipe;
@@ -95,6 +101,7 @@ export function RecipeEditor({
       ? { kind: "replace", file: draftImage, previewUrl: URL.createObjectURL(draftImage), suggested: true }
       : { kind: "keep", previewUrl: recipe?.image_url ?? null },
   );
+  const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
   const [view, setView] = useState<"main" | "ingredients">("main");
   const [showHint, setShowHint] = useState(false);
   const [tagInputOpen, setTagInputOpen] = useState(false);
@@ -160,7 +167,33 @@ export function RecipeEditor({
       return;
     }
 
-    changeCover({ kind: "replace", file, previewUrl: URL.createObjectURL(file), suggested: false });
+    // Every new photo goes through the cropper, so cards show what was chosen.
+    setCropTarget({ src: URL.createObjectURL(file), original: file, objectUrl: true });
+  };
+
+  const openCropper = () => {
+    if (cover.kind === "replace") {
+      const source = cover.original ?? cover.file;
+      setCropTarget({ src: URL.createObjectURL(source), original: source, objectUrl: true });
+    } else if (cover.previewUrl) {
+      setCropTarget({ src: cover.previewUrl, original: null, objectUrl: false });
+    }
+  };
+
+  const closeCropper = () => {
+    if (cropTarget?.objectUrl) URL.revokeObjectURL(cropTarget.src);
+    setCropTarget(null);
+  };
+
+  const applyCrop = (file: File) => {
+    changeCover({
+      kind: "replace",
+      file,
+      previewUrl: URL.createObjectURL(file),
+      suggested: false,
+      original: cropTarget?.original ?? undefined,
+    });
+    closeCropper();
   };
 
   const addTag = (raw: string) => {
@@ -365,6 +398,14 @@ export function RecipeEditor({
               <div className="flex gap-2">
                 <button
                   type="button"
+                  onClick={openCropper}
+                  aria-label="Bild zuschneiden"
+                  className="flex size-11 items-center justify-center rounded-full bg-white/95 text-brand-ink shadow-sm active:scale-95"
+                >
+                  <Crop className="size-4" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => coverInputRef.current?.click()}
                   className="flex h-11 items-center gap-1.5 rounded-full bg-white/95 px-3.5 text-sm font-semibold text-brand-ink shadow-sm active:scale-95"
                 >
@@ -399,10 +440,20 @@ export function RecipeEditor({
             </button>
           )}
           {cover.kind === "replace" && cover.suggested && (
-            <span className="absolute bottom-8 left-3 flex items-center gap-1.5 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-bold text-brand-ink">
-              <Sparkles className="size-3" />
-              KI-Vorschlag
-            </span>
+            <div className="absolute bottom-8 left-3 flex items-center gap-2">
+              <span className="flex h-8 items-center gap-1.5 rounded-lg bg-white/95 px-2.5 text-xs font-bold text-brand-ink">
+                <Sparkles className="size-3" />
+                KI-Vorschlag
+              </span>
+              <button
+                type="button"
+                onClick={openCropper}
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-brand-accent-dark px-2.5 text-xs font-bold text-white shadow-sm active:scale-95"
+              >
+                <Crop className="size-3" />
+                Zuschneiden
+              </button>
+            </div>
           )}
           <input
             ref={coverInputRef}
@@ -689,6 +740,8 @@ export function RecipeEditor({
           composer={composer}
         />
       )}
+
+      {cropTarget && <ImageCropper src={cropTarget.src} onCancel={closeCropper} onDone={applyCrop} />}
     </div>
   );
 }

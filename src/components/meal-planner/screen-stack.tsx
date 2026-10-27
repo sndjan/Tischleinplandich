@@ -13,14 +13,19 @@ import {
 import type { MealType, Recipe } from "@/types/database";
 import type { RecipeDraft } from "@/lib/recipe-draft";
 import type { SharedContent } from "@/lib/share-target";
+import type { SharedRecipe } from "@/lib/recipe-sharing";
 
 export type Screen =
   // draftImage: the cover photo the AI picked from the import images.
   | { kind: "recipe-form"; recipe?: Recipe; draft?: RecipeDraft; draftImage?: File }
   // sharedContent: shared into the app from another app; reading starts right away.
   | { kind: "recipe-create"; sharedContent?: SharedContent }
-  | { kind: "recipe-preview"; recipe: Recipe }
-  | { kind: "cooking-mode"; recipe: Recipe }
+  // servings: portions to show, e.g. how many were planned for a meal.
+  | { kind: "recipe-preview"; recipe: Recipe; servings?: number }
+  | { kind: "cooking-mode"; recipe: Recipe; servings?: number }
+  // Someone else's recipe from "Entdecken".
+  | { kind: "shared-recipe"; recipe: SharedRecipe }
+  | { kind: "profile" }
   | { kind: "add-meal"; dayIndex: number; mealType: MealType }
   | { kind: "nutrition-targets" }
   | { kind: "pantry-staples" }

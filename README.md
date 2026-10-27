@@ -12,9 +12,31 @@
 - Grün anstatt Orange
 - Dialoge auf Mobile anpassen
 
+## Anmelden per Link oder Code
+
+Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Email Templates → Magic Link** diese Vorlage eintragen:
+
+```html
+<h2>Dein Anmeldelink</h2>
+<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Jetzt anmelden</a></p>
+<p>Oder diesen Code in der App eingeben: <strong>{{ .Token }}</strong></p>
+```
+
+Unter **Authentication → URL Configuration** muss die **Site URL** die Adresse der App sein und `https://<deine-domain>/auth/callback` bei den Redirect URLs stehen. Bestehende Konten melden sich einfach mit ihrer E-Mail an.
+
+## Rezepte teilen
+
+Migration `011_recipe_sharing.sql` (im SQL Editor ausführen) fügt Teilen hinzu:
+
+- **Link**: jedes Rezept bekommt beim ersten „Teilen“ einen geheimen Link `/r/<id>`, der ohne Konto nur dieses Rezept zeigt. „Link deaktivieren“ macht ihn ungültig.
+- **Entdecken**: der Schalter „In Entdecken zeigen“ (`is_public`) listet das Rezept für alle angemeldeten Nutzer im Tab Rezepte → Entdecken. Dort und über den Link kann man eine Kopie in die eigenen Rezepte speichern.
+- **Name**: steht als „Geteilt von …“ beim Rezept, wird im Profil gesetzt (`users.display_name`).
+
+Ohne die Migration läuft die App weiter, nur Teilen, Entdecken und der Name zeigen einen Hinweis.
+
 ## Feedback lesen
 
-Nutzer-Feedback (Button 💬 oben rechts) landet in der Tabelle `feedback` (Migration `009_create_feedback.sql`). Nutzer können nur schreiben, nicht lesen. Lesen im Supabase-Dashboard → Table Editor → `feedback`, oder per SQL:
+Nutzer-Feedback (Profil → „Feedback senden“) landet in der Tabelle `feedback` (Migration `009_create_feedback.sql`). Nutzer können nur schreiben, nicht lesen. Lesen im Supabase-Dashboard → Table Editor → `feedback`, oder per SQL:
 
 ```sql
 SELECT f.created_at, f.category, f.message, f.context, u.email

@@ -14,18 +14,22 @@ export type Database = {
         Row: {
           id: string;
           email: string;
+          // Shown on shared recipes ("Geteilt von …"). Added in migration 011.
+          display_name: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           email: string;
+          display_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           email?: string;
+          display_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -47,6 +51,8 @@ export type Database = {
           serving_size: number;
           image_url: string | null;
           is_public: boolean;
+          // Secret id of the share link (/r/<share_id>); null when not shared. Migration 011.
+          share_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -65,6 +71,7 @@ export type Database = {
           serving_size?: number;
           image_url?: string | null;
           is_public?: boolean;
+          share_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -83,6 +90,7 @@ export type Database = {
           serving_size?: number;
           image_url?: string | null;
           is_public?: boolean;
+          share_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -415,6 +423,14 @@ export type Database = {
         Args: { daily_limit: number };
         Returns: boolean;
       };
+      get_shared_recipe: {
+        Args: { p_share_id: string };
+        Returns: Json;
+      };
+      discover_recipes: {
+        Args: { p_search?: string | null; p_limit?: number };
+        Returns: Json;
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -452,4 +468,8 @@ export type ShoppingListItem = {
   ingredient: string;
   quantity: number;
   unit: string;
+  // Name as written in the first recipe that uses it, e.g. "Rote Linsen".
+  label?: string;
+  // Names of the planned recipes that need this item.
+  sources?: string[];
 };

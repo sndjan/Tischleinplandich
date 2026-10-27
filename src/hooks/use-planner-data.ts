@@ -24,7 +24,18 @@ export const queryKeys = {
   week: (userId: string, weekStart: string) => ["week", userId, weekStart] as const,
   nutritionTargets: (userId: string) => ["nutrition-targets", userId] as const,
   pantryStaples: (userId: string) => ["pantry-staples", userId] as const,
+  profile: (userId: string) => ["profile", userId] as const,
+  discover: (search: string) => ["discover", search] as const,
 };
+
+export type ProfileData = {
+  displayName: string | null;
+  // False until migration 011 adds users.display_name and the sharing columns.
+  sharingReady: boolean;
+};
+
+// Postgres "undefined column": the sharing migration has not been run yet.
+export const isMissingColumnError = (error: { code?: string } | null) => error?.code === "42703";
 
 export type RecipesData = {
   recipes: Recipe[];
@@ -139,4 +150,25 @@ export function useMealPlanData() {
     }),
     [recipes, meals, recipesQuery.data?.tagsById, recipesQuery.isFetching, weekQuery.isFetching],
   );
+}
+
+export function useProfileQuery() {
+  const userId = useUserId();
+
+  return useQuery({
+    queryKey: queryKeys.profile(userId ?? ""),
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<ProfileData> => {
+      const { data, error } = await createClient()
+        .from("users")
+        .select("display_name")
+        .eq("id", userId!)
+        .maybeSingle();
+
+      if (isMissingColumnError(error)) return { displayName: null, sharingReady: false };
+      if (error) throw error;
+
+      return { displayName: data?.display_name ?? null, sharingReady: true };
+    },
+  });
 }

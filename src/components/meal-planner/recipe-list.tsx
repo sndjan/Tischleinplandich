@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,9 +15,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
 import {
-  ExternalLink,
   Flame,
   Info,
+  Search,
   SlidersHorizontal,
   UtensilsCrossed,
   Zap,
@@ -35,9 +33,6 @@ type SortOption =
 
 const ALL_TAGS_FILTER_VALUE = "__all_tags__";
 
-const TAG_BADGE_CLASSNAME =
-  "bg-brand-accent-bg text-brand-accent-dark rounded-full";
-
 const formatNumber = (value: number | null) => {
   if (value === null) {
     return null;
@@ -47,12 +42,6 @@ const formatNumber = (value: number | null) => {
     ? value.toString()
     : value.toFixed(1).replace(/\.0$/, "");
 };
-
-export const getTextLines = (text: string | null) =>
-  (text ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
 
 const getPrimaryNutritionItems = (recipe: Recipe) => {
   return [
@@ -74,148 +63,6 @@ const getPrimaryNutritionItems = (recipe: Recipe) => {
     },
   ].filter((item) => item.value !== null);
 };
-
-function TagBadges({ tags }: { tags: string[] }) {
-  if (tags.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {tags.map((tag) => (
-        <Badge key={tag} variant="outline" className={TAG_BADGE_CLASSNAME}>
-          <span className="truncate text-[11px] font-bold">{tag}</span>
-        </Badge>
-      ))}
-    </div>
-  );
-}
-
-export function RecipePreview({ recipe, tags }: { recipe: Recipe; tags: string[] }) {
-  const ingredientLines = getTextLines(recipe.ingredients);
-  const preparationLines = getTextLines(recipe.preparation_steps);
-  const nutritionItems = [
-    { label: "kcal", value: recipe.calories, suffix: "" },
-    { label: "Protein", value: recipe.protein, suffix: "g" },
-    { label: "Carbs", value: recipe.carbs, suffix: "g" },
-    { label: "Fett", value: recipe.fats, suffix: "g" },
-  ].filter((item) => item.value !== null);
-
-  const servingSize = formatNumber(recipe.serving_size);
-
-  return (
-    <div className="space-y-4">
-      {recipe.image_url && (
-        <div className="overflow-hidden rounded-xl border border-brand-card-border bg-brand-chip-neutral">
-          <Image
-            src={recipe.image_url}
-            alt={recipe.name}
-            width={720}
-            height={480}
-            className="h-56 w-full object-cover"
-            unoptimized
-          />
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-brand-ink">
-              {recipe.name}
-            </h3>
-          </div>
-
-          {recipe.source_url && (
-            <a
-              href={recipe.source_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-brand-tertiary transition-colors hover:bg-brand-chip-neutral hover:text-brand-ink"
-              aria-label={`Quelle für ${recipe.name} öffnen`}
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-xs text-brand-secondary">
-          {recipe.prep_time && (
-            <span className="rounded-full bg-brand-chip-neutral px-2.5 py-1">
-              {recipe.prep_time}
-            </span>
-          )}
-          {servingSize && (
-            <span className="rounded-full bg-brand-chip-neutral px-2.5 py-1">
-              {servingSize} Portionen
-            </span>
-          )}
-        </div>
-
-        <TagBadges tags={tags} />
-      </div>
-
-      {nutritionItems.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 rounded-lg bg-brand-stat-bg p-3">
-          {nutritionItems.map((item) => (
-            <div
-              key={item.label}
-              className="rounded-md bg-white px-3 py-2 ring-1 ring-brand-card-border"
-            >
-              <p className="text-[11px] font-medium uppercase tracking-wide text-brand-muted">
-                {item.label}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-brand-ink">
-                {formatNumber(item.value)}
-                {item.suffix}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-3">
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-brand-muted">
-            Zutaten
-          </h4>
-          {ingredientLines.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-sm text-brand-secondary">
-              {ingredientLines.map((ingredient) => (
-                <li key={ingredient} className="flex gap-2">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-brand-muted" />
-                  <span>{ingredient}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-brand-tertiary">
-              Keine Zutaten
-            </p>
-          )}
-        </div>
-
-        {preparationLines.length > 0 && (
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-brand-muted">
-              Zubereitung
-            </h4>
-            <ol className="mt-2 space-y-2 text-sm text-brand-secondary">
-              {preparationLines.map((step, index) => (
-                <li key={`${index}-${step}`} className="flex gap-3">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-chip-neutral text-xs font-medium text-brand-secondary">
-                    {index + 1}
-                  </span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 interface RecipeListProps {
   recipes: Recipe[];
@@ -344,27 +191,29 @@ export function RecipeList({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Input
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Suchen…"
-          aria-label="Rezepte suchen"
-        />
-        <Button
+        <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl bg-brand-chip-neutral px-3">
+          <Search className="size-4 shrink-0 text-brand-secondary" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Suchen"
+            aria-label="Rezepte suchen"
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
+          />
+        </label>
+        <button
           type="button"
-          variant="outline"
-          size="icon"
           onClick={() => setShowFilters((prev) => !prev)}
           aria-label="Filter umschalten"
           aria-expanded={showFilters}
           className={cn(
-            "shrink-0",
-            hasActiveFilters &&
-              "border-brand-accent-dark text-brand-accent-dark",
+            "flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-chip-neutral text-brand-ink transition-transform active:scale-90",
+            hasActiveFilters && "bg-brand-accent-bg text-brand-accent-dark ring-1 ring-brand-accent",
           )}
         >
-          <SlidersHorizontal className="h-4 w-4" />
-        </Button>
+          <SlidersHorizontal className="size-[18px]" />
+        </button>
         {toolbarActions}
       </div>
 
@@ -469,10 +318,8 @@ export function RecipeList({
                   );
                 }}
                 className={cn(
-                  "group relative overflow-hidden rounded-xl border bg-white transition-all duration-150 hover:shadow-md active:scale-[0.97]",
-                  isSelected
-                    ? "border-brand-accent-dark ring-2 ring-brand-accent-dark"
-                    : "border-brand-card-border",
+                  "group relative overflow-hidden rounded-2xl bg-white ring-1 transition-all duration-150 hover:shadow-md active:scale-[0.97]",
+                  isSelected ? "ring-2 ring-brand-accent-dark" : "ring-brand-card-border",
                   disableDrag ? "cursor-pointer" : "cursor-move",
                 )}
               >

@@ -1,14 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Loader2, Minus, Plus } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { queryKeys, useUserId } from "@/hooks/use-planner-data";
 import type { UserPreferences } from "@/types/database";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/controls";
+import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { SubPage } from "./sub-page";
 
@@ -103,209 +102,181 @@ export function useNutritionTargets() {
   return [data ?? DEFAULT_NUTRITION_TARGETS, setTargets] as const;
 }
 
+type TargetKey = "calories" | "protein" | "carbs" | "fats";
+
+const TARGET_FIELDS: { key: TargetKey; label: string; unit: string; step: number; max: number }[] = [
+  { key: "calories", label: "Kalorien", unit: "kcal", step: 50, max: 9950 },
+  { key: "protein", label: "Protein", unit: "g", step: 5, max: 995 },
+  { key: "carbs", label: "Carbs", unit: "g", step: 5, max: 995 },
+  { key: "fats", label: "Fett", unit: "g", step: 5, max: 995 },
+];
+
+const SAVE_DELAY_MS = 600;
+
 interface NutritionTargetsScreenProps {
   targets: NutritionTargetSettings;
   onBack: () => void;
-  onSaved: (targets: NutritionTargetSettings) => void;
+  onChange: (targets: NutritionTargetSettings) => void;
 }
 
-export function NutritionTargetsScreen({
-  targets,
-  onBack,
-  onSaved,
-}: NutritionTargetsScreenProps) {
-  const [targetSettings, setTargetSettings] =
-    useState<NutritionTargetSettings>(targets);
-  const [isSavingTargets, setIsSavingTargets] = useState(false);
-  const supabase = createClient();
+/**
+ * Daily targets with +/- steppers and on/off switches. Changes save by
+ * themselves shortly after the last tap; leaving the screen saves right away.
+ */
+export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionTargetsScreenProps) {
+  const [settings, setSettings] = useState<NutritionTargetSettings>(targets);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const pendingRef = useRef<NutritionTargetSettings | null>(null);
+  const timerRef = useRef<number | null>(null);
 
-  const handleTargetToggle = (
-    field: keyof NutritionTargetSettings,
-    checked: boolean,
-  ) => {
-    setTargetSettings((prev) => ({
-      ...prev,
-      [field]: checked,
-    }));
-  };
+  const save = useCallback(async () => {
+    const next = pendingRef.current;
+    if (!next) return;
+    pendingRef.current = null;
+    setSaveState("saving");
 
-  const handleTargetValueChange = (
-    field: keyof NutritionTargetSettings,
-    value: string,
-  ) => {
-    const parsedValue = Number(value);
-
-    setTargetSettings((prev) => ({
-      ...prev,
-      [field]:
-        Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 0,
-    }));
-  };
-
-  const handleSaveTargets = async () => {
     try {
-      setIsSavingTargets(true);
-
       const user = await getSessionUser();
+      if (!user) throw new Error("Nicht angemeldet");
 
-      if (!user) {
-        toast.error("Nicht angemeldet");
-        return;
-      }
-
-      const payload = {
-        user_id: user.id,
-        calories_target: targetSettings.calories_target,
-        protein_target: targetSettings.protein_target,
-        carbs_target: targetSettings.carbs_target,
-        fats_target: targetSettings.fats_target,
-        calories_target_enabled: targetSettings.calories_target_enabled,
-        protein_target_enabled: targetSettings.protein_target_enabled,
-        carbs_target_enabled: targetSettings.carbs_target_enabled,
-        fats_target_enabled: targetSettings.fats_target_enabled,
-      };
-
-      const { data, error } = await supabase
+      const { error } = await createClient()
         .from("user_preferences")
-        .upsert(payload, { onConflict: "user_id" })
-        .select("*")
-        .single();
+        .upsert({ user_id: user.id, ...next }, { onConflict: "user_id" });
 
       if (error) throw error;
-
-      toast.success("Ziele gespeichert");
-      onSaved(toNutritionTargets(data));
+      setSaveState("saved");
     } catch (err) {
       console.error(err);
-      toast.error("Speichern fehlgeschlagen");
-    } finally {
-      setIsSavingTargets(false);
+      setSaveState("idle");
+      toast.error("Ziele konnten nicht gespeichert werden");
     }
+  }, []);
+
+  // Save whatever is still waiting when the screen closes.
+  useEffect(
+    () => () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      void save();
+    },
+    [save],
+  );
+
+  const update = (patch: Partial<NutritionTargetSettings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    onChange(next);
+    pendingRef.current = next;
+    setSaveState("saving");
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => void save(), SAVE_DELAY_MS);
   };
 
   return (
     <SubPage
-      title="Ziele"
-      description="Pro Tag"
+      title="Tagesziele"
+      tone="muted"
       onBack={onBack}
+      description="Der Planer zeigt, wie viel davon jeden Tag noch frei ist. Ausgeschaltete Ziele werden nicht angezeigt."
       footer={
-        <Button
-          className="w-full"
-          onClick={handleSaveTargets}
-          disabled={isSavingTargets}
+        <p
+          aria-live="polite"
+          className="flex h-6 items-center justify-center gap-1.5 text-[13px] font-semibold text-brand-accent-dark"
         >
-          {isSavingTargets ? "Speichert…" : "Speichern"}
-        </Button>
+          {saveState === "saving" ? (
+            <>
+              <Loader2 className="size-3.5 animate-spin" />
+              Speichert …
+            </>
+          ) : (
+            <>
+              <Check className="size-3.5" strokeWidth={3} />
+              {saveState === "saved" ? "Gespeichert" : "Speichert automatisch"}
+            </>
+          )}
+        </p>
       }
     >
-      <div className="grid gap-3">
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="calories-target">Kalorien</Label>
-            <Input
-              id="calories-target"
-              type="number"
-              min="0"
-              value={targetSettings.calories_target}
-              disabled={!targetSettings.calories_target_enabled}
-              onChange={(e) =>
-                handleTargetValueChange("calories_target", e.target.value)
-              }
-            />
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <Checkbox
-              id="calories-enabled"
-              checked={targetSettings.calories_target_enabled}
-              onCheckedChange={(checked) =>
-                handleTargetToggle(
-                  "calories_target_enabled",
-                  checked === true,
-                )
-              }
-            />
-            <Label htmlFor="calories-enabled">Aktiv</Label>
-          </div>
-        </div>
+      <div className="space-y-3">
+        {TARGET_FIELDS.map(({ key, label, unit, step, max }) => {
+          const valueKey = `${key}_target` as const;
+          const enabledKey = `${key}_target_enabled` as const;
+          const value = settings[valueKey];
+          const enabled = settings[enabledKey];
+          const setValue = (next: number) =>
+            update({ [valueKey]: Math.min(Math.max(Math.round(next), 0), max) });
 
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="protein-target">Protein (g)</Label>
-            <Input
-              id="protein-target"
-              type="number"
-              min="0"
-              value={targetSettings.protein_target}
-              disabled={!targetSettings.protein_target_enabled}
-              onChange={(e) =>
-                handleTargetValueChange("protein_target", e.target.value)
-              }
-            />
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <Checkbox
-              id="protein-enabled"
-              checked={targetSettings.protein_target_enabled}
-              onCheckedChange={(checked) =>
-                handleTargetToggle("protein_target_enabled", checked === true)
-              }
-            />
-            <Label htmlFor="protein-enabled">Aktiv</Label>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="carbs-target">Carbs (g)</Label>
-            <Input
-              id="carbs-target"
-              type="number"
-              min="0"
-              value={targetSettings.carbs_target}
-              disabled={!targetSettings.carbs_target_enabled}
-              onChange={(e) =>
-                handleTargetValueChange("carbs_target", e.target.value)
-              }
-            />
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <Checkbox
-              id="carbs-enabled"
-              checked={targetSettings.carbs_target_enabled}
-              onCheckedChange={(checked) =>
-                handleTargetToggle("carbs_target_enabled", checked === true)
-              }
-            />
-            <Label htmlFor="carbs-enabled">Aktiv</Label>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="fats-target">Fett (g)</Label>
-            <Input
-              id="fats-target"
-              type="number"
-              min="0"
-              value={targetSettings.fats_target}
-              disabled={!targetSettings.fats_target_enabled}
-              onChange={(e) =>
-                handleTargetValueChange("fats_target", e.target.value)
-              }
-            />
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <Checkbox
-              id="fats-enabled"
-              checked={targetSettings.fats_target_enabled}
-              onCheckedChange={(checked) =>
-                handleTargetToggle("fats_target_enabled", checked === true)
-              }
-            />
-            <Label htmlFor="fats-enabled">Aktiv</Label>
-          </div>
-        </div>
+          return (
+            <section
+              key={key}
+              className={cn(
+                "space-y-3 rounded-[18px] bg-white p-3.5 ring-1 ring-brand-card-border transition-opacity",
+                !enabled && "opacity-60",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[15px] font-bold text-brand-ink">{label}</span>
+                <Switch
+                  checked={enabled}
+                  onChange={(checked) => update({ [enabledKey]: checked })}
+                  label={`${label} anzeigen`}
+                />
+              </div>
+              <div className="flex items-center gap-2.5">
+                <StepButton
+                  label={`${label} verringern`}
+                  disabled={!enabled}
+                  onClick={() => setValue(value - step)}
+                >
+                  <Minus className="size-4" strokeWidth={3} />
+                </StepButton>
+                <label className="flex flex-1 items-baseline justify-center gap-1.5">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={value.toLocaleString("de-DE")}
+                    disabled={!enabled}
+                    onChange={(event) => setValue(Number(event.target.value.replace(/\D/g, "")) || 0)}
+                    aria-label={`${label} in ${unit}`}
+                    className="w-28 bg-transparent text-right font-heading text-[28px] font-extrabold text-brand-ink outline-none"
+                  />
+                  <span className="w-12 text-[15px] font-semibold text-brand-secondary">{unit}</span>
+                </label>
+                <StepButton
+                  label={`${label} erhöhen`}
+                  disabled={!enabled}
+                  onClick={() => setValue(value + step)}
+                >
+                  <Plus className="size-4" strokeWidth={3} />
+                </StepButton>
+              </div>
+            </section>
+          );
+        })}
       </div>
     </SubPage>
+  );
+}
+
+function StepButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-xl bg-brand-chip-neutral text-brand-ink transition-transform active:scale-90 active:bg-brand-accent-bg disabled:active:scale-100"
+    >
+      {children}
+    </button>
   );
 }

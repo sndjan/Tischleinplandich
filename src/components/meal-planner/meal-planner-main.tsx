@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChefHat, MessageSquarePlus, Pencil, Settings2, Trash2, WifiOff } from "lucide-react";
-import { MealWeekView } from "./meal-week-view";
+import { WifiOff } from "lucide-react";
+import { MealWeekView, useViewMode, ViewModeToggle } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
 import { RecipeEditor } from "./recipe-editor";
 import { RecipeCreateScreen } from "./recipe-create-screen";
-import { RecipePreview } from "./recipe-list";
+import { RecipeView } from "./recipe-view";
+import { SharedRecipeScreen } from "./shared-recipe-screen";
+import { ProfileScreen, profileInitial } from "./profile-screen";
 import { CookingMode } from "./cooking-mode";
 import { AddMealScreen } from "./add-meal-screen";
 import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
-import { SubPage } from "./sub-page";
 import { FeedbackScreen } from "./feedback-screen";
 import { PantryStaplesScreen, usePantryStaples } from "./pantry-staples-settings";
 import { ScreenStackProvider, useScreenStack, type Screen } from "./screen-stack";
@@ -27,7 +28,8 @@ import { QueryProvider } from "@/lib/query-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useMealPlanData } from "@/hooks/use-planner-data";
+import { useAuth } from "@/lib/auth/context";
+import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
 import { sumMealNutrition } from "./day-card";
 
@@ -68,6 +70,9 @@ function MealPlanner() {
   const [nutritionTargets, setNutritionTargets] = useNutritionTargets();
   const [pantryStaples, setPantryStaples] = usePantryStaples();
   const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
+  const [viewMode, setViewMode] = useViewMode();
+  const { user } = useAuth();
+  const { data: profile } = useProfileQuery();
   const [desktopRightPanelTab, setDesktopRightPanelTab] =
     useState<DesktopRightPanelTab>("recipes");
   const isOnline = useIsOnline();
@@ -144,6 +149,23 @@ function MealPlanner() {
     deleteRecipe(recipe);
   };
 
+  // Stored with feedback to help reproduce bugs.
+  const feedbackContext =
+    typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+      ? `Desktop · ${desktopRightPanelTab}`
+      : `Mobil · ${mobileTab}`;
+
+  const avatar = (
+    <button
+      type="button"
+      onClick={() => openScreen({ kind: "profile" })}
+      aria-label="Profil"
+      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent-bg font-heading text-[15px] font-extrabold text-brand-accent-dark transition-transform active:scale-90"
+    >
+      {profileInitial(profile?.displayName, user?.email)}
+    </button>
+  );
+
   const renderScreen = (screen: Screen) => {
     switch (screen.kind) {
       case "recipe-form":
@@ -173,59 +195,36 @@ function MealPlanner() {
         );
       case "recipe-preview":
         return (
-          <SubPage
-            title="Rezept"
+          <RecipeView
+            recipe={screen.recipe}
+            tags={mealPlanData.tagsById[screen.recipe.id] ?? []}
+            initialServings={screen.servings}
             onBack={closeScreen}
-            actions={
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  onClick={() =>
-                    // Replace so saving the form returns to the list, not a stale preview.
-                    replaceScreen({ kind: "recipe-form", recipe: screen.recipe })
-                  }
-                  aria-label="Rezept bearbeiten"
-                  title="Bearbeiten"
-                >
-                  <Pencil className="size-5 text-brand-tertiary" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  onClick={() => handleRecipeDelete(screen.recipe)}
-                  aria-label="Rezept löschen"
-                  title="Löschen"
-                >
-                  <Trash2 className="size-5 text-red-500" />
-                </Button>
-              </>
-            }
-            footer={
-              <Button
-                className="h-12 w-full"
-                onClick={() => openScreen({ kind: "cooking-mode", recipe: screen.recipe })}
-              >
-                <ChefHat className="size-5" />
-                Kochen starten
-              </Button>
-            }
-          >
-            <RecipePreview
-              recipe={screen.recipe}
-              tags={mealPlanData.tagsById[screen.recipe.id] ?? []}
-            />
-          </SubPage>
+            // Replace so saving the form returns to the list, not a stale preview.
+            onEdit={(recipe) => replaceScreen({ kind: "recipe-form", recipe })}
+            onDelete={handleRecipeDelete}
+            onCook={(recipe, servings) => openScreen({ kind: "cooking-mode", recipe, servings })}
+          />
         );
       case "cooking-mode":
-        return <CookingMode recipe={screen.recipe} onBack={closeScreen} />;
+        return <CookingMode recipe={screen.recipe} servings={screen.servings} onBack={closeScreen} />;
+      case "shared-recipe":
+        return <SharedRecipeScreen recipe={screen.recipe} onBack={closeScreen} />;
+      case "profile":
+        return (
+          <ProfileScreen
+            targets={nutritionTargets}
+            pantryStaples={pantryStaples}
+            feedbackContext={feedbackContext}
+            onBack={closeScreen}
+          />
+        );
       case "add-meal":
         return (
           <AddMealScreen
             dayOfWeek={screen.dayIndex}
             mealType={screen.mealType}
+            nutritionTargets={nutritionTargets}
             onBack={closeScreen}
             onMealAdded={closeScreen}
           />
@@ -235,10 +234,7 @@ function MealPlanner() {
           <NutritionTargetsScreen
             targets={nutritionTargets}
             onBack={closeScreen}
-            onSaved={(targets) => {
-              setNutritionTargets(targets);
-              closeScreen();
-            }}
+            onChange={setNutritionTargets}
           />
         );
       case "pantry-staples":
@@ -265,43 +261,34 @@ function MealPlanner() {
       {/* The planner stays mounted underneath open screens so it keeps its state. */}
       <div
         className={cn(
-          "min-h-screen bg-brand-app-bg pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0",
+          "min-h-screen bg-brand-app-bg pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0",
           stack.length > 0 && "hidden",
         )}
       >
-        <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white">
-          <div className="flex items-center justify-between px-4 py-4">
-            <h1 className="font-heading text-2xl font-extrabold text-brand-ink">
-              <span aria-hidden="true" className="mr-2">🥗</span>
-              <span className="sm:hidden">WMP</span>
-              <span className="hidden sm:inline">Wochen-Essensplaner</span>
+        <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
+          <div className="flex h-[60px] items-center justify-between gap-3 px-4">
+            <h1 className="flex min-w-0 items-center gap-2 font-heading text-[22px] font-extrabold text-brand-ink">
+              {mobileTab === "plan" ? (
+                <>
+                  <span aria-hidden="true" className="text-[26px]">🥗</span>
+                  <span className="sm:hidden">WMP</span>
+                  <span className="hidden sm:inline">Wochen-Essensplaner</span>
+                </>
+              ) : (
+                <>
+                  <span className="lg:hidden">{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>
+                  <span className="hidden items-center gap-2 lg:flex">
+                    <span aria-hidden="true" className="text-[26px]">🥗</span>
+                    Wochen-Essensplaner
+                  </span>
+                </>
+              )}
             </h1>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  openScreen({
-                    kind: "feedback",
-                    context: window.matchMedia("(min-width: 1024px)").matches
-                      ? `Desktop · ${desktopRightPanelTab}`
-                      : `Mobil · ${mobileTab}`,
-                  })
-                }
-                aria-label="Feedback senden"
-                title="Feedback senden"
-              >
-                <MessageSquarePlus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-brand-accent-dark"
-                onClick={() => openScreen({ kind: "nutrition-targets" })}
-              >
-                <Settings2 className="mr-1.5 h-4 w-4" />
-                Ziele
-              </Button>
+              <div className={cn(mobileTab !== "plan" && "hidden lg:block")}>
+                <ViewModeToggle value={viewMode} onChange={setViewMode} />
+              </div>
+              {avatar}
             </div>
           </div>
         </header>
@@ -316,7 +303,7 @@ function MealPlanner() {
           </div>
         )}
 
-        <main className="p-4">
+        <main className="p-3 sm:p-4">
           {/* Desktop layout: week view next to the recipe-library-or-shopping-list panel */}
           <div className="hidden lg:block">
             <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6">
@@ -326,6 +313,8 @@ function MealPlanner() {
                   plannedMeals={mealPlanData.plannedMeals}
                   loading={mealPlanData.loading}
                   nutritionTargets={nutritionTargets}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
                 />
               </div>
               <Card className="p-3">
@@ -377,18 +366,14 @@ function MealPlanner() {
                 plannedMeals={mealPlanData.plannedMeals}
                 loading={mealPlanData.loading}
                 nutritionTargets={nutritionTargets}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
               />
             )}
             {mobileTab === "shopping" && (
-              <Card className="p-3">
-                <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
-              </Card>
+              <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
             )}
-            {mobileTab === "recipes" && (
-              <Card className="p-3">
-                <RecipeLibrary />
-              </Card>
-            )}
+            {mobileTab === "recipes" && <RecipeLibrary />}
           </div>
         </main>
 

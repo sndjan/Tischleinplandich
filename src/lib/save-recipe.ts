@@ -27,7 +27,7 @@ const uniqueTags = (tags: string[]) => {
     });
 };
 
-async function syncRecipeTags(recipeId: string, userId: string, tags: string[]) {
+export async function syncRecipeTags(recipeId: string, userId: string, tags: string[]) {
   const supabase = createClient();
   const tagNames = uniqueTags(tags);
 

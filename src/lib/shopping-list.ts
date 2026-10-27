@@ -220,6 +220,7 @@ function toDisplayUnit(
 function parseIngredientLines(
   ingredients: string,
   multiplier: number,
+  source?: string,
 ): ShoppingListItem[] {
   if (!ingredients || multiplier <= 0) {
     return [];
@@ -235,6 +236,8 @@ function parseIngredientLines(
       ingredient: item.ingredient,
       quantity: roundQuantity(item.quantity * multiplier),
       unit: item.unit,
+      label: item.label,
+      sources: source ? [source] : [],
     }));
 }
 
@@ -246,6 +249,7 @@ export function parseIngredient(ingredientLine: string): {
   ingredient: string;
   quantity: number;
   unit: string;
+  label: string;
 } {
   const cleanedLine = ingredientLine
     .trim()
@@ -258,6 +262,7 @@ export function parseIngredient(ingredientLine: string): {
       ingredient: "",
       quantity: 0,
       unit: "",
+      label: "",
     };
   }
 
@@ -280,14 +285,13 @@ export function parseIngredient(ingredientLine: string): {
     }
   }
 
-  const ingredientName = normalizeIngredientName(
-    tokens.slice(cursor).join(" "),
-  );
+  const rawName = tokens.slice(cursor).join(" ").trim() || cleanedLine;
 
   return {
-    ingredient: ingredientName || normalizeIngredientName(cleanedLine),
+    ingredient: normalizeIngredientName(rawName),
     quantity,
     unit,
+    label: rawName.charAt(0).toUpperCase() + rawName.slice(1),
   };
 }
 
@@ -316,18 +320,20 @@ export function mergeShoppingList(
     const baseValue = toBaseUnit(normalizedQuantity, normalizedUnit);
     const key = `${ingredientName}|${baseValue.unit}`;
 
-    if (grouped.has(key)) {
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.quantity = roundQuantity(
-          existing.quantity + baseValue.quantity,
-        );
+    const existing = grouped.get(key);
+
+    if (existing) {
+      existing.quantity = roundQuantity(existing.quantity + baseValue.quantity);
+      for (const source of item.sources ?? []) {
+        if (!existing.sources?.includes(source)) existing.sources?.push(source);
       }
     } else {
       grouped.set(key, {
         ingredient: ingredientName,
         quantity: roundQuantity(baseValue.quantity),
         unit: baseValue.unit,
+        label: item.label,
+        sources: [...(item.sources ?? [])],
       });
     }
   }
@@ -336,7 +342,7 @@ export function mergeShoppingList(
     .map((item) => {
       const display = toDisplayUnit(item.quantity, item.unit);
       return {
-        ingredient: item.ingredient,
+        ...item,
         quantity: roundQuantity(display.quantity),
         unit: display.unit,
       };
@@ -370,7 +376,7 @@ export function generateShoppingListFromRecipes(
  */
 export function generateShoppingListFromPlannedMeals(
   plannedMeals: Array<Pick<PlannedMeal, "recipe_id" | "serving_size">>,
-  recipes: Array<Pick<Recipe, "id" | "ingredients" | "serving_size">>,
+  recipes: Array<Pick<Recipe, "id" | "name" | "ingredients" | "serving_size">>,
 ): ShoppingListItem[] {
   if (plannedMeals.length === 0 || recipes.length === 0) {
     return [];
@@ -393,7 +399,7 @@ export function generateShoppingListFromPlannedMeals(
       recipe.serving_size && recipe.serving_size > 0 ? recipe.serving_size : 1;
 
     const multiplier = plannedServings / recipeServings;
-    items.push(...parseIngredientLines(recipe.ingredients, multiplier));
+    items.push(...parseIngredientLines(recipe.ingredients, multiplier, recipe.name));
   }
 
   return mergeShoppingList(items);
@@ -428,51 +434,4 @@ export function isBasicIngredient(
   return pantryStaples.some(
     (staple) => name === staple || name.endsWith(` ${staple}`),
   );
-}
-
-/**
- * Format shopping list for display
- */
-export function formatShoppingList(items: ShoppingListItem[]): string {
-  return items
-    .map((item) => {
-      const quantity = Number.isInteger(item.quantity)
-        ? String(item.quantity)
-        : item.quantity
-            .toFixed(2)
-            .replace(/\.00$/, "")
-            .replace(/(\.\d)0$/, "$1");
-
-      const capitalizedIngredient =
-        item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1);
-
-      return item.unit
-        ? `${quantity} ${item.unit} ${capitalizedIngredient}`
-        : `${quantity} ${capitalizedIngredient}`;
-    })
-    .join("\n");
-}
-
-/**
- * Build Bring app deep link URL
- * Reference: https://sites.google.com/getbring.com/bring-import-dev-guide/web-to-app-integration
- */
-export function generateBringAppLink(items: ShoppingListItem[]): string {
-  const listNameEncoded = encodeURIComponent("Wochen-Essensplaner");
-
-  const itemsParams = items
-    .map((item) => {
-      const quantity = Number.isInteger(item.quantity)
-        ? String(item.quantity)
-        : item.quantity.toFixed(2);
-
-      const fullItem = item.unit
-        ? `${quantity} ${item.unit} ${item.ingredient}`
-        : `${quantity} ${item.ingredient}`;
-
-      return `&listItems[]=${encodeURIComponent(fullItem)}`;
-    })
-    .join("");
-
-  return `https://www.getbring.com/?listName=${listNameEncoded}${itemsParams}`;
 }

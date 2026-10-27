@@ -33,8 +33,8 @@ export function WeekSummary({
   const weekCaloriesTarget = nutritionTargets.calories_target * 7;
 
   return (
-    <div className="rounded-2xl bg-white p-3 ring-1 ring-brand-card-border">
-      <div className="rounded-xl bg-brand-stat-bg p-3">
+    <div className="rounded-[18px] bg-white px-4 py-3.5 ring-1 ring-brand-card-border">
+      <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <div className="font-heading flex items-center gap-1.5 text-sm font-bold">
             <Flame className="h-4 w-4 text-brand-accent-dark" strokeWidth={2.5} />
@@ -115,7 +115,7 @@ export function WeekOverviewList({
               type="button"
               onClick={() => onSelectDay(dayIndex)}
               className={cn(
-                "flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left ring-1 ring-brand-card-border transition-colors hover:bg-brand-accent-bg-light",
+                "flex w-full touch-manipulation items-center gap-3 rounded-[18px] bg-white px-4 py-3 text-left ring-1 ring-brand-card-border transition-all hover:bg-brand-accent-bg-light active:scale-[0.98]",
                 dayIndex === todayIndex && "ring-2 ring-brand-accent",
               )}
             >

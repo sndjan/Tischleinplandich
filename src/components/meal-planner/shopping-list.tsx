@@ -1,396 +1,438 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ShoppingListItem } from "@/types/database";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Eye, EyeOff, Plus, Share, X } from "lucide-react";
+import toast from "react-hot-toast";
+import type { ShoppingListItem } from "@/types/database";
 import { isBasicIngredient } from "@/lib/shopping-list";
-import { Eye, EyeOff, Pencil, Plus, Settings2, Trash2 } from "lucide-react";
-import { useScreenStack } from "./screen-stack";
+import {
+  formatShoppingAmount,
+  getShoppingSection,
+  SHOPPING_SECTIONS,
+  shoppingItemLabel,
+  type ShoppingSectionId,
+} from "@/lib/shopping-sections";
+import { cn } from "@/lib/utils";
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
   pantryStaples: string[];
 }
 
-const CHECKED_ITEMS_STORAGE_KEY =
-  "weekly-meal-planner:shopping-list:checked-items";
-const HIDE_BASICS_STORAGE_KEY = "weekly-meal-planner:shopping-list:hide-basics";
+type CustomItem = { id: string; label: string };
 
-function getItemStorageKey(item: ShoppingListItem): string {
-  return `${item.ingredient.trim().toLowerCase()}|${item.unit.trim().toLowerCase()}`;
+type Row = {
+  key: string;
+  label: string;
+  amount: string;
+  sources: string[];
+  section: ShoppingSectionId;
+  basic: boolean;
+  customId?: string;
+};
+
+const CHECKED_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:checked-items";
+const HIDE_BASICS_STORAGE_KEY = "weekly-meal-planner:shopping-list:hide-basics";
+const CUSTOM_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:custom-items";
+
+function readStorage<T>(key: string, fallback: T): T {
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored === null ? fallback : (JSON.parse(stored) as T);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStorage(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage unavailable; the list still works for this session.
+  }
+}
+
+const getItemKey = (item: ShoppingListItem) =>
+  `${item.ingredient.trim().toLowerCase()}|${item.unit.trim().toLowerCase()}`;
+
+// Monday to Sunday of the current week, the days the planner shows.
+function formatWeekRange() {
+  const start = new Date();
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const format = (date: Date) =>
+    date.toLocaleDateString("de-DE", { day: "numeric", month: "short" }).replace(/\.$/, "");
+  return `${format(start)} – ${format(end)}`;
+}
+
+/**
+ * The list as plain text for messengers: only what is still missing, by section.
+ */
+function buildShareText(sections: { label: string; emoji: string; rows: Row[] }[]) {
+  const blocks = sections.map(
+    (section) =>
+      `${section.emoji} ${section.label}\n${section.rows
+        .map((row) => (row.amount ? `• ${row.label} – ${row.amount}` : `• ${row.label}`))
+        .join("\n")}`,
+  );
+  return [`🛒 Einkauf ${formatWeekRange()}`, ...blocks].join("\n\n");
 }
 
 export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
-  const { openScreen } = useScreenStack();
-  const [editableItems, setEditableItems] = useState<ShoppingListItem[]>(items);
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [isStorageHydrated, setIsStorageHydrated] = useState(false);
-  const [hideBasics, setHideBasics] = useState(false);
+  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
+  const [customItems, setCustomItems] = useState<CustomItem[]>([]);
+  const [hideBasics, setHideBasics] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newItem, setNewItem] = useState("");
+  const addInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    try {
-      setHideBasics(
-        window.localStorage.getItem(HIDE_BASICS_STORAGE_KEY) === "true",
-      );
-    } catch {
-      // Storage unavailable; keep the default.
-    }
+    const storedChecked = readStorage<unknown>(CHECKED_ITEMS_STORAGE_KEY, []);
+    setCheckedKeys(
+      new Set(Array.isArray(storedChecked) ? storedChecked.filter((key) => typeof key === "string") : []),
+    );
+    const storedCustom = readStorage<unknown>(CUSTOM_ITEMS_STORAGE_KEY, []);
+    setCustomItems(Array.isArray(storedCustom) ? (storedCustom as CustomItem[]) : []);
+    setHideBasics(readStorage<unknown>(HIDE_BASICS_STORAGE_KEY, true) !== false);
+    setHydrated(true);
   }, []);
 
-  const toggleHideBasics = () => {
-    setHideBasics((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(HIDE_BASICS_STORAGE_KEY, String(next));
-      } catch {
-        // Storage unavailable; the toggle still works for this session.
-      }
+  useEffect(() => {
+    if (hydrated) writeStorage(CHECKED_ITEMS_STORAGE_KEY, Array.from(checkedKeys));
+  }, [checkedKeys, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) writeStorage(CUSTOM_ITEMS_STORAGE_KEY, customItems);
+  }, [customItems, hydrated]);
+
+  useEffect(() => {
+    if (adding) addInputRef.current?.focus();
+  }, [adding]);
+
+  const rows = useMemo<Row[]>(
+    () => [
+      ...items.map((item) => ({
+        key: getItemKey(item),
+        label: shoppingItemLabel(item),
+        amount: formatShoppingAmount(item.quantity, item.unit),
+        sources: item.sources ?? [],
+        section: getShoppingSection(item),
+        basic: isBasicIngredient(item.ingredient, pantryStaples),
+      })),
+      ...customItems.map((item) => ({
+        key: `custom|${item.id}`,
+        label: item.label,
+        amount: "",
+        sources: [],
+        section: getShoppingSection({ ingredient: item.label, unit: "" }),
+        basic: false,
+        customId: item.id,
+      })),
+    ],
+    [items, customItems, pantryStaples],
+  );
+
+  // Forget checks for items that left the list (e.g. a meal was removed).
+  useEffect(() => {
+    if (!hydrated) return;
+    const validKeys = new Set(rows.map((row) => row.key));
+    setCheckedKeys((prev) => {
+      const next = new Set([...prev].filter((key) => validKeys.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rows, hydrated]);
+
+  const hiddenBasics = hideBasics ? rows.filter((row) => row.basic) : [];
+  const visibleRows = hideBasics ? rows.filter((row) => !row.basic) : rows;
+  const openRows = visibleRows.filter((row) => !checkedKeys.has(row.key));
+  const doneRows = visibleRows.filter((row) => checkedKeys.has(row.key));
+
+  const sections = SHOPPING_SECTIONS.map((section) => ({
+    ...section,
+    rows: openRows
+      .filter((row) => row.section === section.id)
+      .sort((a, b) => a.label.localeCompare(b.label, "de")),
+  })).filter((section) => section.rows.length > 0);
+
+  const recipeCount = new Set(items.flatMap((item) => item.sources ?? [])).size;
+  const progress = visibleRows.length > 0 ? doneRows.length / visibleRows.length : 0;
+
+  const toggle = (key: string) => {
+    if (navigator.vibrate) navigator.vibrate(8);
+    setCheckedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
 
-  useEffect(() => {
+  const toggleHideBasics = () => {
+    setHideBasics((prev) => {
+      writeStorage(HIDE_BASICS_STORAGE_KEY, !prev);
+      return !prev;
+    });
+  };
+
+  const addCustomItem = (event: React.FormEvent) => {
+    event.preventDefault();
+    const label = newItem.trim();
+    if (!label) {
+      setAdding(false);
+      return;
+    }
+    setCustomItems((prev) => [...prev, { id: crypto.randomUUID(), label }]);
+    setNewItem("");
+  };
+
+  const removeCustomItem = (id: string) =>
+    setCustomItems((prev) => prev.filter((item) => item.id !== id));
+
+  const share = async () => {
+    if (sections.length === 0) {
+      toast("Alles im Wagen 🎉");
+      return;
+    }
+
+    const text = buildShareText(sections);
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
     try {
-      const storedItems = window.localStorage.getItem(
-        CHECKED_ITEMS_STORAGE_KEY,
-      );
-
-      if (!storedItems) {
-        return;
-      }
-
-      const parsed = JSON.parse(storedItems);
-
-      if (!Array.isArray(parsed)) {
-        return;
-      }
-
-      const validKeys = parsed.filter(
-        (entry): entry is string => typeof entry === "string",
-      );
-      setCheckedItems(new Set(validKeys));
+      await navigator.clipboard.writeText(text);
+      toast.success("Liste kopiert");
     } catch {
-      // Ignore malformed data and start with an empty set.
-    } finally {
-      setIsStorageHydrated(true);
+      toast.error("Teilen nicht möglich");
     }
-  }, []);
-
-  useEffect(() => {
-    if (!isStorageHydrated) {
-      return;
-    }
-
-    window.localStorage.setItem(
-      CHECKED_ITEMS_STORAGE_KEY,
-      JSON.stringify(Array.from(checkedItems)),
-    );
-  }, [checkedItems, isStorageHydrated]);
-
-  useEffect(() => {
-    setEditableItems(items);
-
-    const validItemKeys = new Set(items.map((item) => getItemStorageKey(item)));
-
-    setCheckedItems((prev) => {
-      const nextCheckedItems = new Set<string>();
-
-      prev.forEach((key) => {
-        if (validItemKeys.has(key)) {
-          nextCheckedItems.add(key);
-        }
-      });
-
-      return nextCheckedItems;
-    });
-  }, [items]);
-
-  const toggleItem = (rowKey: string) => {
-    const newSet = new Set(checkedItems);
-    if (newSet.has(rowKey)) {
-      newSet.delete(rowKey);
-    } else {
-      newSet.add(rowKey);
-    }
-    setCheckedItems(newSet);
   };
-
-  const updateItem = (index: number, updates: Partial<ShoppingListItem>) => {
-    setEditableItems((prev) =>
-      prev.map((item, currentIndex) =>
-        currentIndex === index
-          ? {
-              ...item,
-              ...updates,
-            }
-          : item,
-      ),
-    );
-  };
-
-  const removeItem = (index: number) => {
-    const removedItem = editableItems[index];
-
-    setEditableItems((prev) =>
-      prev.filter((_, currentIndex) => currentIndex !== index),
-    );
-
-    if (!removedItem) {
-      return;
-    }
-
-    const removedItemKey = getItemStorageKey(removedItem);
-    setCheckedItems((prev) => {
-      const nextCheckedItems = new Set(prev);
-      nextCheckedItems.delete(removedItemKey);
-      return nextCheckedItems;
-    });
-  };
-
-  const addCustomItem = () => {
-    setEditableItems((prev) => [
-      ...prev,
-      {
-        ingredient: "",
-        quantity: 1,
-        unit: "",
-      },
-    ]);
-  };
-
-  const viewRows = editableItems.map((item, index) => {
-    const key = `row-${index}`;
-    const checkKey = getItemStorageKey(item);
-    const isChecked = checkedItems.has(checkKey);
-    const qty = Number.isInteger(item.quantity)
-      ? String(item.quantity)
-      : item.quantity.toFixed(2);
-    const formattedIngredient = item.ingredient
-      .split(" ")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-
-    return {
-      item,
-      index,
-      key,
-      checkKey,
-      isChecked,
-      qty,
-      formattedIngredient,
-      itemLabel: item.unit
-        ? `${qty} ${item.unit} ${formattedIngredient}`
-        : `${qty} ${formattedIngredient}`,
-    };
-  });
-
-  // Basic ingredients are only hidden in view mode; edit mode shows everything.
-  const visibleViewRows = hideBasics
-    ? viewRows.filter((row) => !isBasicIngredient(row.item.ingredient, pantryStaples))
-    : viewRows;
-  const hiddenBasicRows = hideBasics
-    ? viewRows.filter((row) => isBasicIngredient(row.item.ingredient, pantryStaples))
-    : [];
-  const uncheckedViewRows = visibleViewRows.filter((row) => !row.isChecked);
-  const checkedViewRows = visibleViewRows.filter((row) => row.isChecked);
 
   return (
-    <div>
-      <div className="flex items-center gap-2">
-        {/* On desktop the panel tabs above already say "Einkaufsliste". */}
-        <h2 className="font-heading text-lg font-bold text-brand-ink lg:hidden">
-          Einkaufsliste
-        </h2>
-        <div className="flex-1" />
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => openScreen({ kind: "pantry-staples" })}
-          aria-label="Grundzutaten verwalten"
-          title="Grundzutaten verwalten"
-        >
-          <Settings2 className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={hideBasics ? "default" : "outline"}
-          size="icon"
-          onClick={toggleHideBasics}
-          aria-label="Grundzutaten ausblenden"
-          aria-pressed={hideBasics}
-          title={
-            hideBasics ? "Grundzutaten einblenden" : "Grundzutaten ausblenden"
-          }
-        >
-          {hideBasics ? (
-            <EyeOff className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={addCustomItem}
-          disabled={!isEditMode}
-          aria-label="Artikel hinzufügen"
-          title="Artikel hinzufügen"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={isEditMode ? "default" : "outline"}
-          size="icon"
-          onClick={() => setIsEditMode((prev) => !prev)}
-          aria-label="Bearbeitungsmodus umschalten"
-          title="Bearbeitungsmodus umschalten"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="mt-3">
-        {editableItems.length === 0 ? (
-          <p className="text-sm text-brand-tertiary">Liste ist leer</p>
-        ) : !isEditMode ? (
-          <div className="space-y-2">
-            <ul className="space-y-1">
-              {uncheckedViewRows.map((row) => (
-                <li
-                  key={row.key}
-                  className="flex items-center gap-2 text-sm leading-5"
-                >
-                  <input
-                    type="checkbox"
-                    checked={false}
-                    onChange={() => toggleItem(row.checkKey)}
-                    className="w-4 h-4"
-                  />
-                  <span>{row.itemLabel.trim()}</span>
-                </li>
-              ))}
-            </ul>
-
-            {hiddenBasicRows.length > 0 && (
-              <details className="border-brand-card-border py-2">
-                <summary className="cursor-pointer select-none text-xs text-brand-tertiary">
-                  Grundzutaten ({hiddenBasicRows.length})
-                </summary>
-                <ul className="mt-2 space-y-1">
-                  {hiddenBasicRows.map((row) => (
-                    <li
-                      key={row.key}
-                      className={`flex items-center gap-2 text-sm leading-5 ${row.isChecked ? "opacity-50" : ""}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={row.isChecked}
-                        onChange={() => toggleItem(row.checkKey)}
-                        className="w-4 h-4"
-                      />
-                      <span
-                        className={
-                          row.isChecked
-                            ? "text-brand-disabled line-through"
-                            : ""
-                        }
-                      >
-                        {row.itemLabel.trim()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-
-            {checkedViewRows.length > 0 && (
-              <details className=" border-brand-card-border py-2">
-                <summary className="cursor-pointer select-none text-xs text-brand-tertiary">
-                  Erledigt ({checkedViewRows.length})
-                </summary>
-                <ul className="mt-2 space-y-1">
-                  {checkedViewRows.map((row) => (
-                    <li
-                      key={row.key}
-                      className="flex items-center gap-2 text-sm leading-5 opacity-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked
-                        onChange={() => toggleItem(row.checkKey)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-brand-disabled line-through">
-                        {row.itemLabel.trim()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+    <div className="space-y-3">
+      <div className="space-y-3 rounded-[18px] bg-white p-4 ring-1 ring-brand-card-border lg:p-0 lg:ring-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-brand-ink">Diese Woche</p>
+            <p className="text-[13px] text-brand-secondary">
+              {formatWeekRange()}
+              {recipeCount > 0 && ` · ${recipeCount} ${recipeCount === 1 ? "Rezept" : "Rezepte"}`}
+            </p>
           </div>
-        ) : (
-          <ul className="space-y-2">
-            {viewRows.map((row) => {
-              return (
-                <li
-                  key={row.key}
-                  className={`grid grid-cols-[auto_84px_84px_1fr_auto] gap-2 items-center ${row.isChecked ? "opacity-50" : ""}`}
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              aria-label="Artikel hinzufügen"
+              className="flex size-10 items-center justify-center rounded-full bg-brand-chip-neutral text-brand-ink transition-transform active:scale-90"
+            >
+              <Plus className="size-[18px]" strokeWidth={2.5} />
+            </button>
+            <button
+              type="button"
+              onClick={() => void share()}
+              aria-label="Liste teilen"
+              className="flex size-10 items-center justify-center rounded-full bg-brand-chip-neutral text-brand-ink transition-transform active:scale-90"
+            >
+              <Share className="size-[18px]" />
+            </button>
+          </div>
+        </div>
+
+        {rows.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2 text-[13px] font-semibold">
+              <span className="text-brand-ink">
+                {doneRows.length} von {visibleRows.length} im Wagen
+              </span>
+              {(hiddenBasics.length > 0 || !hideBasics) && (
+                <button
+                  type="button"
+                  onClick={toggleHideBasics}
+                  className="flex items-center gap-1 text-brand-secondary transition-opacity active:opacity-60"
                 >
-                  <input
-                    type="checkbox"
-                    checked={row.isChecked}
-                    onChange={() => toggleItem(row.checkKey)}
-                    className="w-4 h-4"
-                  />
-
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={row.qty}
-                    onChange={(event) => {
-                      const parsed = Number.parseFloat(event.target.value);
-                      updateItem(row.index, {
-                        quantity:
-                          Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
-                      });
-                    }}
-                    className="h-8"
-                  />
-
-                  <Input
-                    value={row.item.unit}
-                    onChange={(event) =>
-                      updateItem(row.index, { unit: event.target.value })
-                    }
-                    placeholder="Einheit"
-                    className="h-8"
-                  />
-
-                  <Input
-                    value={row.formattedIngredient}
-                    onChange={(event) =>
-                      updateItem(row.index, { ingredient: event.target.value })
-                    }
-                    placeholder="Zutat"
-                    className={`h-8 ${row.isChecked ? "line-through" : ""}`}
-                  />
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removeItem(row.index)}
-                    className="h-8 px-2"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+                  {hideBasics ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  {hideBasics
+                    ? `${hiddenBasics.length} Grundzutaten ausgeblendet`
+                    : "Grundzutaten ausblenden"}
+                </button>
+              )}
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-brand-track">
+              <div
+                className="h-full rounded-full bg-brand-accent transition-[width] duration-300"
+                style={{ width: `${progress * 100}%` }}
+              />
+            </div>
+          </div>
         )}
       </div>
+
+      {adding && (
+        <form
+          onSubmit={addCustomItem}
+          className="flex animate-fade-up items-center gap-2 rounded-[18px] bg-white p-2 pl-4 ring-1 ring-brand-card-border"
+        >
+          <input
+            ref={addInputRef}
+            value={newItem}
+            onChange={(event) => setNewItem(event.target.value)}
+            onBlur={() => !newItem.trim() && setAdding(false)}
+            placeholder="z. B. Spülmittel"
+            aria-label="Artikel"
+            enterKeyHint="done"
+            className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
+          />
+          <button
+            type="submit"
+            className="h-10 rounded-xl bg-brand-accent-dark px-4 text-sm font-bold text-white transition-transform active:scale-95"
+          >
+            Hinzufügen
+          </button>
+        </form>
+      )}
+
+      {rows.length === 0 && !adding ? (
+        <div className="rounded-[18px] bg-white px-6 py-10 text-center ring-1 ring-brand-card-border">
+          <p className="text-3xl" aria-hidden="true">🧺</p>
+          <p className="mt-2 font-heading text-lg font-extrabold text-brand-ink">Noch nichts zu kaufen</p>
+          <p className="mt-1 text-sm text-brand-secondary">
+            Plane Mahlzeiten für diese Woche, dann steht hier alles, was du brauchst.
+          </p>
+        </div>
+      ) : (
+        <>
+          {sections.map((section) => (
+            <section
+              key={section.id}
+              aria-label={section.label}
+              className="rounded-[18px] bg-white py-1 pl-3.5 pr-1 ring-1 ring-brand-card-border"
+            >
+              <h3 className="flex items-center gap-1.5 pb-1 pt-2.5 text-xs font-bold uppercase tracking-[0.06em] text-brand-accent-dark">
+                <span aria-hidden="true">{section.emoji}</span>
+                {section.label}
+                <span className="text-brand-muted">· {section.rows.length}</span>
+              </h3>
+              <ul>
+                {section.rows.map((row) => (
+                  <ShoppingRow
+                    key={row.key}
+                    row={row}
+                    checked={false}
+                    onToggle={() => toggle(row.key)}
+                    onRemove={row.customId ? () => removeCustomItem(row.customId!) : undefined}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+
+          {sections.length === 0 && doneRows.length > 0 && (
+            <p className="py-2 text-center text-sm font-semibold text-brand-accent-dark">
+              Alles im Wagen 🎉
+            </p>
+          )}
+
+          {doneRows.length > 0 && (
+            <section
+              aria-label="Im Wagen"
+              className="rounded-[18px] bg-white py-1 pl-3.5 pr-1 ring-1 ring-brand-card-border"
+            >
+              <h3 className="flex items-center gap-1.5 pb-1 pt-2.5 text-xs font-bold uppercase tracking-[0.06em] text-brand-muted">
+                <Check className="size-3.5" strokeWidth={3} />
+                Im Wagen · {doneRows.length}
+              </h3>
+              <ul>
+                {doneRows.map((row) => (
+                  <ShoppingRow
+                    key={row.key}
+                    row={row}
+                    checked
+                    onToggle={() => toggle(row.key)}
+                    onRemove={row.customId ? () => removeCustomItem(row.customId!) : undefined}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+function ShoppingRow({
+  row,
+  checked,
+  onToggle,
+  onRemove,
+}: {
+  row: Row;
+  checked: boolean;
+  onToggle: () => void;
+  onRemove?: () => void;
+}) {
+  return (
+    <li className="flex items-center border-b border-brand-divider last:border-b-0">
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        onClick={onToggle}
+        className={cn(
+          "flex min-w-0 flex-1 touch-manipulation items-center gap-3 py-2 pr-3 text-left transition-colors active:bg-brand-accent-bg-light",
+          checked ? "min-h-11" : "min-h-[52px]",
+        )}
+      >
+        <span
+          className={cn(
+            "flex size-6 shrink-0 items-center justify-center rounded-full transition-all duration-150",
+            checked ? "bg-brand-accent text-white" : "border-2 border-brand-disabled",
+          )}
+        >
+          {checked && <Check className="size-3.5 animate-pop-in" strokeWidth={3} />}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span
+            className={cn(
+              "text-[15px]",
+              checked ? "text-brand-muted line-through" : "font-semibold text-brand-ink",
+            )}
+          >
+            {row.label}
+          </span>
+          {!checked && row.sources.length > 0 && (
+            <span className="truncate text-xs text-brand-tertiary">{row.sources.join(" · ")}</span>
+          )}
+        </span>
+        {row.amount && (
+          <span
+            className={cn(
+              "shrink-0 whitespace-nowrap text-[15px]",
+              checked ? "text-brand-muted" : "font-bold text-brand-ink",
+            )}
+          >
+            {row.amount}
+          </span>
+        )}
+      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`${row.label} entfernen`}
+          className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-brand-tertiary transition-colors active:bg-brand-chip-neutral"
+        >
+          <X className="size-4" />
+        </button>
+      )}
+    </li>
   );
 }

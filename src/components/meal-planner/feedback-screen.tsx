@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
 import type { FeedbackCategory } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { StatusButton, useActionStatus } from "@/components/ui/status-button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -34,7 +35,8 @@ interface FeedbackScreenProps {
 export function FeedbackScreen({ context, onBack, onSent }: FeedbackScreenProps) {
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [message, setMessage] = useState("");
-  const [isSending, setIsSending] = useState(false);
+  const { status, run } = useActionStatus();
+  const isSending = status !== "idle";
   const supabase = createClient();
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -47,15 +49,9 @@ export function FeedbackScreen({ context, onBack, onSent }: FeedbackScreenProps)
       return;
     }
 
-    setIsSending(true);
-
-    try {
+    await run(async () => {
       const user = await getSessionUser();
-
-      if (!user) {
-        toast.error("Nicht angemeldet");
-        return;
-      }
+      if (!user) throw new Error("Nicht angemeldet");
 
       // No .select(): users can write feedback but not read it back.
       const { error } = await supabase.from("feedback").insert({
@@ -67,16 +63,16 @@ export function FeedbackScreen({ context, onBack, onSent }: FeedbackScreenProps)
       });
 
       if (error) throw error;
-
-      toast.success("Danke für dein Feedback!");
-      setMessage("");
-      onSent();
-    } catch (err) {
-      console.error(err);
-      toast.error("Senden fehlgeschlagen");
-    } finally {
-      setIsSending(false);
-    }
+    })
+      .then(() => {
+        toast.success("Danke für dein Feedback!");
+        setMessage("");
+        onSent();
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error("Senden fehlgeschlagen");
+      });
   };
 
   return (
@@ -86,15 +82,18 @@ export function FeedbackScreen({ context, onBack, onSent }: FeedbackScreenProps)
       onBack={onBack}
       backDisabled={isSending}
       footer={
-        <Button
+        <StatusButton
           type="submit"
           form={FORM_ID}
-          className="w-full"
-          disabled={isSending || !message.trim()}
+          status={status}
+          pendingLabel="Wird gesendet …"
+          successLabel="Gesendet"
+          className="h-12 w-full rounded-[14px] text-base font-bold"
+          disabled={!message.trim()}
         >
-          <Send className="h-4 w-4" />
-          {isSending ? "Sendet…" : "Senden"}
-        </Button>
+          <Send className="size-4" />
+          Senden
+        </StatusButton>
       }
     >
       <form id={FORM_ID} onSubmit={handleSubmit} className="space-y-4">
@@ -137,7 +136,7 @@ export function FeedbackScreen({ context, onBack, onSent }: FeedbackScreenProps)
                   ? "z. B. Ich hätte gern eine Wochenübersicht"
                   : "Was möchtest du uns sagen?"
             }
-            className="h-32"
+            className="h-40 rounded-2xl text-[15px]"
             disabled={isSending}
             autoFocus
           />
