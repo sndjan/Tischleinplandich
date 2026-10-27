@@ -418,6 +418,31 @@ export type Database = {
         };
         Relationships: [];
       };
+      // "Was ist neu?" entries, read by everyone signed in. Migration 013.
+      changelog: {
+        Row: {
+          id: string;
+          released_on: string;
+          title: string;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          released_on?: string;
+          title: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          released_on?: string;
+          title?: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       // Written only by consume_ai_quota; users can read their own rows. Migration 010.
       ai_usage: {
         Row: {
@@ -466,6 +491,7 @@ export type Database = {
 
 // Application Types
 export type Recipe = Database['public']['Tables']['recipes']['Row'];
+export type ChangelogEntry = Database['public']['Tables']['changelog']['Row'];
 export type MealPlan = Database['public']['Tables']['meal_plans']['Row'];
 export type PlannedMeal = Database['public']['Tables']['planned_meals']['Row'];
 export type Tag = Database['public']['Tables']['tags']['Row'];

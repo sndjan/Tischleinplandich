@@ -29,7 +29,7 @@ type SortOption =
 
 // Upper limits in minutes; 0 means any time.
 const TIME_FILTERS = [
-  { value: 0, label: "Alle" },
+  { value: 0, label: "Jede Zeit" },
   { value: 15, label: "≤ 15 Min." },
   { value: 30, label: "≤ 30 Min." },
   { value: 60, label: "≤ 60 Min." },
@@ -244,32 +244,8 @@ export function RecipeList({
         {toolbarActions}
       </div>
 
-      {/* Cooking time is the filter people reach for most, so it stays visible. */}
-      <div role="group" aria-label="Zubereitungszeit" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
-        {TIME_FILTERS.map((filter) => {
-          const active = maxMinutes === filter.value;
-          return (
-            <button
-              key={filter.value}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setMaxMinutes(filter.value)}
-              className={cn(
-                "flex h-8 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-bold transition-all duration-200 active:scale-95",
-                active
-                  ? "bg-brand-accent-dark text-white"
-                  : "bg-brand-chip-neutral text-brand-ink",
-              )}
-            >
-              {filter.value > 0 && <Clock className="size-3.5" />}
-              {filter.label}
-            </button>
-          );
-        })}
-      </div>
-
       {showFilters && (
-        <div className="grid animate-fade-up grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid animate-fade-up grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2">
           <Select
             value={visibilityFilter}
             onValueChange={(value: VisibilityFilter) =>
@@ -298,6 +274,22 @@ export function RecipeList({
               {availableTags.map((tag) => (
                 <SelectItem key={tag} value={tag}>
                   {tag}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={String(maxMinutes)}
+            onValueChange={(value) => setMaxMinutes(Number(value))}
+          >
+            <SelectTrigger className="w-full" aria-label="Zubereitungszeit">
+              <SelectValue placeholder="Zeit" />
+            </SelectTrigger>
+            <SelectContent>
+              {TIME_FILTERS.map((filter) => (
+                <SelectItem key={filter.value} value={String(filter.value)}>
+                  {filter.label}
                 </SelectItem>
               ))}
             </SelectContent>

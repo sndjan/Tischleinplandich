@@ -163,7 +163,23 @@
   animation: screen-in 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+@keyframes pop-up {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-pop-up {
+  animation: pop-up 200ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .animate-pop-up,
   .animate-toast-in,
   .animate-pop-in,
   .animate-fade-up,

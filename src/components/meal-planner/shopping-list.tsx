@@ -250,19 +250,28 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
         {rows.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2 text-[13px] font-semibold">
-              <span className="text-brand-ink">
+              <span className="min-w-0 truncate text-brand-ink">
                 {doneRows.length} von {visibleRows.length} im Wagen
               </span>
               {(hiddenBasics.length > 0 || !hideBasics) && (
+                // Same one-line label in both states, so switching doesn't reflow the row.
                 <button
                   type="button"
                   onClick={toggleHideBasics}
-                  className="flex items-center gap-1 text-brand-secondary transition-opacity active:opacity-60"
+                  aria-pressed={hideBasics}
+                  aria-label={
+                    hideBasics
+                      ? `${hiddenBasics.length} Grundzutaten ausgeblendet, einblenden`
+                      : "Grundzutaten ausblenden"
+                  }
+                  className={cn(
+                    "flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 transition-colors active:scale-95",
+                    hideBasics ? "bg-brand-chip-neutral text-brand-secondary" : "text-brand-secondary",
+                  )}
                 >
                   {hideBasics ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                  {hideBasics
-                    ? `${hiddenBasics.length} Grundzutaten ausgeblendet`
-                    : "Grundzutaten ausblenden"}
+                  Grundzutaten
+                  {hideBasics && <span className="tabular-nums text-brand-muted">· {hiddenBasics.length}</span>}
                 </button>
               )}
             </div>

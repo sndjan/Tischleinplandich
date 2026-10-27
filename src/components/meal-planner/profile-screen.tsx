@@ -13,6 +13,7 @@ import { exportRecipesAsZip } from "@/lib/recipe-export";
 import { cn } from "@/lib/utils";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { SubPage } from "./sub-page";
+import { useHasUnseenChanges } from "./whats-new-screen";
 import { useScreenStack } from "./screen-stack";
 
 const formatNumber = (value: number) => value.toLocaleString("de-DE", { maximumFractionDigits: 0 });
@@ -122,11 +123,11 @@ function useExportRecipes() {
 interface ProfileScreenProps {
   targets: NutritionTargetSettings;
   pantryStaples: string[];
-  feedbackContext: string;
+  onFeedback: () => void;
   onBack: () => void;
 }
 
-export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack }: ProfileScreenProps) {
+export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: ProfileScreenProps) {
   const { user } = useAuth();
   const { openScreen } = useScreenStack();
   const { data: profile } = useProfileQuery();
@@ -137,6 +138,7 @@ export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack 
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { data: aiUsage } = useAiUsageToday();
   const exportRecipes = useExportRecipes();
+  const hasUnseenChanges = useHasUnseenChanges();
 
   useEffect(() => setCanInstall(!isStandalone()), []);
 
@@ -263,11 +265,20 @@ export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack 
 
       <section className="overflow-hidden rounded-[18px] bg-white ring-1 ring-brand-card-border">
         <ProfileRow
+          emoji="🎉"
+          tint="bg-brand-accent-bg"
+          title="Was ist neu?"
+          subtitle="Alle Änderungen an der App"
+          badge={hasUnseenChanges ? "Neu" : undefined}
+          onClick={() => openScreen({ kind: "whats-new" })}
+        />
+        <ProfileRow
           emoji="💬"
           tint="bg-brand-chip-neutral"
           title="Feedback senden"
           subtitle="Fehler oder Idee melden"
-          onClick={() => openScreen({ kind: "feedback", context: feedbackContext })}
+          onClick={onFeedback}
+          feedbackTrigger
         />
         <form action="/api/auth/sign-out" method="post">
           <button
@@ -327,24 +338,36 @@ function ProfileRow({
   title,
   subtitle,
   onClick,
+  badge,
+  feedbackTrigger,
 }: {
   emoji: string;
   tint: string;
   title: string;
   subtitle: string;
   onClick: () => void;
+  // Small green "Neu" style marker after the title.
+  badge?: string;
+  // Opens the feedback card, which must not treat this tap as "outside".
+  feedbackTrigger?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-feedback-trigger={feedbackTrigger || undefined}
       className="flex min-h-16 w-full items-center gap-3.5 border-b border-brand-divider px-3.5 text-left transition-colors last:border-b-0 active:bg-brand-accent-bg-light"
     >
       <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-[10px] text-lg", tint)} aria-hidden="true">
         {emoji}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold text-brand-ink">{title}</span>
+        <span className="flex items-center gap-1.5 text-[15px] font-bold text-brand-ink">
+          {title}
+          {badge && (
+            <span className="rounded-full bg-brand-accent px-1.5 py-px text-[11px] font-bold text-white">{badge}</span>
+          )}
+        </span>
         <span className="block truncate text-[13px] text-brand-secondary">{subtitle}</span>
       </span>
       <ChevronRight className="size-[18px] shrink-0 text-brand-muted" />

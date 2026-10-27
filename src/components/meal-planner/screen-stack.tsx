@@ -29,8 +29,7 @@ export type Screen =
   | { kind: "add-meal"; dayIndex: number; mealType: MealType }
   | { kind: "nutrition-targets" }
   | { kind: "pantry-staples" }
-  // context: where the user was, stored with the feedback to help reproduce bugs.
-  | { kind: "feedback"; context?: string };
+  | { kind: "whats-new" };
 
 export type ScreenEntry = {
   key: number;

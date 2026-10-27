@@ -13,7 +13,8 @@ import { CookingMode } from "./cooking-mode";
 import { AddMealScreen } from "./add-meal-screen";
 import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
-import { FeedbackScreen } from "./feedback-screen";
+import { FeedbackPopover } from "./feedback-popover";
+import { WhatsNewScreen } from "./whats-new-screen";
 import { PantryStaplesScreen, usePantryStaples } from "./pantry-staples-settings";
 import { ScreenStackProvider, useScreenStack, type Screen } from "./screen-stack";
 import type { Recipe } from "@/types/database";
@@ -77,6 +78,8 @@ function MealPlanner() {
   const [desktopRightPanelTab, setDesktopRightPanelTab] =
     useState<DesktopRightPanelTab>("recipes");
   const isOnline = useIsOnline();
+  // Where feedback was opened from, or null while the feedback card is closed.
+  const [feedbackContext, setFeedbackContext] = useState<string | null>(null);
 
   const mealPlanData = useMealPlanData();
   const deleteRecipe = useDeleteRecipe();
@@ -151,12 +154,13 @@ function MealPlanner() {
   };
 
   // Stored with feedback to help reproduce bugs.
-  const feedbackContext =
-    typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+  const currentContext = () =>
+    window.matchMedia("(min-width: 1024px)").matches
       ? `Desktop · ${desktopRightPanelTab}`
       : `Mobil · ${mobileTab}`;
 
-  const openFeedback = () => openScreen({ kind: "feedback", context: feedbackContext });
+  const toggleFeedback = (context = currentContext()) =>
+    setFeedbackContext((open) => (open === null ? context : null));
 
   const avatar = (
     <button
@@ -218,7 +222,7 @@ function MealPlanner() {
           <ProfileScreen
             targets={nutritionTargets}
             pantryStaples={pantryStaples}
-            feedbackContext={feedbackContext}
+            onFeedback={() => toggleFeedback("Profil")}
             onBack={closeScreen}
           />
         );
@@ -240,20 +244,14 @@ function MealPlanner() {
             onChange={setNutritionTargets}
           />
         );
+      case "whats-new":
+        return <WhatsNewScreen onBack={closeScreen} />;
       case "pantry-staples":
         return (
           <PantryStaplesScreen
             staples={pantryStaples}
             onBack={closeScreen}
             onChange={setPantryStaples}
-          />
-        );
-      case "feedback":
-        return (
-          <FeedbackScreen
-            context={screen.context}
-            onBack={closeScreen}
-            onSent={closeScreen}
           />
         );
     }
@@ -293,8 +291,10 @@ function MealPlanner() {
               </div>
               <button
                 type="button"
-                onClick={openFeedback}
+                onClick={() => toggleFeedback()}
+                data-feedback-trigger
                 aria-label="Feedback senden"
+                aria-expanded={feedbackContext !== null}
                 className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-brand-chip-neutral text-brand-secondary transition-transform active:scale-90 lg:flex"
               >
                 <MessageSquarePlus className="size-[18px]" />
@@ -388,7 +388,12 @@ function MealPlanner() {
           </Entrance>
         </main>
 
-        <MobileTabBar activeTab={mobileTab} onTabChange={setMobileTab} onFeedback={openFeedback} />
+        <MobileTabBar
+          activeTab={mobileTab}
+          onTabChange={setMobileTab}
+          feedbackOpen={feedbackContext !== null}
+          onFeedback={() => toggleFeedback()}
+        />
       </div>
 
       {stack.map((entry, index) => (
@@ -400,6 +405,10 @@ function MealPlanner() {
           {renderScreen(entry.screen)}
         </Entrance>
       ))}
+
+      {feedbackContext !== null && (
+        <FeedbackPopover context={feedbackContext} onClose={() => setFeedbackContext(null)} />
+      )}
     </>
   );
 }

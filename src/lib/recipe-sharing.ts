@@ -71,6 +71,8 @@ export type SharedRecipe = Pick<
 };
 
 const SAVED_STORAGE_KEY = "weekly-meal-planner:saved-shared-recipes";
+// Shared recipe id → id of the user's own copy, so planning reuses that copy.
+const COPIES_STORAGE_KEY = "weekly-meal-planner:shared-recipe-copies";
 
 export function readSavedSharedIds(): string[] {
   try {
@@ -81,12 +83,36 @@ export function readSavedSharedIds(): string[] {
   }
 }
 
-function rememberSaved(id: string) {
+function readCopies(): Record<string, string> {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(COPIES_STORAGE_KEY) ?? "{}");
+    return stored && typeof stored === "object" ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberSaved(id: string, copyId: string) {
   try {
     window.localStorage.setItem(SAVED_STORAGE_KEY, JSON.stringify([...new Set([...readSavedSharedIds(), id])]));
+    window.localStorage.setItem(COPIES_STORAGE_KEY, JSON.stringify({ ...readCopies(), [id]: copyId }));
   } catch {
     // Storage unavailable; the save itself still worked.
   }
+}
+
+/**
+ * The user's own copy of a shared recipe: the remembered one, else one with the
+ * same name and ingredients (saved on another device or before copies were
+ * remembered).
+ */
+export function findOwnCopy(source: SharedRecipe, ownRecipes: Recipe[]): Recipe | null {
+  const copyId = readCopies()[source.id];
+  return (
+    ownRecipes.find((recipe) => recipe.id === copyId) ??
+    ownRecipes.find((recipe) => recipe.name === source.name && recipe.ingredients === source.ingredients) ??
+    null
+  );
 }
 
 /**
@@ -140,7 +166,7 @@ export async function saveSharedRecipeCopy(source: SharedRecipe): Promise<Recipe
     console.error(tagError);
   }
 
-  rememberSaved(source.id);
+  rememberSaved(source.id, data.id);
   return data;
 }
 

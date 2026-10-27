@@ -6,7 +6,8 @@ import { Check, Loader2, Plus, Search, UtensilsCrossed } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/hooks/use-planner-data";
-import { readSavedSharedIds, useSaveSharedRecipe, type SharedRecipe } from "@/lib/recipe-sharing";
+import { findOwnCopy, readSavedSharedIds, useSaveSharedRecipe, type SharedRecipe } from "@/lib/recipe-sharing";
+import type { Recipe } from "@/types/database";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useScreenStack } from "./screen-stack";
@@ -50,7 +51,30 @@ export function useSavedSharedRecipes() {
     }
   };
 
-  return { savedIds, savingId, save };
+  /**
+   * The user's own copy to plan with, saving one first if there is none yet.
+   * Resolves null when saving failed (the error is already shown).
+   */
+  const ensureCopy = async (recipe: SharedRecipe, ownRecipes: Recipe[]): Promise<Recipe | null> => {
+    const existing = findOwnCopy(recipe, ownRecipes);
+    if (existing) return existing;
+    if (savingId) return null;
+
+    setSavingId(recipe.id);
+    try {
+      const copy = await saveSharedRecipe(recipe);
+      setSavedIds((prev) => new Set(prev).add(recipe.id));
+      return copy;
+    } catch (error) {
+      console.error(error);
+      toast.error("Speichern fehlgeschlagen");
+      return null;
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return { savedIds, savingId, save, ensureCopy };
 }
 
 export function DiscoverRecipes() {

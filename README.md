@@ -12,6 +12,19 @@
 - Grün anstatt Orange
 - Dialoge auf Mobile anpassen
 
+### Später mit Claude Design
+
+Feedback, das eine Neugestaltung braucht (Einträge in `feedback` bleiben auf `new`):
+
+- Bewertung (Sterne) passt optisch noch nicht ins Rezept
+- Filter der Rezeptliste insgesamt (Zeitfilter sitzt vorerst im Filtermenü)
+- Landingpage für die Hauptdomain mit Demo, SEO und Logo
+
+### Später (größer)
+
+- Wochenpläne teilen und gemeinsam bearbeiten (z. B. mit der Familie)
+- Drag & Drop: Rezept halten, Tage erscheinen, auf einen Tag ziehen
+
 ## Anmelden per Link oder Code
 
 Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Email Templates → Magic Link** diese Vorlage eintragen:
@@ -60,6 +73,16 @@ SELECT u.email, a.usage_date, a.request_count
 FROM ai_usage a JOIN users u ON u.id = a.user_id
 ORDER BY a.usage_date DESC, a.request_count DESC;
 ```
+
+## Was ist neu?
+
+Profil → „Was ist neu?“ liest die Tabelle `changelog` (Migration `013_create_changelog.sql`). Neue Einträge per SQL:
+
+```sql
+INSERT INTO changelog (title, description) VALUES ('Kurzer Titel', 'Ein Satz, was sich ändert.');
+```
+
+`released_on` ist standardmäßig heute. Neue Einträge zeigen im Profil ein „Neu“, bis die Seite geöffnet wurde.
 
 ## Bewertungen und Export
 
