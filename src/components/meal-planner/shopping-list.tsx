@@ -13,6 +13,7 @@ import {
   type ShoppingSectionId,
 } from "@/lib/shopping-sections";
 import { cn } from "@/lib/utils";
+import { useEntrance } from "@/hooks/use-entrance";
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
@@ -335,7 +336,7 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
           ))}
 
           {sections.length === 0 && doneRows.length > 0 && (
-            <p className="py-2 text-center text-sm font-semibold text-brand-accent-dark">
+            <p className="animate-pop-in py-2 text-center text-sm font-semibold text-brand-accent-dark">
               Alles im Wagen 🎉
             </p>
           )}
@@ -379,8 +380,14 @@ function ShoppingRow({
   onToggle: () => void;
   onRemove?: () => void;
 }) {
+  // Rows rise in when they move between the open list and "Im Wagen".
+  const { entering, onAnimationEnd } = useEntrance();
+
   return (
-    <li className="flex items-center border-b border-brand-divider last:border-b-0">
+    <li
+      className={cn("flex items-center border-b border-brand-divider last:border-b-0", entering && "animate-rise")}
+      onAnimationEnd={onAnimationEnd}
+    >
       <button
         type="button"
         role="checkbox"

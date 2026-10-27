@@ -132,7 +132,7 @@ const splitLines = (text: string | null | undefined) =>
 
 // Steps are stored one per line; a leading "1." is display-only.
 const parseSteps = (text: string | null | undefined) =>
-  splitLines(text).map((line) => line.replace(/^\d+[.)]\s*/, ""));
+  splitLines(text).map((line) => line.replace(/^\d+[.)](?!\d)\s*/, ""));
 
 const numberToField = (value: number | null | undefined) =>
   value === null || value === undefined ? "" : String(value);
@@ -150,7 +150,7 @@ export function editableFromDraft(draft: RecipeDraft): EditableRecipe {
     fats: numberToField(draft.fats),
     tags: draft.tags,
     source_url: draft.source_url,
-    is_public: false,
+    is_public: true,
   };
 }
 
@@ -183,7 +183,7 @@ export const emptyEditableRecipe = (): EditableRecipe => ({
   fats: "",
   tags: [],
   source_url: "",
-  is_public: false,
+  is_public: true,
 });
 
 const fieldToNumber = (value: string) => {

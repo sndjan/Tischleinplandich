@@ -66,6 +66,12 @@ interface RecipeCreateScreenProps {
   targetHint?: string | null;
 }
 
+const base64ToFile = (data: string, mediaType: string) => {
+  const bytes = Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
+  const extension = mediaType.split("/")[1] ?? "jpg";
+  return new File([bytes], `cover.${extension}`, { type: mediaType });
+};
+
 const hostOf = (url: string) => {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -251,7 +257,9 @@ export function RecipeCreateScreen({
         const cover =
           result.coverImageIndex !== null
             ? imagesRef.current[result.coverImageIndex]?.file
-            : undefined;
+            : result.coverImage
+              ? base64ToFile(result.coverImage.data, result.coverImage.mediaType)
+              : undefined;
         onDraftReady(result.draft, cover);
       } catch (error) {
         if (controller.signal.aborted) return;

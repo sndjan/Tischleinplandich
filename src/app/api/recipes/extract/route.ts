@@ -15,6 +15,7 @@ import {
   consumeAiQuota,
   countPdfPages,
   ExtractedRecipeSchema,
+  fetchCoverImage,
   fetchRecipePage,
   getUserTagNames,
   IDEA_SYSTEM_PROMPT,
@@ -67,13 +68,17 @@ export async function POST(request: Request) {
 
       try {
         let pageContent: string | null = null;
+        // Downloads alongside the model run; used only if no attached photo fits.
+        let pageCover: ReturnType<typeof fetchCoverImage> = Promise.resolve(null);
 
         if (input.url) {
           const host = safeHost(input.url);
           send({ type: 'step', id: 'link', status: 'active', label: `Link wird gelesen · ${host}` });
 
           try {
-            pageContent = await fetchRecipePage(input.url);
+            const page = await fetchRecipePage(input.url);
+            pageContent = page.content;
+            if (page.imageUrl) pageCover = fetchCoverImage(page.imageUrl);
             send({ type: 'step', id: 'link', status: 'done', label: `Link gelesen · ${host}` });
           } catch (error) {
             // Sites like Instagram often block page reads; the photos and text
@@ -136,14 +141,18 @@ export async function POST(request: Request) {
         }
 
         const coverIndex = extracted.cover_image_index;
+        const coverImageIndex =
+          coverIndex !== null && Number.isInteger(coverIndex) && coverIndex >= 0 && coverIndex < input.images.length
+            ? coverIndex
+            : null;
+        // Without a suitable attached photo, the recipe page's own photo is the cover.
+        const coverImage = coverImageIndex === null ? await pageCover : null;
 
         send({
           type: 'done',
           draft: toRecipeDraft(extracted, input.url),
-          coverImageIndex:
-            coverIndex !== null && Number.isInteger(coverIndex) && coverIndex >= 0 && coverIndex < input.images.length
-              ? coverIndex
-              : null,
+          coverImageIndex,
+          coverImage,
         });
       } catch (error) {
         if (request.signal.aborted || error instanceof Anthropic.APIUserAbortError) {

@@ -23,7 +23,13 @@ export type RecipeStreamStage = "reading" | "ingredients" | "steps" | "nutrition
 export type RecipeStreamEvent =
   | { type: "step"; id: string; status: "active" | "done"; label: string }
   | { type: "partial"; stage: RecipeStreamStage; draft: RecipeDraft }
-  | { type: "done"; draft: RecipeDraft; coverImageIndex: number | null }
+  | {
+      type: "done";
+      draft: RecipeDraft;
+      coverImageIndex: number | null;
+      // Photo from the imported web page, base64, when no attached image fits.
+      coverImage?: { mediaType: string; data: string } | null;
+    }
   | { type: "error"; message: string };
 
 export type RecipeRefineResult = {
@@ -31,6 +37,9 @@ export type RecipeRefineResult = {
   summary: string;
   changes: Array<{ before: string | null; after: string }>;
 };
+
+// AI requests (import, "Aus Idee", chat changes) per user and day.
+export const DAILY_AI_LIMIT = 30;
 
 export const RECIPE_EXTRACT_MAX_IMAGES = 5;
 export const RECIPE_EXTRACT_MAX_IMAGE_BYTES = 5 * 1024 * 1024;

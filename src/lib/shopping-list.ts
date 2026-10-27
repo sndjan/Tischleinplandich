@@ -254,7 +254,7 @@ export function parseIngredient(ingredientLine: string): {
   const cleanedLine = ingredientLine
     .trim()
     .replace(/^[-•*]\s*/, "")
-    .replace(/^\d+[.)]\s*/, "")
+    .replace(/^\d+[.)](?!\d)\s*/, "")
     .replace(/\s+/g, " ");
 
   if (!cleanedLine) {

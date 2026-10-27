@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, LogOut, Pencil } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/context";
 import { isStandalone, promptInstall } from "@/lib/install-prompt";
-import { queryKeys, useProfileQuery, useUserId } from "@/hooks/use-planner-data";
+import { queryKeys, useProfileQuery, useRecipesQuery, useUserId } from "@/hooks/use-planner-data";
+import { DAILY_AI_LIMIT } from "@/lib/recipe-draft";
+import { exportRecipesAsZip } from "@/lib/recipe-export";
 import { cn } from "@/lib/utils";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { SubPage } from "./sub-page";
@@ -56,6 +58,67 @@ export function useSaveDisplayName() {
   };
 }
 
+/**
+ * Today's AI requests. Null until migration 010 (ai_usage) exists; without it
+ * no limit applies, so there is nothing to show.
+ */
+function useAiUsageToday() {
+  const userId = useUserId();
+
+  return useQuery({
+    queryKey: ["ai-usage", userId ?? ""],
+    enabled: Boolean(userId),
+    staleTime: 0,
+    queryFn: async (): Promise<number | null> => {
+      // The database counts per UTC day (CURRENT_DATE).
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await createClient()
+        .from("ai_usage")
+        .select("request_count")
+        .eq("user_id", userId!)
+        .eq("usage_date", today)
+        .maybeSingle();
+
+      if (error) return null;
+      return data?.request_count ?? 0;
+    },
+  });
+}
+
+function useExportRecipes() {
+  const { data } = useRecipesQuery();
+  const [exporting, setExporting] = useState(false);
+
+  const run = async () => {
+    const recipes = data?.recipes ?? [];
+    if (recipes.length === 0) {
+      toast("Noch keine Rezepte zum Exportieren");
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const zip = await exportRecipesAsZip(recipes, data?.tagsById ?? {});
+      const url = URL.createObjectURL(zip);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `rezepte-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success(`${recipes.length} ${recipes.length === 1 ? "Rezept" : "Rezepte"} exportiert`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Export hat nicht geklappt");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return { exporting, run, count: data?.recipes.length ?? 0 };
+}
+
 interface ProfileScreenProps {
   targets: NutritionTargetSettings;
   pantryStaples: string[];
@@ -72,6 +135,8 @@ export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack 
   const [name, setName] = useState("");
   const [canInstall, setCanInstall] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const { data: aiUsage } = useAiUsageToday();
+  const exportRecipes = useExportRecipes();
 
   useEffect(() => setCanInstall(!isStandalone()), []);
 
@@ -127,6 +192,16 @@ export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack 
           : "Was du immer zu Hause hast",
       onClick: () => openScreen({ kind: "pantry-staples" }),
     },
+    {
+      key: "export",
+      emoji: "📦",
+      tint: "bg-[#efe9fb]",
+      title: exportRecipes.exporting ? "Wird exportiert …" : "Rezepte exportieren",
+      subtitle: `${exportRecipes.count} ${exportRecipes.count === 1 ? "Rezept" : "Rezepte"} als Markdown (ZIP)`,
+      onClick: () => {
+        if (!exportRecipes.exporting) void exportRecipes.run();
+      },
+    },
     ...(canInstall
       ? [
           {
@@ -178,6 +253,8 @@ export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack 
         </div>
       </section>
 
+      {aiUsage !== null && aiUsage !== undefined && <AiUsageCard used={aiUsage} />}
+
       <section className="overflow-hidden rounded-[18px] bg-white ring-1 ring-brand-card-border">
         {rows.map(({ key, ...row }) => (
           <ProfileRow key={key} {...row} />
@@ -205,6 +282,42 @@ export function ProfileScreen({ targets, pantryStaples, feedbackContext, onBack 
         </form>
       </section>
     </SubPage>
+  );
+}
+
+function AiUsageCard({ used }: { used: number }) {
+  const shown = Math.min(used, DAILY_AI_LIMIT);
+  const left = DAILY_AI_LIMIT - shown;
+
+  return (
+    <section
+      aria-label="KI-Nutzung heute"
+      className="space-y-2 rounded-[18px] bg-white px-3.5 py-3 ring-1 ring-brand-card-border"
+    >
+      <div className="flex items-center gap-3.5">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-brand-accent-bg text-lg" aria-hidden="true">
+          ✨
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-bold text-brand-ink">KI-Anfragen heute</span>
+          <span className="block text-[13px] text-brand-secondary">
+            {left > 0 ? `Noch ${left} frei · neue gibt es morgen` : "Für heute aufgebraucht · morgen geht es weiter"}
+          </span>
+        </span>
+        <span className="shrink-0 text-[15px] font-bold tabular-nums text-brand-ink">
+          {shown}/{DAILY_AI_LIMIT}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-brand-track">
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-500",
+            left > 0 ? "bg-brand-accent" : "bg-brand-warn",
+          )}
+          style={{ width: `${(shown / DAILY_AI_LIMIT) * 100}%` }}
+        />
+      </div>
+    </section>
   );
 }
 

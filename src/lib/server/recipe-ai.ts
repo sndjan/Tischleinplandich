@@ -2,15 +2,13 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod/v4";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { RecipeDraft } from "@/lib/recipe-draft";
+import { DAILY_AI_LIMIT, type RecipeDraft } from "@/lib/recipe-draft";
 
 // Haiku is plenty for reading and adapting recipes and keeps each request at a
 // fraction of a cent. Low effort keeps the hidden reasoning (and its cost) short.
 export const RECIPE_AI_MODEL = "claude-haiku-5-5";
 export const RECIPE_AI_EFFORT = "low" as const;
 
-// Per user and day, across import, idea and chat changes.
-export const DAILY_AI_LIMIT = 30;
 // Above ~100k input tokens Haiku costs 5x; this keeps PDFs well below that.
 export const MAX_PDF_PAGES = 20;
 
@@ -201,7 +199,17 @@ export function toErrorResponseBody(error: unknown): { status: number; message: 
   return { status: 500, message: "Das hat nicht geklappt, bitte erneut versuchen" };
 }
 
-export async function fetchRecipePage(rawUrl: string): Promise<string> {
+export type RecipePage = {
+  content: string;
+  // The page's own photo of the dish, used as cover when none was attached.
+  imageUrl: string | null;
+};
+
+// Covers travel back inside the streamed response, so they stay small.
+const MAX_COVER_BYTES = 3 * 1024 * 1024;
+const COVER_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+export async function fetchRecipePage(rawUrl: string): Promise<RecipePage> {
   let url: URL;
 
   try {
@@ -244,8 +252,10 @@ export async function fetchRecipePage(rawUrl: string): Promise<string> {
     (match) => match[1].trim(),
   ).filter((block) => /"@type"\s*:\s*(\[[^\]]*)?"Recipe"/.test(block));
 
+  const imageUrl = findPageImage(html, jsonLdBlocks, url);
+
   if (jsonLdBlocks.length > 0) {
-    return jsonLdBlocks.join("\n");
+    return { content: jsonLdBlocks.join("\n"), imageUrl };
   }
 
   const pageText = html
@@ -263,5 +273,90 @@ export async function fetchRecipePage(rawUrl: string): Promise<string> {
   }
 
   // Page text beyond this is almost always comments, footers and ads.
-  return pageText.slice(0, 60_000);
+  return { content: pageText.slice(0, 60_000), imageUrl };
+}
+
+/**
+ * The dish photo of a recipe page: the schema.org Recipe image, else og:image.
+ */
+function findPageImage(html: string, jsonLdBlocks: string[], pageUrl: URL): string | null {
+  const candidates: unknown[] = [];
+
+  for (const block of jsonLdBlocks) {
+    try {
+      collectRecipeImages(JSON.parse(block), candidates);
+    } catch {
+      // Broken JSON-LD is common; og:image below still works.
+    }
+  }
+
+  const ogImage =
+    html.match(/<meta[^>]+property=["']og:image(?::url)?["'][^>]+content=["']([^"']+)["']/i)?.[1] ??
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::url)?["']/i)?.[1];
+  if (ogImage) candidates.push(ogImage);
+
+  for (const candidate of candidates) {
+    const raw =
+      typeof candidate === "string"
+        ? candidate
+        : candidate && typeof candidate === "object" && "url" in candidate
+          ? String((candidate as { url: unknown }).url)
+          : null;
+    if (!raw) continue;
+
+    try {
+      const resolved = new URL(raw.replace(/&amp;/g, "&").trim(), pageUrl);
+      if (resolved.protocol === "http:" || resolved.protocol === "https:") return resolved.href;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return null;
+}
+
+function collectRecipeImages(node: unknown, out: unknown[]) {
+  if (Array.isArray(node)) {
+    node.forEach((item) => collectRecipeImages(item, out));
+    return;
+  }
+  if (!node || typeof node !== "object") return;
+
+  const record = node as Record<string, unknown>;
+  const type = record["@type"];
+  const isRecipe = type === "Recipe" || (Array.isArray(type) && type.includes("Recipe"));
+
+  if (isRecipe && record.image) {
+    out.push(...(Array.isArray(record.image) ? record.image : [record.image]));
+  }
+  if (record["@graph"]) collectRecipeImages(record["@graph"], out);
+}
+
+/**
+ * Downloads a page's dish photo for the cover. Missing or odd images just mean
+ * no cover, never a failed import.
+ */
+export async function fetchCoverImage(
+  imageUrl: string,
+): Promise<{ mediaType: string; data: string } | null> {
+  try {
+    const response = await fetch(imageUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; WeeklyMealPlanner/1.0)", Accept: "image/*" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return null;
+
+    const mediaType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+    if (!COVER_TYPES.includes(mediaType)) return null;
+    if (Number(response.headers.get("content-length") ?? 0) > MAX_COVER_BYTES) return null;
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > MAX_COVER_BYTES) return null;
+
+    return { mediaType, data: bytes.toString("base64") };
+  } catch (error) {
+    console.warn("Cover image fetch failed", error);
+    return null;
+  }
 }

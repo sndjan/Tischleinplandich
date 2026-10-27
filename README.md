@@ -51,6 +51,8 @@ Erledigtes mit `UPDATE feedback SET status = 'done' WHERE id = '…';` markieren
 
 Rezept-Import, „Aus Idee“ und „Mit KI ändern“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
 
+Im Profil steht unter „KI-Anfragen heute“, wie viele davon schon verbraucht sind (nur sichtbar, wenn die Migration läuft).
+
 Verbrauch pro Tag:
 
 ```sql
@@ -58,3 +60,8 @@ SELECT u.email, a.usage_date, a.request_count
 FROM ai_usage a JOIN users u ON u.id = a.user_id
 ORDER BY a.usage_date DESC, a.request_count DESC;
 ```
+
+## Bewertungen und Export
+
+- **Bewertung**: Migration `012_add_recipe_rating.sql` (im SQL Editor ausführen) fügt `recipes.rating` (1–5 Sterne) hinzu. Bewertet wird in der Rezeptansicht; die Rezeptliste kann nach „Beste Bewertung“ sortieren. Ohne die Migration zeigt das Antippen der Sterne einen Hinweis.
+- **Export**: Profil → „Rezepte exportieren“ lädt alle Rezepte als ZIP mit einer Markdown-Datei pro Rezept (plus Fotos in `images/`) herunter.

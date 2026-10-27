@@ -9,6 +9,7 @@ import { Stepper } from "@/components/ui/controls";
 import { cn } from "@/lib/utils";
 import { PlanRecipeSheet } from "./plan-recipe-sheet";
 import { ShareRecipeSheet } from "./share-recipe-sheet";
+import { StarRating, useRateRecipe } from "./star-rating";
 
 const formatNumber = (value: number | null) =>
   value === null ? null : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
@@ -16,7 +17,7 @@ const formatNumber = (value: number | null) =>
 const getSteps = (text: string | null) =>
   (text ?? "")
     .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^\d+[.)]\s*/, ""))
+    .map((line) => line.trim().replace(/^\d+[.)](?!\d)\s*/, ""))
     .filter(Boolean);
 
 export function sourceHost(url: string | null) {
@@ -39,6 +40,7 @@ export function RecipeBody({
   onServingsChange,
   heroActions,
   attribution,
+  rating,
 }: {
   recipe: Pick<
     Recipe,
@@ -49,6 +51,8 @@ export function RecipeBody({
   onServingsChange: (servings: number) => void;
   heroActions?: React.ReactNode;
   attribution?: React.ReactNode;
+  // Own rating stars; only shown for the reader's own recipes.
+  rating?: React.ReactNode;
 }) {
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const factor = servings / baseServings;
@@ -109,6 +113,7 @@ export function RecipeBody({
               </a>
             )}
           </div>
+          {rating}
         </div>
 
         {nutrition.length > 0 && (
@@ -222,6 +227,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const [servings, setServings] = useState(initialServings ?? baseServings);
   const [sheet, setSheet] = useState<"plan" | "share" | null>(null);
+  const rateRecipe = useRateRecipe();
 
   return (
     <div className="flex min-h-dvh flex-col bg-white">
@@ -231,6 +237,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
           tags={tags}
           servings={servings}
           onServingsChange={setServings}
+          rating={<StarRating value={recipe.rating ?? null} onChange={(value) => void rateRecipe(recipe, value)} />}
           heroActions={
             <>
               <HeroButton label="Zurück" onClick={onBack}>

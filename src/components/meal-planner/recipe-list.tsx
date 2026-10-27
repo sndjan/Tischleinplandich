@@ -14,14 +14,8 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
-import {
-  Flame,
-  Info,
-  Search,
-  SlidersHorizontal,
-  UtensilsCrossed,
-  Zap,
-} from "lucide-react";
+import { Clock, Info, Search, SlidersHorizontal, Star, UtensilsCrossed } from "lucide-react";
+import { formatPrepMinutes, parsePrepMinutes } from "@/lib/prep-time";
 
 type VisibilityFilter = "all" | "private" | "public";
 type SortOption =
@@ -29,7 +23,17 @@ type SortOption =
   | "oldest"
   | "name-asc"
   | "name-desc"
-  | "protein-desc";
+  | "protein-desc"
+  | "time-asc"
+  | "rating-desc";
+
+// Upper limits in minutes; 0 means any time.
+const TIME_FILTERS = [
+  { value: 0, label: "Alle" },
+  { value: 15, label: "≤ 15 Min." },
+  { value: 30, label: "≤ 30 Min." },
+  { value: 60, label: "≤ 60 Min." },
+];
 
 const ALL_TAGS_FILTER_VALUE = "__all_tags__";
 
@@ -43,26 +47,12 @@ const formatNumber = (value: number | null) => {
     : value.toFixed(1).replace(/\.0$/, "");
 };
 
-const getPrimaryNutritionItems = (recipe: Recipe) => {
-  return [
-    {
-      label: "kcal",
-      value: recipe.calories,
-      suffix: "",
-      Icon: Flame,
-      iconClassName: "text-brand-accent-dark size-4 ",
-      textClassName: "text-brand-accent-dark",
-    },
-    {
-      label: "Protein",
-      value: recipe.protein,
-      suffix: "g",
-      Icon: Zap,
-      iconClassName: "text-brand-accent-dark size-4",
-      textClassName: "text-brand-accent-dark",
-    },
+// Values per portion, as on the recipe page: kcal neutral, protein in green.
+const getPrimaryNutritionItems = (recipe: Recipe) =>
+  [
+    { label: "kcal", value: recipe.calories, unit: "kcal", accent: false },
+    { label: "Protein", value: recipe.protein, unit: "g Protein", accent: true },
   ].filter((item) => item.value !== null);
-};
 
 interface RecipeListProps {
   recipes: Recipe[];
@@ -92,6 +82,16 @@ export function RecipeList({
     useState<VisibilityFilter>("all");
   const [selectedTag, setSelectedTag] = useState<string>(ALL_TAGS_FILTER_VALUE);
   const [sortOption, setSortOption] = useState<SortOption>("newest");
+  const [maxMinutes, setMaxMinutes] = useState(0);
+  // Cards rise in once when the list first shows, not again after returning
+  // from a recipe (the list is only hidden meanwhile, which restarts CSS animations).
+  const [cardsSettled, setCardsSettled] = useState(false);
+
+  useEffect(() => {
+    if (loading || cardsSettled) return;
+    const timeout = window.setTimeout(() => setCardsSettled(true), 700);
+    return () => window.clearTimeout(timeout);
+  }, [loading, cardsSettled]);
   const [showFilters, setShowFilters] = useState(false);
 
   const availableTags = useMemo(() => {
@@ -104,11 +104,23 @@ export function RecipeList({
     return Array.from(uniqueTags).sort((a, b) => a.localeCompare(b));
   }, [recipeTagsById]);
 
+  const minutesById = useMemo(
+    () => new Map(recipes.map((recipe) => [recipe.id, parsePrepMinutes(recipe.prep_time)])),
+    [recipes],
+  );
+
   const filteredRecipes = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
     const results = recipes.filter((recipe) => {
       const recipeTags = recipeTagsById[recipe.id] ?? [];
+
+      if (maxMinutes > 0) {
+        const minutes = minutesById.get(recipe.id);
+        if (minutes === null || minutes === undefined || minutes > maxMinutes) {
+          return false;
+        }
+      }
 
       if (visibilityFilter === "public" && !recipe.is_public) {
         return false;
@@ -163,6 +175,18 @@ export function RecipeList({
         return b.name.localeCompare(a.name);
       }
 
+      if (sortOption === "time-asc") {
+        // Recipes without a time go last.
+        return (
+          (minutesById.get(a.id) ?? Number.POSITIVE_INFINITY) -
+          (minutesById.get(b.id) ?? Number.POSITIVE_INFINITY)
+        );
+      }
+
+      if (sortOption === "rating-desc") {
+        return (b.rating ?? 0) - (a.rating ?? 0);
+      }
+
       return (b.protein ?? -1) - (a.protein ?? -1);
     });
   }, [
@@ -172,6 +196,8 @@ export function RecipeList({
     visibilityFilter,
     selectedTag,
     sortOption,
+    maxMinutes,
+    minutesById,
   ]);
 
   useEffect(() => {
@@ -186,7 +212,8 @@ export function RecipeList({
   const hasActiveFilters =
     visibilityFilter !== "all" ||
     selectedTag !== ALL_TAGS_FILTER_VALUE ||
-    sortOption !== "newest";
+    sortOption !== "newest" ||
+    maxMinutes > 0;
 
   return (
     <div className="space-y-3">
@@ -217,8 +244,32 @@ export function RecipeList({
         {toolbarActions}
       </div>
 
+      {/* Cooking time is the filter people reach for most, so it stays visible. */}
+      <div role="group" aria-label="Zubereitungszeit" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+        {TIME_FILTERS.map((filter) => {
+          const active = maxMinutes === filter.value;
+          return (
+            <button
+              key={filter.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setMaxMinutes(filter.value)}
+              className={cn(
+                "flex h-8 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] font-bold transition-all duration-200 active:scale-95",
+                active
+                  ? "bg-brand-accent-dark text-white"
+                  : "bg-brand-chip-neutral text-brand-ink",
+              )}
+            >
+              {filter.value > 0 && <Clock className="size-3.5" />}
+              {filter.label}
+            </button>
+          );
+        })}
+      </div>
+
       {showFilters && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid animate-fade-up grid-cols-1 gap-2 sm:grid-cols-3">
           <Select
             value={visibilityFilter}
             onValueChange={(value: VisibilityFilter) =>
@@ -265,6 +316,8 @@ export function RecipeList({
               <SelectItem value="name-asc">Name (A-Z)</SelectItem>
               <SelectItem value="name-desc">Name (Z-A)</SelectItem>
               <SelectItem value="protein-desc">Protein</SelectItem>
+              <SelectItem value="time-asc">Schnellste zuerst</SelectItem>
+              <SelectItem value="rating-desc">Beste Bewertung</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -288,13 +341,16 @@ export function RecipeList({
         </p>
       ) : filteredRecipes.length === 0 ? (
         <p className="text-sm text-brand-tertiary">
-          Keine Treffer
+          {maxMinutes > 0
+            ? `Keine Rezepte mit höchstens ${maxMinutes} Min. Zubereitungszeit`
+            : "Keine Treffer"}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
-          {filteredRecipes.map((recipe) => {
+          {filteredRecipes.map((recipe, index) => {
             const primaryNutritionItems = getPrimaryNutritionItems(recipe);
             const isSelected = selectedRecipeId === recipe.id;
+            const minutes = minutesById.get(recipe.id) ?? null;
 
             const openPreview = () =>
               openScreen({ kind: "recipe-preview", recipe });
@@ -317,8 +373,11 @@ export function RecipeList({
                     }),
                   );
                 }}
+                // Cards rise in one after another; capped so long lists don't lag.
+                style={cardsSettled ? undefined : { animationDelay: `${Math.min(index, 8) * 35}ms` }}
                 className={cn(
                   "group relative overflow-hidden rounded-2xl bg-white ring-1 transition-all duration-150 hover:shadow-md active:scale-[0.97]",
+                  !cardsSettled && "animate-rise",
                   isSelected ? "ring-2 ring-brand-accent-dark" : "ring-brand-card-border",
                   disableDrag ? "cursor-pointer" : "cursor-move",
                 )}
@@ -340,7 +399,7 @@ export function RecipeList({
                     }
                   }}
                 >
-                  <div className="aspect-[4/3] w-full overflow-hidden bg-brand-chip-neutral">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-brand-chip-neutral">
                     {recipe.image_url ? (
                       <Image
                         src={recipe.image_url}
@@ -356,6 +415,12 @@ export function RecipeList({
                         <UtensilsCrossed className="size-8 text-brand-muted" />
                       </div>
                     )}
+                    {minutes !== null && (
+                      <span className="absolute bottom-1.5 left-1.5 flex h-6 items-center gap-1 rounded-full bg-white/90 px-2 text-[11px] font-bold text-brand-ink shadow-sm backdrop-blur">
+                        <Clock className="size-3" strokeWidth={2.5} />
+                        {formatPrepMinutes(minutes)}
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 p-2.5">
@@ -366,23 +431,30 @@ export function RecipeList({
                       {recipe.name}
                     </h3>
 
-                    {primaryNutritionItems.length > 0 && (
-                      <div className="flex flex-wrap gap-x-2 gap-y-1">
+                    {(primaryNutritionItems.length > 0 || recipe.rating) && (
+                      <div className="flex flex-wrap items-center gap-1">
                         {primaryNutritionItems.map((item) => (
-                          <div
+                          <span
                             key={item.label}
-                            className={`inline-flex items-center gap-1 text-xs font-bold ${item.textClassName}`}
+                            className={cn(
+                              "inline-flex h-[22px] items-center rounded-md px-1.5 text-[11px] font-bold tabular-nums",
+                              item.accent
+                                ? "bg-brand-accent-bg text-brand-accent-dark"
+                                : "bg-brand-chip-neutral text-brand-secondary",
+                            )}
                           >
-                            <item.Icon
-                              className={item.iconClassName}
-                              strokeWidth={2.5}
-                            />
-                            <span>
-                              {formatNumber(item.value)}
-                              {item.suffix}
-                            </span>
-                          </div>
+                            {formatNumber(item.value)} {item.unit}
+                          </span>
                         ))}
+                        {recipe.rating ? (
+                          <span
+                            className="inline-flex h-[22px] items-center gap-0.5 rounded-md px-1 text-[11px] font-bold text-brand-ink"
+                            aria-label={`${recipe.rating} von 5 Sternen`}
+                          >
+                            <Star className="size-3 fill-brand-orange text-brand-orange" />
+                            {recipe.rating}
+                          </span>
+                        ) : null}
                       </div>
                     )}
                   </div>

@@ -53,6 +53,8 @@ export type Database = {
           is_public: boolean;
           // Secret id of the share link (/r/<share_id>); null when not shared. Migration 011.
           share_id: string | null;
+          // Own 1–5 star rating, null when not rated. Migration 012.
+          rating: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -72,6 +74,7 @@ export type Database = {
           image_url?: string | null;
           is_public?: boolean;
           share_id?: string | null;
+          rating?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -91,6 +94,7 @@ export type Database = {
           image_url?: string | null;
           is_public?: boolean;
           share_id?: string | null;
+          rating?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -411,6 +415,25 @@ export type Database = {
           user_agent?: string | null;
           status?: 'new' | 'seen' | 'done';
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      // Written only by consume_ai_quota; users can read their own rows. Migration 010.
+      ai_usage: {
+        Row: {
+          user_id: string;
+          usage_date: string;
+          request_count: number;
+        };
+        Insert: {
+          user_id: string;
+          usage_date?: string;
+          request_count?: number;
+        };
+        Update: {
+          user_id?: string;
+          usage_date?: string;
+          request_count?: number;
         };
         Relationships: [];
       };

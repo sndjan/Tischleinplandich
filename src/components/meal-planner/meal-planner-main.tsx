@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { WifiOff } from "lucide-react";
+import { MessageSquarePlus, WifiOff } from "lucide-react";
 import { MealWeekView, useViewMode, ViewModeToggle } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
 import { RecipeEditor } from "./recipe-editor";
@@ -32,6 +32,7 @@ import { useAuth } from "@/lib/auth/context";
 import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
 import { sumMealNutrition } from "./day-card";
+import { useEntrance } from "@/hooks/use-entrance";
 
 type DesktopRightPanelTab = "recipes" | "shopping";
 
@@ -154,6 +155,8 @@ function MealPlanner() {
     typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
       ? `Desktop · ${desktopRightPanelTab}`
       : `Mobil · ${mobileTab}`;
+
+  const openFeedback = () => openScreen({ kind: "feedback", context: feedbackContext });
 
   const avatar = (
     <button
@@ -288,6 +291,14 @@ function MealPlanner() {
               <div className={cn(mobileTab !== "plan" && "hidden lg:block")}>
                 <ViewModeToggle value={viewMode} onChange={setViewMode} />
               </div>
+              <button
+                type="button"
+                onClick={openFeedback}
+                aria-label="Feedback senden"
+                className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-brand-chip-neutral text-brand-secondary transition-transform active:scale-90 lg:flex"
+              >
+                <MessageSquarePlus className="size-[18px]" />
+              </button>
               {avatar}
             </div>
           </div>
@@ -359,7 +370,7 @@ function MealPlanner() {
           </div>
 
           {/* Mobile layout: single active tab, switched via the bottom nav */}
-          <div className="space-y-4 lg:hidden">
+          <Entrance key={mobileTab} className="space-y-4 lg:hidden" animation="animate-rise">
             {mobileTab === "plan" && (
               <MealWeekView
                 recipes={mealPlanData.recipes}
@@ -374,17 +385,39 @@ function MealPlanner() {
               <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
             )}
             {mobileTab === "recipes" && <RecipeLibrary />}
-          </div>
+          </Entrance>
         </main>
 
-        <MobileTabBar activeTab={mobileTab} onTabChange={setMobileTab} />
+        <MobileTabBar activeTab={mobileTab} onTabChange={setMobileTab} onFeedback={openFeedback} />
       </div>
 
       {stack.map((entry, index) => (
-        <div key={entry.key} className={cn(index < stack.length - 1 && "hidden")}>
+        <Entrance
+          key={entry.key}
+          className={cn(index < stack.length - 1 && "hidden")}
+          animation="animate-screen-in"
+        >
           {renderScreen(entry.screen)}
-        </div>
+        </Entrance>
       ))}
     </>
+  );
+}
+
+function Entrance({
+  animation,
+  className,
+  children,
+}: {
+  animation: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { entering, onAnimationEnd } = useEntrance();
+
+  return (
+    <div className={cn(entering && animation, className)} onAnimationEnd={onAnimationEnd}>
+      {children}
+    </div>
   );
 }

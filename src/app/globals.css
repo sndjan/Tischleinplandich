@@ -142,11 +142,34 @@
   animation: sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Like fade-up, but leaves no transform behind once done, so it can sit on
+   elements that scale on press (cards, rows). */
+.animate-rise {
+  animation: fade-up 260ms ease-out backwards;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-screen-in {
+  animation: screen-in 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-toast-in,
   .animate-pop-in,
   .animate-fade-up,
-  .animate-sheet-up {
+  .animate-sheet-up,
+  .animate-rise,
+  .animate-screen-in {
     animation: none;
   }
 }

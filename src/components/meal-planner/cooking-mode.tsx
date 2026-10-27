@@ -118,7 +118,7 @@ function useTimers() {
 const getSteps = (text: string | null) =>
   (text ?? "")
     .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^\d+[.)]\s*/, ""))
+    .map((line) => line.trim().replace(/^\d+[.)](?!\d)\s*/, ""))
     .filter(Boolean);
 
 interface CookingModeProps {

@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     background_color: "#ffffff",
-    theme_color: "#4f9c6e",
+    theme_color: "#ffffff",
     // Lets Android (and desktop Chrome) list the installed app in the share sheet.
     // public/sw.js receives the POST; /share-target handles it without the worker.
     share_target: {
