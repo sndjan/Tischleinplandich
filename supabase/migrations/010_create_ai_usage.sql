@@ -41,5 +41,6 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.consume_ai_quota(INTEGER) FROM PUBLIC;
+-- Supabase also grants new functions to anon directly, so revoke that too.
+REVOKE ALL ON FUNCTION public.consume_ai_quota(INTEGER) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.consume_ai_quota(INTEGER) TO authenticated;
