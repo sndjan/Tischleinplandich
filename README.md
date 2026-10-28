@@ -18,12 +18,17 @@ Feedback, das eine Neugestaltung braucht (Einträge in `feedback` bleiben auf `n
 
 - Bewertung (Sterne) passt optisch noch nicht ins Rezept
 - Filter der Rezeptliste insgesamt (Zeitfilter sitzt vorerst im Filtermenü)
-- Landingpage für die Hauptdomain mit Demo, SEO und Logo
 
 ### Später (größer)
 
 - Wochenpläne teilen und gemeinsam bearbeiten (z. B. mit der Familie)
 - Drag & Drop: Rezept halten, Tage erscheinen, auf einen Tag ziehen
+
+## Landingpage
+
+Abgemeldete Besucher sehen unter `/` die öffentliche Landingpage (`src/components/landing/`) mit interaktiver Demo (nur Beispieldaten), Preisen und FAQ; angemeldete werden direkt zu `/meal-planner` weitergeleitet. Preise und FAQ stehen in `content.ts` und landen von dort auch in den strukturierten Daten für Google.
+
+Für Canonical-URL, Sitemap, `robots.txt` und Vorschaubilder beim Build `NEXT_PUBLIC_SITE_URL` setzen (z. B. `https://deine-domain.de`).
 
 ## Anmelden per Link oder Code
 
