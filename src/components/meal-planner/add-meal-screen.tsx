@@ -114,9 +114,12 @@ export function AddMealScreen({
       plannedMeals.filter((meal) => meal.day_of_week === dayOfWeek),
       recipesById,
     );
+    const show = nutritionTargets.show_nutrition;
     return {
-      calories: nutritionTargets.calories_target_enabled ? nutritionTargets.calories_target - planned.calories : null,
-      protein: nutritionTargets.protein_target_enabled ? nutritionTargets.protein_target - planned.protein : null,
+      calories:
+        show && nutritionTargets.calories_target_enabled ? nutritionTargets.calories_target - planned.calories : null,
+      protein:
+        show && nutritionTargets.protein_target_enabled ? nutritionTargets.protein_target - planned.protein : null,
     };
   }, [plannedMeals, dayOfWeek, recipesById, nutritionTargets]);
 
@@ -269,8 +272,12 @@ export function AddMealScreen({
                 ? { label: "Zuletzt geplant", className: "bg-brand-chip-neutral text-brand-secondary" }
                 : null;
             const facts = [
-              recipe.calories != null && `${formatNumber(recipe.calories * servings)} kcal`,
-              recipe.protein != null && `${formatNumber(recipe.protein * servings)} g Protein`,
+              nutritionTargets.show_nutrition &&
+                recipe.calories != null &&
+                `${formatNumber(recipe.calories * servings)} kcal`,
+              nutritionTargets.show_nutrition &&
+                recipe.protein != null &&
+                `${formatNumber(recipe.protein * servings)} g Protein`,
               recipe.prep_time,
             ].filter(Boolean);
 

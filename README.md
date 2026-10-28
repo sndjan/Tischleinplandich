@@ -88,3 +88,7 @@ INSERT INTO changelog (title, description) VALUES ('Kurzer Titel', 'Ein Satz, wa
 
 - **Bewertung**: Migration `012_add_recipe_rating.sql` (im SQL Editor ausführen) fügt `recipes.rating` (1–5 Sterne) hinzu. Bewertet wird in der Rezeptansicht; die Rezeptliste kann nach „Beste Bewertung“ sortieren. Ohne die Migration zeigt das Antippen der Sterne einen Hinweis.
 - **Export**: Profil → „Rezepte exportieren“ lädt alle Rezepte als ZIP mit einer Markdown-Datei pro Rezept (plus Fotos in `images/`) herunter.
+
+## Nährwerte ausblenden
+
+Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros in der ganzen App aus (Planer, Wochenübersicht, Rezeptkarten und -ansicht). Gespeichert wird das in `user_preferences.show_nutrition` (Migration `014_add_show_nutrition.sql`, im SQL Editor ausführen). Ohne die Migration bleiben Nährwerte sichtbar und der Schalter zeigt einen Hinweis.

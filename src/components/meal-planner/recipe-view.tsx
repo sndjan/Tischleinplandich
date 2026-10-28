@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { PlanRecipeSheet } from "./plan-recipe-sheet";
 import { ShareRecipeSheet } from "./share-recipe-sheet";
 import { StarRating, useRateRecipe } from "./star-rating";
+import { useShowNutrition } from "./nutrition-target-settings";
 
 const formatNumber = (value: number | null) =>
   value === null ? null : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
@@ -41,6 +42,7 @@ export function RecipeBody({
   heroActions,
   attribution,
   rating,
+  showNutrition = true,
 }: {
   recipe: Pick<
     Recipe,
@@ -53,6 +55,7 @@ export function RecipeBody({
   attribution?: React.ReactNode;
   // Own rating stars; only shown for the reader's own recipes.
   rating?: React.ReactNode;
+  showNutrition?: boolean;
 }) {
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const factor = servings / baseServings;
@@ -116,7 +119,7 @@ export function RecipeBody({
           {rating}
         </div>
 
-        {nutrition.length > 0 && (
+        {showNutrition && nutrition.length > 0 && (
           <section aria-label="Nährwerte pro Portion" className="space-y-1.5">
             <div className="grid grid-cols-4 gap-2">
               {nutrition.map((item) => (
@@ -228,6 +231,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
   const [servings, setServings] = useState(initialServings ?? baseServings);
   const [sheet, setSheet] = useState<"plan" | "share" | null>(null);
   const rateRecipe = useRateRecipe();
+  const showNutrition = useShowNutrition();
 
   return (
     <div className="flex min-h-dvh flex-col bg-white">
@@ -237,6 +241,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
           tags={tags}
           servings={servings}
           onServingsChange={setServings}
+          showNutrition={showNutrition}
           rating={<StarRating value={recipe.rating ?? null} onChange={(value) => void rateRecipe(recipe, value)} />}
           heroActions={
             <>

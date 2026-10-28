@@ -19,6 +19,7 @@ import { useScreenStack } from "./screen-stack";
 const formatNumber = (value: number) => value.toLocaleString("de-DE", { maximumFractionDigits: 0 });
 
 export function describeTargets(targets: NutritionTargetSettings) {
+  if (!targets.show_nutrition) return "Nährwerte ausgeblendet";
   const parts = [
     targets.calories_target_enabled && `${formatNumber(targets.calories_target)} kcal`,
     targets.protein_target_enabled && `${formatNumber(targets.protein_target)} g Protein`,

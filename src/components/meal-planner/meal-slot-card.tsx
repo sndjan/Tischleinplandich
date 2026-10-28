@@ -33,9 +33,9 @@ export function MealSlotCard({
   const openRecipe = () => openScreen({ kind: "recipe-preview", recipe, servings: servingSize });
 
   const facts = [
-    recipe.calories != null && nutritionTargets.calories_target_enabled &&
+    nutritionTargets.show_nutrition && recipe.calories != null && nutritionTargets.calories_target_enabled &&
       `${formatNumber(recipe.calories * servingSize)} kcal`,
-    recipe.protein != null && nutritionTargets.protein_target_enabled &&
+    nutritionTargets.show_nutrition && recipe.protein != null && nutritionTargets.protein_target_enabled &&
       `${formatNumber(recipe.protein * servingSize)} g Protein`,
     servingSize !== 1 && `${servingSize.toLocaleString("de-DE")} Portionen`,
   ].filter(Boolean);
@@ -77,7 +77,7 @@ export function MealSlotCard({
         <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-brand-tertiary">
           {MEAL_TYPE_LABELS[mealType]}
         </p>
-        <p className="truncate text-[15px] font-bold text-brand-ink" title={recipe.name}>
+        <p className="line-clamp-2 text-[15px] font-bold leading-tight text-brand-ink" title={recipe.name}>
           {recipe.name}
         </p>
         {facts.length > 0 && (
@@ -98,7 +98,8 @@ export function MealSlotCard({
             e.stopPropagation();
             onRemove();
           }}
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-brand-muted transition-colors hover:bg-black/5 active:bg-black/5 lg:opacity-0 lg:group-hover:opacity-100"
+          // Desktop: floats over the corner on hover instead of taking width from the name.
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-brand-muted transition-colors hover:bg-black/5 active:bg-black/5 lg:absolute lg:right-1.5 lg:top-1.5 lg:size-7 lg:bg-white lg:opacity-0 lg:shadow-sm lg:group-hover:opacity-100"
           aria-label={`${recipe.name} entfernen`}
         >
           <X className="size-4" />

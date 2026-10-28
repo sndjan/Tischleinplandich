@@ -16,6 +16,7 @@ import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
 import { Clock, Info, Search, SlidersHorizontal, Star, UtensilsCrossed } from "lucide-react";
 import { formatPrepMinutes, parsePrepMinutes } from "@/lib/prep-time";
+import { useShowNutrition } from "./nutrition-target-settings";
 
 type VisibilityFilter = "all" | "private" | "public";
 type SortOption =
@@ -77,6 +78,7 @@ export function RecipeList({
   toolbarActions,
 }: RecipeListProps) {
   const { openScreen } = useScreenStack();
+  const showNutrition = useShowNutrition();
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] =
     useState<VisibilityFilter>("all");
@@ -307,7 +309,7 @@ export function RecipeList({
               <SelectItem value="oldest">Älteste</SelectItem>
               <SelectItem value="name-asc">Name (A-Z)</SelectItem>
               <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-              <SelectItem value="protein-desc">Protein</SelectItem>
+              {showNutrition && <SelectItem value="protein-desc">Protein</SelectItem>}
               <SelectItem value="time-asc">Schnellste zuerst</SelectItem>
               <SelectItem value="rating-desc">Beste Bewertung</SelectItem>
             </SelectContent>
@@ -340,7 +342,7 @@ export function RecipeList({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
           {filteredRecipes.map((recipe, index) => {
-            const primaryNutritionItems = getPrimaryNutritionItems(recipe);
+            const primaryNutritionItems = showNutrition ? getPrimaryNutritionItems(recipe) : [];
             const isSelected = selectedRecipeId === recipe.id;
             const minutes = minutesById.get(recipe.id) ?? null;
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquarePlus, WifiOff } from "lucide-react";
 import { MealWeekView, useViewMode, ViewModeToggle } from "./meal-week-view";
-import { RecipeLibrary } from "./recipe-library";
+import { RecipeLibrary, SegmentedTabs } from "./recipe-library";
 import { RecipeEditor } from "./recipe-editor";
 import { RecipeCreateScreen } from "./recipe-create-screen";
 import { RecipeView } from "./recipe-view";
@@ -26,8 +26,6 @@ import { generateShoppingListFromPlannedMeals } from "@/lib/shopping-list";
 import { collectIngredientNames } from "@/lib/editable-recipe";
 import { takeSharedContent } from "@/lib/share-target";
 import { QueryProvider } from "@/lib/query-provider";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
@@ -35,7 +33,7 @@ import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
 import { sumMealNutrition } from "./day-card";
 import { useEntrance } from "@/hooks/use-entrance";
 
-type DesktopRightPanelTab = "recipes" | "shopping";
+type DesktopRightPanelTab = "mine" | "discover" | "shopping";
 
 export function MealPlannerMain() {
   return (
@@ -76,7 +74,7 @@ function MealPlanner() {
   const { user } = useAuth();
   const { data: profile } = useProfileQuery();
   const [desktopRightPanelTab, setDesktopRightPanelTab] =
-    useState<DesktopRightPanelTab>("recipes");
+    useState<DesktopRightPanelTab>("mine");
   const isOnline = useIsOnline();
   // Where feedback was opened from, or null while the feedback card is closed.
   const [feedbackContext, setFeedbackContext] = useState<string | null>(null);
@@ -108,6 +106,7 @@ function MealPlanner() {
 
   // What is left of today's targets, so "Aus Idee" can fit a recipe into the day.
   const targetHint = useMemo(() => {
+    if (!nutritionTargets.show_nutrition) return null;
     const recipesById = new Map(mealPlanData.recipes.map((recipe) => [recipe.id, recipe]));
     const todayMeals = mealPlanData.plannedMeals.filter(
       (meal) => meal.day_of_week === getTodayDayIndex(),
@@ -328,44 +327,33 @@ function MealPlanner() {
                   onViewModeChange={setViewMode}
                 />
               </div>
-              <Card className="p-3">
-                <div className="flex gap-1 rounded-xl bg-brand-chip-neutral p-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDesktopRightPanelTab("recipes")}
-                    className={cn(
-                      "flex-1 rounded-full",
-                      desktopRightPanelTab === "recipes" &&
-                        "bg-white text-brand-accent-dark shadow-sm",
-                    )}
-                  >
-                    Rezepte
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDesktopRightPanelTab("shopping")}
-                    className={cn(
-                      "flex-1 rounded-full",
-                      desktopRightPanelTab === "shopping" &&
-                        "bg-white text-brand-accent-dark shadow-sm",
-                    )}
-                  >
-                    Einkaufsliste
-                  </Button>
-                </div>
+              {/* Stays in view next to the week and scrolls by itself, so a long
+                  recipe list doesn't stretch the page (iPad). */}
+              <div className="sticky top-[calc(76px+env(safe-area-inset-top))] flex max-h-[calc(100dvh-92px-env(safe-area-inset-top))] flex-col gap-3 self-start rounded-xl bg-white p-3 ring-1 ring-brand-card-border">
+                {/* One row for all three, instead of "Rezepte | Einkaufsliste"
+                    with "Meine | Entdecken" stacked underneath. */}
+                <SegmentedTabs
+                  label="Seitenleiste"
+                  value={desktopRightPanelTab}
+                  onChange={setDesktopRightPanelTab}
+                  options={[
+                    {
+                      value: "mine",
+                      label: mealPlanData.loading ? "Meine" : `Meine · ${mealPlanData.recipes.length}`,
+                    },
+                    { value: "discover", label: "Entdecken" },
+                    { value: "shopping", label: "Einkauf" },
+                  ]}
+                />
 
-                <div>
-                  {desktopRightPanelTab === "recipes" ? (
-                    <RecipeLibrary />
-                  ) : (
+                <div className="-mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-1">
+                  {desktopRightPanelTab === "shopping" ? (
                     <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
+                  ) : (
+                    <RecipeLibrary tab={desktopRightPanelTab} />
                   )}
                 </div>
-              </Card>
+              </div>
             </div>
           </div>
 

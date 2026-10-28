@@ -247,9 +247,13 @@ export function WeekAgenda({
                   })}
                   <div className="flex items-center justify-between gap-2 border-t border-brand-divider pb-0.5 pt-1.5">
                     <span className="text-[11px] text-brand-secondary">
-                      {formatNumber(totals.calories)} kcal
-                      {nutritionTargets.calories_target_enabled &&
-                        (left > 0 ? ` · noch ${formatNumber(left)} frei` : " · Ziel erreicht")}
+                      {nutritionTargets.show_nutrition && (
+                        <>
+                          {formatNumber(totals.calories)} kcal
+                          {nutritionTargets.calories_target_enabled &&
+                            (left > 0 ? ` · noch ${formatNumber(left)} frei` : " · Ziel erreicht")}
+                        </>
+                      )}
                     </span>
                     <button
                       type="button"

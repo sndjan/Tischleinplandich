@@ -11,6 +11,7 @@ import type { Recipe } from "@/types/database";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useScreenStack } from "./screen-stack";
+import { useShowNutrition } from "./nutrition-target-settings";
 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
 
@@ -82,6 +83,7 @@ export function DiscoverRecipes() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search.trim(), 300);
   const { savedIds, savingId, save } = useSavedSharedRecipes();
+  const showNutrition = useShowNutrition();
 
   const { data, isPending, error } = useQuery({
     queryKey: queryKeys.discover(debouncedSearch),
@@ -160,7 +162,7 @@ export function DiscoverRecipes() {
                   </div>
                   <div className="space-y-0.5 px-2.5 pb-3 pt-2">
                     <h3 className="line-clamp-2 text-sm font-bold leading-tight text-brand-ink">{recipe.name}</h3>
-                    {recipe.calories != null && (
+                    {showNutrition && recipe.calories != null && (
                       <p className="text-xs font-semibold text-brand-accent-dark">
                         {formatNumber(recipe.calories)} kcal
                         {recipe.protein != null && ` · ${formatNumber(recipe.protein)} g`}
