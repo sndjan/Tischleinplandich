@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 
 const RESEND_SECONDS = 30;
 // Must match Authentication → Providers → Email → "Email OTP Length" in Supabase.
-const CODE_LENGTH = 8;
+const CODE_LENGTH = 6;
 
 const authErrorMessage = (error: AuthError) => {
   if (error.status === 429) return 'Zu viele Versuche. Bitte kurz warten.';

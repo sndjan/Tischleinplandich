@@ -39,6 +39,6 @@ export const FAQ: { question: string; answer: string }[] = [
   },
   {
     question: "Brauche ich ein Passwort?",
-    answer: "Nein. Du meldest dich mit einem Link oder einem 8-stelligen Code per E-Mail an.",
+    answer: "Nein. Du meldest dich mit einem Link oder einem 6-stelligen Code per E-Mail an.",
   },
 ];
