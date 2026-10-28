@@ -9,6 +9,7 @@ import { PlanRecipeSheet } from "./plan-recipe-sheet";
 import { cn } from "@/lib/utils";
 import { HeroButton, RecipeBody } from "./recipe-body";
 import { useSavedSharedRecipes } from "./discover-recipes";
+import { useShowNutrition } from "./nutrition-target-settings";
 
 export function SharedByLine({ name }: { name: string | null }) {
   return (
@@ -28,6 +29,7 @@ export function SharedByLine({ name }: { name: string | null }) {
 export function SharedRecipeScreen({ recipe, onBack }: { recipe: SharedRecipe; onBack: () => void }) {
   const [servings, setServings] = useState(recipe.serving_size > 0 ? recipe.serving_size : 1);
   const { savedIds, savingId, save, ensureCopy } = useSavedSharedRecipes();
+  const showNutrition = useShowNutrition();
   const { data: own } = useRecipesQuery();
   const [planning, setPlanning] = useState<Recipe | null>(null);
   const saved = savedIds.has(recipe.id);
@@ -44,6 +46,7 @@ export function SharedRecipeScreen({ recipe, onBack }: { recipe: SharedRecipe; o
           recipe={recipe}
           tags={recipe.tags}
           servings={servings}
+          showNutrition={showNutrition}
           onServingsChange={setServings}
           attribution={<SharedByLine name={recipe.author_name} />}
           heroActions={

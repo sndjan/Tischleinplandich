@@ -29,7 +29,6 @@ import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import { generateShoppingListFromPlannedMeals } from "@/lib/shopping-list";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Stepper } from "@/components/ui/controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddMealButton } from "@/components/meal-planner/add-meal-button";
@@ -39,6 +38,7 @@ import { RecipeAiProgress } from "@/components/meal-planner/recipe-ai-progress";
 import { HeroButton, RecipeBody } from "@/components/meal-planner/recipe-body";
 import { RecipeList } from "@/components/meal-planner/recipe-list";
 import { StaticScreenStackProvider, type Screen } from "@/components/meal-planner/screen-stack";
+import { SegmentedTabs } from "@/components/meal-planner/segmented-tabs";
 import { ShoppingList } from "@/components/meal-planner/shopping-list";
 import { SubPage } from "@/components/meal-planner/sub-page";
 import {
@@ -203,7 +203,7 @@ function DemoDevice({ data, layout, framed = false }: { data: DemoData; layout: 
   const isDesktop = layout === "desktop";
   const [selectedDay, setSelectedDay] = useState(todayIndex);
   const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
-  const [panelTab, setPanelTab] = useState<"recipes" | "shopping">("shopping");
+  const [panelTab, setPanelTab] = useState<"mine" | "discover" | "shopping">("shopping");
   const [screen, setScreen] = useState<DemoScreen | null>(null);
   const [importStep, setImportStep] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -357,8 +357,22 @@ function DemoDevice({ data, layout, framed = false }: { data: DemoData; layout: 
     </div>
   );
 
+  const recipeList = (
+    <DemoRecipeList recipes={recipes} tagsById={tagsById} onNew={() => showScreen({ kind: "create" })} />
+  );
   const recipeLibrary = (
-    <RecipeLibraryDemo recipes={recipes} tagsById={tagsById} onNew={() => showScreen({ kind: "create" })} />
+    <div className="space-y-3">
+      <SegmentedTabs
+        label="Rezepte"
+        value="mine"
+        onChange={(value) => value === "discover" && notInDemo()}
+        options={[
+          { value: "mine", label: `Meine · ${recipes.length}` },
+          { value: "discover", label: "Entdecken" },
+        ]}
+      />
+      {recipeList}
+    </div>
   );
   const shoppingList = (
     <ShoppingList items={shoppingItems} pantryStaples={DEMO_PANTRY_STAPLES} persist={false} alwaysCard={!isDesktop} />
@@ -401,28 +415,22 @@ function DemoDevice({ data, layout, framed = false }: { data: DemoData; layout: 
                 {isDesktop ? (
                   <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5">
                     <div className="min-w-0">{dayView}</div>
-                    <Card className="p-3">
-                      <div className="flex gap-1 rounded-xl bg-brand-chip-neutral p-1">
-                        {(
-                          [
-                            ["recipes", "Rezepte"],
-                            ["shopping", "Einkaufsliste"],
-                          ] as const
-                        ).map(([value, label]) => (
-                          <Button
-                            key={value}
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPanelTab(value)}
-                            className={cn("flex-1 rounded-full", panelTab === value && "bg-white text-brand-accent-dark shadow-sm")}
-                          >
-                            {label}
-                          </Button>
-                        ))}
+                    {/* Same panel as the app: one tab row, sticky, scrolls by itself. */}
+                    <div className="sticky top-[76px] flex max-h-[668px] flex-col gap-3 self-start rounded-xl bg-white p-3 ring-1 ring-brand-card-border">
+                      <SegmentedTabs
+                        label="Seitenleiste"
+                        value={panelTab}
+                        onChange={(value) => (value === "discover" ? notInDemo() : setPanelTab(value))}
+                        options={[
+                          { value: "mine", label: `Meine · ${recipes.length}` },
+                          { value: "discover", label: "Entdecken" },
+                          { value: "shopping", label: "Einkauf" },
+                        ]}
+                      />
+                      <div className="-mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-1">
+                        {panelTab === "shopping" ? shoppingList : recipeList}
                       </div>
-                      <div>{panelTab === "recipes" ? recipeLibrary : shoppingList}</div>
-                    </Card>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -577,7 +585,7 @@ function DemoTabBar({ activeTab, onTabChange }: { activeTab: MobileTab; onTabCha
   );
 }
 
-function RecipeLibraryDemo({
+function DemoRecipeList({
   recipes,
   tagsById,
   onNew,
@@ -587,28 +595,23 @@ function RecipeLibraryDemo({
   onNew: () => void;
 }) {
   return (
-    <div className="space-y-3">
-      <div role="tablist" aria-label="Rezepte" className="grid h-10 grid-cols-2 rounded-xl bg-brand-chip-neutral p-[3px] text-sm font-bold">
-        <button type="button" role="tab" aria-selected="true" className="rounded-[10px] bg-white text-brand-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
-          Meine · {recipes.length}
+    <RecipeList
+      recipes={recipes}
+      recipeTagsById={tagsById}
+      loading={false}
+      showNutrition={DEMO_TARGETS.show_nutrition}
+      disableDrag
+      toolbarActions={
+        <button
+          type="button"
+          onClick={onNew}
+          className="flex h-11 shrink-0 touch-manipulation items-center gap-1 rounded-xl bg-brand-accent px-3.5 text-sm font-bold text-white transition-transform active:scale-[0.97] active:bg-brand-accent-dark"
+        >
+          <Plus className="size-4" strokeWidth={2.5} />
+          Neu
         </button>
-        <button type="button" role="tab" aria-selected="false" onClick={notInDemo} className="rounded-[10px] text-brand-secondary">
-          Entdecken
-        </button>
-      </div>
-      <RecipeList
-        recipes={recipes}
-        recipeTagsById={tagsById}
-        loading={false}
-        disableDrag
-        toolbarActions={
-          <Button type="button" onClick={onNew} className="h-11 shrink-0 gap-1 rounded-xl px-3.5 text-sm font-bold">
-            <Plus className="size-4" strokeWidth={2.5} />
-            Neu
-          </Button>
-        }
-      />
-    </div>
+      }
+    />
   );
 }
 

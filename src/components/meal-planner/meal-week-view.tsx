@@ -277,14 +277,16 @@ export function MealWeekView({
         </div>
       ) : (
         <>
-          <WeekSummary
-            plannedMeals={plannedMeals}
-            recipesById={recipesById}
-            nutritionTargets={nutritionTargets}
-            todayIndex={todayIndex}
-            weekRange={weekRange}
-            onSelectDay={openDay}
-          />
+          {nutritionTargets.show_nutrition && (
+            <WeekSummary
+              plannedMeals={plannedMeals}
+              recipesById={recipesById}
+              nutritionTargets={nutritionTargets}
+              todayIndex={todayIndex}
+              weekRange={weekRange}
+              onSelectDay={openDay}
+            />
+          )}
 
           {/* Mobile: agenda; the date or "Planen" opens the day to add meals */}
           <div className="lg:hidden">
@@ -298,8 +300,9 @@ export function MealWeekView({
             />
           </div>
 
-          {/* Desktop: horizontally-scrollable row of day cards */}
-          <div className="hidden gap-3 overflow-x-auto pb-2 lg:flex">
+          {/* Desktop: day cards wrap into as many columns as fit, so narrower
+              screens like an iPad don't need sideways scrolling. */}
+          <div className="hidden gap-3 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
             {DAYS.map((day, index) => (
               <DayCard
                 key={day}

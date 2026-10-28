@@ -2,60 +2,56 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useRecipesQuery } from "@/hooks/use-planner-data";
-import { cn } from "@/lib/utils";
 import { RecipeList } from "./recipe-list";
 import { DiscoverRecipes } from "./discover-recipes";
+import { SegmentedTabs } from "./segmented-tabs";
+import { useShowNutrition } from "./nutrition-target-settings";
 import { useScreenStack } from "./screen-stack";
 
-type LibraryTab = "mine" | "discover";
+export type LibraryTab = "mine" | "discover";
 
-export function RecipeLibrary() {
+/**
+ * Own recipes and "Entdecken". With `tab` set, the parent shows the tabs
+ * itself (the desktop panel merges them with "Einkaufsliste").
+ */
+export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {}) {
   const { openScreen } = useScreenStack();
   const { data, isPending } = useRecipesQuery();
-  const [tab, setTab] = useState<LibraryTab>("mine");
+  const showNutrition = useShowNutrition();
+  const [ownTab, setTab] = useState<LibraryTab>("mine");
+  const tab = controlledTab ?? ownTab;
   const count = data?.recipes.length;
 
   return (
     <div className="space-y-3">
-      <div role="tablist" aria-label="Rezepte" className="grid h-10 grid-cols-2 rounded-xl bg-brand-chip-neutral p-[3px] text-sm font-bold">
-        {(
-          [
-            ["mine", count !== undefined ? `Meine · ${count}` : "Meine"],
-            ["discover", "Entdecken"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => setTab(value)}
-            className={cn(
-              "rounded-[10px] transition-all active:scale-[0.97]",
-              tab === value ? "bg-white text-brand-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-brand-secondary",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {!controlledTab && (
+        <SegmentedTabs
+          label="Rezepte"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "mine", label: count !== undefined ? `Meine · ${count}` : "Meine" },
+            { value: "discover", label: "Entdecken" },
+          ]}
+        />
+      )}
 
       {tab === "mine" ? (
         <RecipeList
           recipes={data?.recipes ?? []}
           recipeTagsById={data?.tagsById ?? {}}
           loading={isPending}
+          showNutrition={showNutrition}
           toolbarActions={
-            <Button
+            <button
               type="button"
               onClick={() => openScreen({ kind: "recipe-create" })}
-              className="h-11 shrink-0 gap-1 rounded-xl px-3.5 text-sm font-bold"
+              className="flex h-11 shrink-0 touch-manipulation items-center gap-1 rounded-xl bg-brand-accent px-3.5 text-sm font-bold text-white transition-transform active:bg-brand-accent-dark active:scale-[0.97]"
             >
               <Plus className="size-4" strokeWidth={2.5} />
               Neu
-            </Button>
+            </button>
           }
         />
       ) : (

@@ -8,6 +8,7 @@ import { HeroButton, RecipeBody } from "./recipe-body";
 import { PlanRecipeSheet } from "./plan-recipe-sheet";
 import { ShareRecipeSheet } from "./share-recipe-sheet";
 import { StarRating, useRateRecipe } from "./star-rating";
+import { useShowNutrition } from "./nutrition-target-settings";
 
 interface RecipeViewProps {
   recipe: Recipe;
@@ -28,6 +29,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
   const [servings, setServings] = useState(initialServings ?? baseServings);
   const [sheet, setSheet] = useState<"plan" | "share" | null>(null);
   const rateRecipe = useRateRecipe();
+  const showNutrition = useShowNutrition();
 
   return (
     <div className="flex min-h-dvh flex-col bg-white">
@@ -37,6 +39,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
           tags={tags}
           servings={servings}
           onServingsChange={setServings}
+          showNutrition={showNutrition}
           rating={<StarRating value={recipe.rating ?? null} onChange={(value) => void rateRecipe(recipe, value)} />}
           heroActions={
             <>

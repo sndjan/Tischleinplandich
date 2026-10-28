@@ -64,6 +64,8 @@ interface RecipeListProps {
   disableDrag?: boolean;
   selectedRecipeId?: string | null;
   toolbarActions?: React.ReactNode;
+  // Calories and protein on the cards and the protein sort; off when the user hides nutrition.
+  showNutrition?: boolean;
 }
 
 export function RecipeList({
@@ -75,6 +77,7 @@ export function RecipeList({
   disableDrag = false,
   selectedRecipeId = null,
   toolbarActions,
+  showNutrition = true,
 }: RecipeListProps) {
   const { openScreen } = useScreenStack();
   const [searchQuery, setSearchQuery] = useState("");
@@ -307,7 +310,7 @@ export function RecipeList({
               <SelectItem value="oldest">Älteste</SelectItem>
               <SelectItem value="name-asc">Name (A-Z)</SelectItem>
               <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-              <SelectItem value="protein-desc">Protein</SelectItem>
+              {showNutrition && <SelectItem value="protein-desc">Protein</SelectItem>}
               <SelectItem value="time-asc">Schnellste zuerst</SelectItem>
               <SelectItem value="rating-desc">Beste Bewertung</SelectItem>
             </SelectContent>
@@ -340,7 +343,7 @@ export function RecipeList({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
           {filteredRecipes.map((recipe, index) => {
-            const primaryNutritionItems = getPrimaryNutritionItems(recipe);
+            const primaryNutritionItems = showNutrition ? getPrimaryNutritionItems(recipe) : [];
             const isSelected = selectedRecipeId === recipe.id;
             const minutes = minutesById.get(recipe.id) ?? null;
 

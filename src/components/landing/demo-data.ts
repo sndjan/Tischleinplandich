@@ -16,6 +16,7 @@ export const DEMO_TARGETS: NutritionTargetSettings = {
   protein_target_enabled: true,
   carbs_target_enabled: true,
   fats_target_enabled: true,
+  show_nutrition: true,
 };
 
 export const DEMO_PANTRY_STAPLES = ["salz", "olivenöl", "currypulver"];

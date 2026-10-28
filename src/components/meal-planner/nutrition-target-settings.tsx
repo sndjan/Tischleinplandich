@@ -20,6 +20,8 @@ export type NutritionTargetSettings = {
   protein_target_enabled: boolean;
   carbs_target_enabled: boolean;
   fats_target_enabled: boolean;
+  // Off hides calories and macros everywhere in the app.
+  show_nutrition: boolean;
 };
 
 export const DEFAULT_NUTRITION_TARGETS: NutritionTargetSettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_NUTRITION_TARGETS: NutritionTargetSettings = {
   protein_target_enabled: true,
   carbs_target_enabled: true,
   fats_target_enabled: true,
+  show_nutrition: true,
 };
 
 const toNutritionTargets = (
@@ -63,6 +66,10 @@ const toNutritionTargets = (
   fats_target_enabled: Boolean(
     preferences?.fats_target_enabled ??
     DEFAULT_NUTRITION_TARGETS.fats_target_enabled,
+  ),
+  // Missing until migration 014 runs.
+  show_nutrition: Boolean(
+    preferences?.show_nutrition ?? DEFAULT_NUTRITION_TARGETS.show_nutrition,
   ),
 });
 
@@ -102,6 +109,11 @@ export function useNutritionTargets() {
   return [data ?? DEFAULT_NUTRITION_TARGETS, setTargets] as const;
 }
 
+/** Whether calories and macros are shown at all. */
+export function useShowNutrition() {
+  return useNutritionTargets()[0].show_nutrition;
+}
+
 type TargetKey = "calories" | "protein" | "carbs" | "fats";
 
 const TARGET_FIELDS: { key: TargetKey; label: string; unit: string; step: number; max: number }[] = [
@@ -139,9 +151,12 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
       const user = await getSessionUser();
       if (!user) throw new Error("Nicht angemeldet");
 
+      // show_nutrition is saved on its own, so targets still save without migration 014.
+      const targets: Partial<NutritionTargetSettings> = { ...next };
+      delete targets.show_nutrition;
       const { error } = await createClient()
         .from("user_preferences")
-        .upsert({ user_id: user.id, ...next }, { onConflict: "user_id" });
+        .upsert({ user_id: user.id, ...targets }, { onConflict: "user_id" });
 
       if (error) throw error;
       setSaveState("saved");
@@ -160,6 +175,26 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
     },
     [save],
   );
+
+  const toggleShowNutrition = async (show: boolean) => {
+    const next = { ...settings, show_nutrition: show };
+    setSettings(next);
+    onChange(next);
+
+    const user = await getSessionUser();
+    if (!user) return;
+    const { error } = await createClient()
+      .from("user_preferences")
+      .upsert({ user_id: user.id, show_nutrition: show }, { onConflict: "user_id" });
+
+    if (error) {
+      console.error(error);
+      const reverted = { ...next, show_nutrition: !show };
+      setSettings(reverted);
+      onChange(reverted);
+      toast.error("Gibt es erst nach dem Datenbank-Update (Migration 014).");
+    }
+  };
 
   const update = (patch: Partial<NutritionTargetSettings>) => {
     const next = { ...settings, ...patch };
@@ -197,7 +232,21 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
       }
     >
       <div className="space-y-3">
-        {TARGET_FIELDS.map(({ key, label, unit, step, max }) => {
+        <section className="flex items-center justify-between gap-3 rounded-[18px] bg-white p-3.5 ring-1 ring-brand-card-border">
+          <span className="min-w-0">
+            <span className="block text-[15px] font-bold text-brand-ink">Nährwerte anzeigen</span>
+            <span className="block text-[13px] text-brand-secondary">
+              Aus: keine Kalorien und Makros im Planer und bei Rezepten
+            </span>
+          </span>
+          <Switch
+            checked={settings.show_nutrition}
+            onChange={(checked) => void toggleShowNutrition(checked)}
+            label="Nährwerte anzeigen"
+          />
+        </section>
+
+        {settings.show_nutrition && TARGET_FIELDS.map(({ key, label, unit, step, max }) => {
           const valueKey = `${key}_target` as const;
           const enabledKey = `${key}_target_enabled` as const;
           const value = settings[valueKey];

@@ -37,6 +37,7 @@ export function RecipeBody({
   heroActions,
   attribution,
   rating,
+  showNutrition = true,
 }: {
   recipe: Pick<
     Recipe,
@@ -49,6 +50,7 @@ export function RecipeBody({
   attribution?: React.ReactNode;
   // Own rating stars; only shown for the reader's own recipes.
   rating?: React.ReactNode;
+  showNutrition?: boolean;
 }) {
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const factor = servings / baseServings;
@@ -112,7 +114,7 @@ export function RecipeBody({
           {rating}
         </div>
 
-        {nutrition.length > 0 && (
+        {showNutrition && nutrition.length > 0 && (
           <section aria-label="Nährwerte pro Portion" className="space-y-1.5">
             <div className="grid grid-cols-4 gap-2">
               {nutrition.map((item) => (

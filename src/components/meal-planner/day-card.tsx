@@ -19,7 +19,7 @@ interface DayCardProps {
   summaryTitle?: string;
   dayIndex: number;
   isToday?: boolean;
-  // Fill the available width instead of the fixed desktop column width.
+  // Fill the available width without the desktop column's own card.
   fullWidth?: boolean;
   recipesById: Map<string, Recipe>;
   plannedMealsForDay: PlannedMeal[];
@@ -80,7 +80,7 @@ export function DayCard({
     <div
       className={cn(
         "w-full shrink-0 space-y-2.5",
-        !fullWidth && "rounded-[22px] bg-brand-app-bg p-2.5 ring-1 ring-brand-card-border lg:w-72",
+        !fullWidth && "rounded-[22px] bg-brand-app-bg p-2.5 ring-1 ring-brand-card-border",
         !fullWidth && isToday && "ring-2 ring-brand-accent",
       )}
     >
@@ -91,7 +91,16 @@ export function DayCard({
         </h3>
       )}
 
-      <DaySummary title={summaryTitle} isToday={isToday} totals={totals} targets={nutritionTargets} />
+      {nutritionTargets.show_nutrition ? (
+        <DaySummary title={summaryTitle} isToday={isToday} totals={totals} targets={nutritionTargets} />
+      ) : (
+        summaryTitle && (
+          <h2 className="px-1 font-heading text-lg font-extrabold text-brand-ink">
+            {summaryTitle}
+            {isToday && <span className="ml-1.5 font-sans text-[13px] font-bold text-brand-accent-dark">· Heute</span>}
+          </h2>
+        )
+      )}
 
       {FIXED_MEAL_TYPES.map((mealType) => {
         const meal = plannedMealsForDay.find((m) => m.meal_type === mealType);
