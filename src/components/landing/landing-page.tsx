@@ -177,7 +177,7 @@ export function LandingPage() {
           </ul>
         </section>
 
-        <section id="demo" aria-labelledby="demo-heading" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 pb-[104px] pt-8 sm:px-6">
+        <section id="demo" aria-labelledby="demo-heading" className="mx-auto max-w-[1320px] scroll-mt-6 px-4 pb-[104px] pt-8 sm:px-6">
           <div className="mx-auto mb-6 flex max-w-[620px] flex-col items-center gap-3 text-center">
             <span className="rounded-full bg-brand-highlight px-3 py-1.5 text-[13px] font-bold text-brand-ink">Interaktive Demo</span>
             <h2 id="demo-heading" className="font-heading text-[clamp(26px,3vw,34px)] font-black leading-tight">
@@ -185,7 +185,8 @@ export function LandingPage() {
             </h2>
             <p className="text-[15px] leading-relaxed text-brand-secondary">
               Plane ein Gericht, öffne ein Rezept oder importiere eins per KI – die Einkaufsliste rechnet mit.
-              Beispieldaten, nichts wird gespeichert.
+              <span className="hidden xl:inline"> Computer und Handy teilen sich dieselben Daten.</span> Beispieldaten,
+              nichts wird gespeichert.
             </p>
           </div>
           <LazyLandingDemo />

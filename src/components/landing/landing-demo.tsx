@@ -82,35 +82,44 @@ const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE"
 
 const notInDemo = () => toast("Das geht in der echten App – hier ist nur die Demo.");
 
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(false);
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
 
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
-    const update = () => setIsDesktop(query.matches);
+    const list = window.matchMedia(query);
+    const update = () => setMatches(list.matches);
     update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
+    list.addEventListener("change", update);
+    return () => list.removeEventListener("change", update);
+  }, [query]);
 
-  return isDesktop;
+  return matches;
 }
 
+type DemoData = {
+  todayIndex: number;
+  weekDates: number[];
+  meals: DemoMeal[];
+  recipes: Recipe[];
+  recipesById: Map<string, Recipe>;
+  tagsById: Record<string, string[]>;
+  addMeal: (dayIndex: number, mealType: MealType, recipeId: string, servings: number) => void;
+  removeMeal: (mealId: string) => void;
+  addImportedRecipe: () => void;
+};
+
+// Holds the sample plan. On large screens a desktop and a phone view share it, so a
+// meal planned on one shows up on the other; each keeps its own screens and tabs.
 export function LandingDemo() {
-  const isDesktop = useIsDesktop();
+  // The app's own desktop layout starts at 1024px; next to a phone it needs more room.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const hasRoomForBoth = useMediaQuery("(min-width: 1280px)");
   // Dates depend on the visitor's clock, so the planner fills in after mounting.
   const [todayIndex, setTodayIndex] = useState<number | null>(null);
   const [weekDates, setWeekDates] = useState<number[]>([]);
-  const [selectedDay, setSelectedDay] = useState(0);
   const [meals, setMeals] = useState<DemoMeal[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>(DEMO_RECIPES);
   const [tagsById, setTagsById] = useState<Record<string, string[]>>(DEMO_TAGS_BY_ID);
-  const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
-  const [panelTab, setPanelTab] = useState<"recipes" | "shopping">("shopping");
-  const [screen, setScreen] = useState<DemoScreen | null>(null);
-  const [importStep, setImportStep] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const importTimers = useRef<number[]>([]);
   const nextMealId = useRef(100);
 
   useEffect(() => {
@@ -125,13 +134,83 @@ export function LandingDemo() {
       }),
     );
     setTodayIndex(today);
-    setSelectedDay(today);
     setMeals(initialDemoMeals(today));
   }, []);
 
+  const recipesById = useMemo(() => new Map(recipes.map((recipe) => [recipe.id, recipe])), [recipes]);
+
+  if (todayIndex === null) {
+    return (
+      <div className={cn(FRAME_CLASS, "p-3 sm:p-4")}>
+        <PlannerSkeleton />
+      </div>
+    );
+  }
+
+  const data: DemoData = {
+    todayIndex,
+    weekDates,
+    meals,
+    recipes,
+    recipesById,
+    tagsById,
+    addMeal: (dayIndex, mealType, recipeId, servings) =>
+      setMeals((current) => [
+        // Fixed slots hold one meal, like in the app; extras can hold any number.
+        ...current.filter(
+          (meal) => mealType === "extra" || meal.day_of_week !== dayIndex || meal.meal_type !== mealType,
+        ),
+        {
+          id: `demo-${nextMealId.current++}`,
+          meal_plan_id: "demo",
+          recipe_id: recipeId,
+          day_of_week: dayIndex,
+          meal_type: mealType,
+          serving_size: servings,
+          created_at: new Date().toISOString(),
+        },
+      ]),
+    removeMeal: (mealId) => setMeals((current) => current.filter((meal) => meal.id !== mealId)),
+    addImportedRecipe: () => {
+      setRecipes((current) =>
+        current.some((recipe) => recipe.id === IMPORTED_RECIPE_ID) ? current : [IMPORTED_RECIPE, ...current],
+      );
+      setTagsById((current) => ({ ...current, [IMPORTED_RECIPE_ID]: IMPORTED_TAGS }));
+    },
+  };
+
+  if (!isDesktop) return <DemoDevice data={data} layout="phone" />;
+  if (!hasRoomForBoth) return <DemoDevice data={data} layout="desktop" />;
+
+  return (
+    <div className="flex items-start gap-8">
+      <div className="min-w-0 flex-1">
+        <DemoDevice data={data} layout="desktop" />
+      </div>
+      <div className="mt-14 w-[360px] shrink-0 rounded-[48px] bg-brand-ink p-2.5 shadow-[0_40px_70px_-30px_rgba(28,43,34,0.5)]">
+        <DemoDevice data={data} layout="phone" framed />
+      </div>
+    </div>
+  );
+}
+
+const FRAME_CLASS =
+  "h-[680px] overflow-hidden rounded-[28px] bg-brand-app-bg shadow-[0_30px_60px_-30px_rgba(28,43,34,0.3)] ring-1 ring-brand-card-border lg:h-[760px]";
+
+// One device: the desktop layout (week day + side panel) or the phone layout (tabs).
+function DemoDevice({ data, layout, framed = false }: { data: DemoData; layout: "desktop" | "phone"; framed?: boolean }) {
+  const { todayIndex, weekDates, meals, recipes, recipesById, tagsById } = data;
+  const isDesktop = layout === "desktop";
+  const [selectedDay, setSelectedDay] = useState(todayIndex);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
+  const [panelTab, setPanelTab] = useState<"recipes" | "shopping">("shopping");
+  const [screen, setScreen] = useState<DemoScreen | null>(null);
+  const [importStep, setImportStep] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const importTimers = useRef<number[]>([]);
+
   useEffect(() => () => importTimers.current.forEach((timer) => window.clearTimeout(timer)), []);
 
-  const recipesById = useMemo(() => new Map(recipes.map((recipe) => [recipe.id, recipe])), [recipes]);
   const shoppingItems = useMemo(() => generateShoppingListFromPlannedMeals(meals, recipes), [meals, recipes]);
 
   const showScreen = useCallback((next: DemoScreen | null) => {
@@ -149,24 +228,11 @@ export function LandingDemo() {
     [showScreen],
   );
 
-  const addMeal = (dayIndex: number, mealType: MealType, recipeId: string, servings: number) => {
-    setMeals((current) => [
-      // Fixed slots hold one meal, like in the app; extras can hold any number.
-      ...current.filter(
-        (meal) => mealType === "extra" || meal.day_of_week !== dayIndex || meal.meal_type !== mealType,
-      ),
-      {
-        id: `demo-${nextMealId.current++}`,
-        meal_plan_id: "demo",
-        recipe_id: recipeId,
-        day_of_week: dayIndex,
-        meal_type: mealType,
-        serving_size: servings,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+  const planMeal = (dayIndex: number, mealType: MealType, recipeId: string, servings: number) => {
+    data.addMeal(dayIndex, mealType, recipeId, servings);
     setSelectedDay(dayIndex);
     setMobileTab("plan");
+    showScreen(null);
   };
 
   const startImport = () => {
@@ -178,10 +244,7 @@ export function LandingDemo() {
     );
     importTimers.current.push(
       window.setTimeout(() => {
-        setRecipes((current) =>
-          current.some((recipe) => recipe.id === IMPORTED_RECIPE_ID) ? current : [IMPORTED_RECIPE, ...current],
-        );
-        setTagsById((current) => ({ ...current, [IMPORTED_RECIPE_ID]: IMPORTED_TAGS }));
+        data.addImportedRecipe();
         showScreen({ kind: "recipe", recipeId: IMPORTED_RECIPE_ID });
       }, 5 * IMPORT_STEP_MS),
     );
@@ -205,10 +268,7 @@ export function LandingDemo() {
             plannedForDay={meals.filter((meal) => meal.day_of_week === current.dayIndex)}
             recipesById={recipesById}
             onBack={() => showScreen(null)}
-            onAdd={(recipeId, servings) => {
-              addMeal(current.dayIndex, current.mealType, recipeId, servings);
-              showScreen(null);
-            }}
+            onAdd={(recipeId, servings) => planMeal(current.dayIndex, current.mealType, recipeId, servings)}
           />
         );
       case "recipe": {
@@ -223,10 +283,7 @@ export function LandingDemo() {
             initialServings={current.servings}
             selectedDay={selectedDay}
             onBack={() => showScreen(null)}
-            onPlan={(dayIndex, mealType, servings) => {
-              addMeal(dayIndex, mealType, recipe.id, servings);
-              showScreen(null);
-            }}
+            onPlan={(dayIndex, mealType, servings) => planMeal(dayIndex, mealType, recipe.id, servings)}
           />
         );
       }
@@ -256,72 +313,81 @@ export function LandingDemo() {
     }
   };
 
-  const dayView =
-    todayIndex === null ? null : (
-      <div className="mx-auto max-w-xl space-y-2.5">
-        <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">
-          {SHORT_DAYS.map((day, index) => {
-            const selected = index === selectedDay;
-            const hasMeals = meals.some((meal) => meal.day_of_week === index);
+  const dayView = (
+    <div className="mx-auto max-w-xl space-y-2.5">
+      <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">
+        {SHORT_DAYS.map((day, index) => {
+          const selected = index === selectedDay;
+          const hasMeals = meals.some((meal) => meal.day_of_week === index);
 
-            return (
-              <button
-                key={day}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
-                onClick={() => setSelectedDay(index)}
-                className={cn(
-                  "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
-                  selected
-                    ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
-                    : index === todayIndex
-                      ? "bg-white text-brand-ink ring-2 ring-brand-accent"
-                      : "bg-white text-brand-ink ring-1 ring-brand-card-border",
-                )}
-              >
-                <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>{day}</span>
-                <span className="font-heading text-[17px] font-extrabold leading-none">{weekDates[index]}</span>
-                <span
-                  className={cn("size-1.5 rounded-full", hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent")}
-                />
-              </button>
-            );
-          })}
-        </div>
-
-        <DayView
-          dayIndex={selectedDay}
-          isToday={selectedDay === todayIndex}
-          meals={meals.filter((meal) => meal.day_of_week === selectedDay)}
-          recipesById={recipesById}
-          onRemove={(id) => setMeals((current) => current.filter((meal) => meal.id !== id))}
-        />
+          return (
+            <button
+              key={day}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
+              onClick={() => setSelectedDay(index)}
+              className={cn(
+                "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
+                selected
+                  ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
+                  : index === todayIndex
+                    ? "bg-white text-brand-ink ring-2 ring-brand-accent"
+                    : "bg-white text-brand-ink ring-1 ring-brand-card-border",
+              )}
+            >
+              <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>{day}</span>
+              <span className="font-heading text-[17px] font-extrabold leading-none">{weekDates[index]}</span>
+              <span
+                className={cn("size-1.5 rounded-full", hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent")}
+              />
+            </button>
+          );
+        })}
       </div>
-    );
+
+      <DayView
+        dayIndex={selectedDay}
+        isToday={selectedDay === todayIndex}
+        meals={meals.filter((meal) => meal.day_of_week === selectedDay)}
+        recipesById={recipesById}
+        onRemove={data.removeMeal}
+      />
+    </div>
+  );
 
   const recipeLibrary = (
     <RecipeLibraryDemo recipes={recipes} tagsById={tagsById} onNew={() => showScreen({ kind: "create" })} />
   );
-  const shoppingList = <ShoppingList items={shoppingItems} pantryStaples={DEMO_PANTRY_STAPLES} persist={false} />;
+  const shoppingList = (
+    <ShoppingList items={shoppingItems} pantryStaples={DEMO_PANTRY_STAPLES} persist={false} alwaysCard={!isDesktop} />
+  );
 
   return (
-    <div className="overflow-hidden rounded-[28px] bg-brand-app-bg shadow-[0_30px_60px_-30px_rgba(28,43,34,0.3)] ring-1 ring-brand-card-border">
-      <div ref={scrollRef} className="h-[680px] overflow-y-auto overscroll-contain lg:h-[760px]">
+    <div
+      className={
+        framed ? "h-[740px] overflow-hidden rounded-[38px] bg-brand-app-bg [transform:translateZ(0)]" : FRAME_CLASS
+      }
+    >
+      <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain [scrollbar-width:none]">
         <StaticScreenStackProvider onOpenScreen={handleOpenScreen}>
           {screen ? (
             renderScreen(screen)
           ) : (
             <div className="flex min-h-full flex-col">
               <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white/90 backdrop-blur-lg">
-                <div className="flex h-[60px] items-center justify-between gap-3 px-4">
+                <div className={cn("flex h-[60px] items-center justify-between gap-3 px-4", framed && "pt-2")}>
                   <p className="flex min-w-0 items-center gap-2 font-heading text-[22px] font-extrabold text-brand-ink">
-                    {mobileTab === "plan" || isDesktop ? (
+                    {isDesktop ? (
                       <>
                         <span aria-hidden="true" className="text-[26px]">🥗</span>
-                        <span className="sm:hidden">WMP</span>
-                        <span className="hidden sm:inline">Wochen-Essensplaner</span>
+                        Wochen-Essensplaner
+                      </>
+                    ) : mobileTab === "plan" ? (
+                      <>
+                        <span aria-hidden="true" className="text-[26px]">🥗</span>
+                        WMP
                       </>
                     ) : (
                       <span>{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>
@@ -332,10 +398,8 @@ export function LandingDemo() {
               </header>
 
               <main className="flex-1 p-3 sm:p-4">
-                {todayIndex === null ? (
-                  <PlannerSkeleton />
-                ) : isDesktop ? (
-                  <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6">
+                {isDesktop ? (
+                  <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5">
                     <div className="min-w-0">{dayView}</div>
                     <Card className="p-3">
                       <div className="flex gap-1 rounded-xl bg-brand-chip-neutral p-1">
@@ -369,7 +433,7 @@ export function LandingDemo() {
                 )}
               </main>
 
-              {!isDesktop && todayIndex !== null && <DemoTabBar activeTab={mobileTab} onTabChange={setMobileTab} />}
+              {!isDesktop && <DemoTabBar activeTab={mobileTab} onTabChange={setMobileTab} />}
             </div>
           )}
         </StaticScreenStackProvider>

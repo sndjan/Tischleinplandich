@@ -20,6 +20,9 @@ interface ShoppingListProps {
   pantryStaples: string[];
   // Off for the landing page demo, so it never touches a real list on this device.
   persist?: boolean;
+  // Keep the header card on large screens too, e.g. in the demo's phone frame.
+  // By default it drops the card there, since the desktop side panel is already one.
+  alwaysCard?: boolean;
 }
 
 type CustomItem = { id: string; label: string };
@@ -82,7 +85,7 @@ function buildShareText(sections: { label: string; emoji: string; rows: Row[] }[
   return [`🛒 Einkauf ${formatWeekRange()}`, ...blocks].join("\n\n");
 }
 
-export function ShoppingList({ items, pantryStaples, persist = true }: ShoppingListProps) {
+export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard = false }: ShoppingListProps) {
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
   const [customItems, setCustomItems] = useState<CustomItem[]>([]);
   const [hideBasics, setHideBasics] = useState(true);
@@ -221,7 +224,12 @@ export function ShoppingList({ items, pantryStaples, persist = true }: ShoppingL
 
   return (
     <div className="space-y-3">
-      <div className="space-y-3 rounded-[18px] bg-white p-4 ring-1 ring-brand-card-border lg:p-0 lg:ring-0">
+      <div
+        className={cn(
+          "space-y-3 rounded-[18px] bg-white p-4 ring-1 ring-brand-card-border",
+          !alwaysCard && "lg:p-0 lg:ring-0",
+        )}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-brand-ink">Diese Woche</p>
