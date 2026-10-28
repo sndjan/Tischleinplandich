@@ -38,13 +38,9 @@ Für Canonical-URL, Sitemap, `robots.txt` und Vorschaubilder beim Build `NEXT_PU
 
 ## Anmelden per Link oder Code
 
-Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Email Templates → Magic Link** diese Vorlage eintragen:
+Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Emails → Templates** den Inhalt von `supabase/templates/sign-in.html` in **Magic Link** und **Confirm signup** eintragen (Betreff: „Dein Anmeldelink für den Essensplaner“).
 
-```html
-<h2>Dein Anmeldelink</h2>
-<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Jetzt anmelden</a></p>
-<p>Oder diesen Code in der App eingeben: <strong>{{ .Token }}</strong></p>
-```
+Für den Versand im Livebetrieb unter **Authentication → Emails → SMTP Settings** eigenes SMTP einrichten (Resend: Host `smtp.resend.com`, Port `465`, Benutzer `resend`, Passwort = API-Key mit „Sending access“) und unter **Authentication → Rate Limits** das Mail-Limit erhöhen. Der eingebaute Versand von Supabase schafft nur wenige Mails pro Stunde.
 
 Unter **Authentication → URL Configuration** muss die **Site URL** die Adresse der App sein und `https://<deine-domain>/auth/callback` bei den Redirect URLs stehen. Bestehende Konten melden sich einfach mit ihrer E-Mail an.
 
