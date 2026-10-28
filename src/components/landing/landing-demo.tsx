@@ -1,463 +1,925 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, Plus, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  BookOpen,
+  CalendarDays,
+  CalendarPlus,
+  Camera,
+  Check,
+  ChefHat,
+  ChevronLeft,
+  ClipboardPaste,
+  Download,
+  FileText,
+  Lightbulb,
+  Link2,
+  PencilLine,
+  Plus,
+  Search,
+  ShoppingCart,
+  Sparkles,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import type { MealType, Recipe } from "@/types/database";
+import type { RecipeStreamStage } from "@/lib/recipe-draft";
+import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
+import { generateShoppingListFromPlannedMeals } from "@/lib/shopping-list";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Stepper } from "@/components/ui/controls";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AddMealButton } from "@/components/meal-planner/add-meal-button";
+import { DaySummary, sumMealNutrition } from "@/components/meal-planner/day-summary";
+import { MealSlotCard } from "@/components/meal-planner/meal-slot-card";
+import { RecipeAiProgress } from "@/components/meal-planner/recipe-ai-progress";
+import { HeroButton, RecipeBody } from "@/components/meal-planner/recipe-body";
+import { RecipeList } from "@/components/meal-planner/recipe-list";
+import { StaticScreenStackProvider, type Screen } from "@/components/meal-planner/screen-stack";
+import { ShoppingList } from "@/components/meal-planner/shopping-list";
+import { SubPage } from "@/components/meal-planner/sub-page";
+import {
+  DEMO_PANTRY_STAPLES,
+  DEMO_RECIPES,
+  DEMO_TAGS_BY_ID,
+  DEMO_TARGETS,
+  IMPORT_LINK,
+  IMPORTED_RECIPE,
+  IMPORTED_RECIPE_ID,
+  IMPORTED_TAGS,
+  importedDraft,
+  initialDemoMeals,
+  type DemoMeal,
+} from "./demo-data";
 
-// Sample data for the landing page demo. Nothing here touches the real app or Supabase.
+// The planner's own components running on sample data. Screens that need the
+// database (adding a meal, a recipe, the AI import) are rebuilt here with the
+// same building blocks and work only on local state.
 
-type RecipeId = "oats" | "egg" | "dal" | "bowl" | "veg" | "pasta" | "salmon" | "shakshuka";
-type SlotKey = "breakfast" | "lunch" | "dinner";
-type Ingredient = [name: string, quantity: number, unit: string];
-type DemoRecipe = { name: string; kcal: number; protein: number; minutes: number; ingredients: Ingredient[] };
-type DayPlan = Partial<Record<SlotKey, RecipeId>>;
-type Tab = "plan" | "shop" | "recipes";
+const DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+const SHORT_DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const FIXED_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
+const IMPORT_STEP_MS = 900;
+const IMPORT_HOST = new URL(IMPORT_LINK).hostname.replace(/^www\./, "");
 
-const RECIPES: Record<RecipeId, DemoRecipe> = {
-  oats: { name: "Overnight Oats mit Beeren", kcal: 420, protein: 18, minutes: 5, ingredients: [["Haferflocken", 60, "g"], ["Naturjoghurt", 150, "g"], ["Beeren", 100, "g"]] },
-  egg: { name: "Rührei auf Vollkornbrot", kcal: 450, protein: 26, minutes: 10, ingredients: [["Eier", 3, "Stk."], ["Vollkornbrot", 2, "Scheiben"], ["Schnittlauch", 1, "Bund"]] },
-  dal: { name: "Linsen-Dal mit Reis", kcal: 610, protein: 24, minutes: 30, ingredients: [["Rote Linsen", 120, "g"], ["Kokosmilch", 200, "ml"], ["Reis", 80, "g"]] },
-  bowl: { name: "Hähnchen-Bowl", kcal: 680, protein: 45, minutes: 25, ingredients: [["Hähnchenbrust", 150, "g"], ["Reis", 80, "g"], ["Paprika", 1, "Stk."]] },
-  veg: { name: "Ofengemüse mit Feta", kcal: 540, protein: 22, minutes: 35, ingredients: [["Paprika", 2, "Stk."], ["Zucchini", 1, "Stk."], ["Feta", 100, "g"]] },
-  pasta: { name: "Pasta Pomodoro", kcal: 650, protein: 20, minutes: 20, ingredients: [["Spaghetti", 125, "g"], ["Dosentomaten", 400, "g"], ["Basilikum", 1, "Bund"]] },
-  salmon: { name: "Lachs mit Ofenkartoffeln", kcal: 620, protein: 38, minutes: 40, ingredients: [["Lachsfilet", 150, "g"], ["Kartoffeln", 300, "g"], ["Zitrone", 1, "Stk."]] },
-  shakshuka: { name: "Shakshuka mit Feta", kcal: 480, protein: 27, minutes: 25, ingredients: [["Eier", 3, "Stk."], ["Dosentomaten", 400, "g"], ["Paprika", 1, "Stk."], ["Feta", 50, "g"]] },
-};
+type MobileTab = "plan" | "shopping" | "recipes";
+type DemoScreen =
+  | { kind: "add-meal"; dayIndex: number; mealType: MealType }
+  | { kind: "recipe"; recipeId: string; servings?: number }
+  | { kind: "create" }
+  | { kind: "importing" };
 
-const BASE_LIBRARY: RecipeId[] = ["oats", "egg", "dal", "bowl", "veg", "pasta", "salmon"];
-const IMPORTED_RECIPE: RecipeId = "shakshuka";
-const SLOTS: [SlotKey, string][] = [["breakfast", "Frühstück"], ["lunch", "Mittagessen"], ["dinner", "Abendessen"]];
-const CHOICES: Record<SlotKey, RecipeId[]> = { breakfast: ["oats", "egg"], lunch: ["dal", "bowl", "veg"], dinner: ["pasta", "salmon", "veg"] };
-const DAYS: [short: string, long: string][] = [["Mo", "Montag"], ["Di", "Dienstag"], ["Mi", "Mittwoch"], ["Do", "Donnerstag"], ["Fr", "Freitag"], ["Sa", "Samstag"], ["So", "Sonntag"]];
-const START_PLAN: DayPlan[] = [{ breakfast: "oats", lunch: "bowl", dinner: "pasta" }, { breakfast: "egg", dinner: "salmon" }, {}, {}, {}, {}, {}];
-const IMPORT_STEPS = ["Seite wird gelesen …", "Zutaten & Mengen erkannt …", "Nährwerte berechnet …"];
-const IMPORT_STEP_MS = 800;
-const TARGETS = { kcal: 2000, protein: 110 };
-const TABS: [Tab, string][] = [["plan", "Planer"], ["shop", "Einkauf"], ["recipes", "Rezepte"]];
+const MOBILE_TABS: { value: MobileTab; label: string; Icon: typeof CalendarDays }[] = [
+  { value: "plan", label: "Planer", Icon: CalendarDays },
+  { value: "shopping", label: "Einkauf", Icon: ShoppingCart },
+  { value: "recipes", label: "Rezepte", Icon: BookOpen },
+];
 
-function formatQuantity(quantity: number, unit: string) {
-  if (unit === "g" && quantity >= 1000) return `${(quantity / 1000).toLocaleString("de-DE")} kg`;
-  if (unit === "ml" && quantity >= 1000) return `${(quantity / 1000).toLocaleString("de-DE")} l`;
-  return `${quantity} ${unit}`;
-}
+const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
 
-function recipeMeta(recipe: DemoRecipe, withProtein = true) {
-  return [`${recipe.kcal} kcal`, withProtein && `${recipe.protein} g Protein`, `${recipe.minutes} Min.`].filter(Boolean).join(" · ");
+const notInDemo = () => toast("Das geht in der echten App – hier ist nur die Demo.");
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isDesktop;
 }
 
 export function LandingDemo() {
-  const [tab, setTab] = useState<Tab>("plan");
-  const [day, setDay] = useState(1);
-  const [plan, setPlan] = useState<DayPlan[]>(START_PLAN);
-  const [picking, setPicking] = useState<SlotKey | null>(null);
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [library, setLibrary] = useState<RecipeId[]>(BASE_LIBRARY);
-  const [openRecipe, setOpenRecipe] = useState<RecipeId>("dal");
-  const [importStep, setImportStep] = useState(-1);
-  const [importUrl, setImportUrl] = useState("");
-  const [exported, setExported] = useState(false);
+  const isDesktop = useIsDesktop();
+  // Dates depend on the visitor's clock, so the planner fills in after mounting.
+  const [todayIndex, setTodayIndex] = useState<number | null>(null);
+  const [weekDates, setWeekDates] = useState<number[]>([]);
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [meals, setMeals] = useState<DemoMeal[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>(DEMO_RECIPES);
+  const [tagsById, setTagsById] = useState<Record<string, string[]>>(DEMO_TAGS_BY_ID);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("plan");
+  const [panelTab, setPanelTab] = useState<"recipes" | "shopping">("shopping");
+  const [screen, setScreen] = useState<DemoScreen | null>(null);
+  const [importStep, setImportStep] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const importTimers = useRef<number[]>([]);
+  const nextMealId = useRef(100);
+
+  useEffect(() => {
+    const today = (new Date().getDay() + 6) % 7;
+    const monday = new Date();
+    monday.setDate(monday.getDate() - today);
+    setWeekDates(
+      Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + index);
+        return date.getDate();
+      }),
+    );
+    setTodayIndex(today);
+    setSelectedDay(today);
+    setMeals(initialDemoMeals(today));
+  }, []);
 
   useEffect(() => () => importTimers.current.forEach((timer) => window.clearTimeout(timer)), []);
 
-  const assign = (dayIndex: number, slot: SlotKey, recipe: RecipeId | null) => {
-    setPlan((current) =>
-      current.map((dayPlan, index) => {
-        if (index !== dayIndex) return dayPlan;
-        const next = { ...dayPlan };
-        if (recipe) next[slot] = recipe;
-        else delete next[slot];
-        return next;
-      }),
-    );
-    setPicking(null);
+  const recipesById = useMemo(() => new Map(recipes.map((recipe) => [recipe.id, recipe])), [recipes]);
+  const shoppingItems = useMemo(() => generateShoppingListFromPlannedMeals(meals, recipes), [meals, recipes]);
+
+  const showScreen = useCallback((next: DemoScreen | null) => {
+    setScreen(next);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, []);
+
+  const handleOpenScreen = useCallback(
+    (next: Screen) => {
+      if (next.kind === "add-meal") showScreen({ kind: "add-meal", dayIndex: next.dayIndex, mealType: next.mealType });
+      else if (next.kind === "recipe-preview") showScreen({ kind: "recipe", recipeId: next.recipe.id, servings: next.servings });
+      else if (next.kind === "recipe-create") showScreen({ kind: "create" });
+      else notInDemo();
+    },
+    [showScreen],
+  );
+
+  const addMeal = (dayIndex: number, mealType: MealType, recipeId: string, servings: number) => {
+    setMeals((current) => [
+      // Fixed slots hold one meal, like in the app; extras can hold any number.
+      ...current.filter(
+        (meal) => mealType === "extra" || meal.day_of_week !== dayIndex || meal.meal_type !== mealType,
+      ),
+      {
+        id: `demo-${nextMealId.current++}`,
+        meal_plan_id: "demo",
+        recipe_id: recipeId,
+        day_of_week: dayIndex,
+        meal_type: mealType,
+        serving_size: servings,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    setSelectedDay(dayIndex);
+    setMobileTab("plan");
   };
 
-  const runImport = () => {
-    if (importStep >= 0) return;
-    setExported(false);
+  const startImport = () => {
+    importTimers.current.forEach((timer) => window.clearTimeout(timer));
     setImportStep(0);
-    importTimers.current = [
-      window.setTimeout(() => setImportStep(1), IMPORT_STEP_MS),
-      window.setTimeout(() => setImportStep(2), IMPORT_STEP_MS * 2),
+    showScreen({ kind: "importing" });
+    importTimers.current = [1, 2, 3, 4].map((step) =>
+      window.setTimeout(() => setImportStep(step), step * IMPORT_STEP_MS),
+    );
+    importTimers.current.push(
       window.setTimeout(() => {
-        setImportStep(-1);
-        setImportUrl("");
-        setLibrary((current) => (current.includes(IMPORTED_RECIPE) ? current : [IMPORTED_RECIPE, ...current]));
-        setOpenRecipe(IMPORTED_RECIPE);
-      }, IMPORT_STEP_MS * 3),
-    ];
+        setRecipes((current) =>
+          current.some((recipe) => recipe.id === IMPORTED_RECIPE_ID) ? current : [IMPORTED_RECIPE, ...current],
+        );
+        setTagsById((current) => ({ ...current, [IMPORTED_RECIPE_ID]: IMPORTED_TAGS }));
+        showScreen({ kind: "recipe", recipeId: IMPORTED_RECIPE_ID });
+      }, 5 * IMPORT_STEP_MS),
+    );
   };
 
-  const totals = useMemo(() => {
-    let kcal = 0;
-    let protein = 0;
-    for (const id of Object.values(plan[day])) {
-      kcal += RECIPES[id].kcal;
-      protein += RECIPES[id].protein;
-    }
-    return { kcal, protein };
-  }, [plan, day]);
+  const cancelImport = () => {
+    importTimers.current.forEach((timer) => window.clearTimeout(timer));
+    showScreen({ kind: "create" });
+  };
 
-  // Same idea as the real shopping list: identical ingredients across the week add up.
-  const shopping = useMemo(() => {
-    const byKey = new Map<string, { key: string; name: string; unit: string; quantity: number }>();
-    for (const dayPlan of plan) {
-      for (const id of Object.values(dayPlan)) {
-        for (const [name, quantity, unit] of RECIPES[id].ingredients) {
-          const key = `${name}|${unit}`;
-          const entry = byKey.get(key) ?? { key, name, unit, quantity: 0 };
-          entry.quantity += quantity;
-          byKey.set(key, entry);
-        }
+  const renderScreen = (current: DemoScreen) => {
+    switch (current.kind) {
+      case "add-meal":
+        return (
+          <AddMealDemoScreen
+            key={`${current.dayIndex}-${current.mealType}`}
+            dayIndex={current.dayIndex}
+            mealType={current.mealType}
+            recipes={recipes}
+            tagsById={tagsById}
+            plannedForDay={meals.filter((meal) => meal.day_of_week === current.dayIndex)}
+            recipesById={recipesById}
+            onBack={() => showScreen(null)}
+            onAdd={(recipeId, servings) => {
+              addMeal(current.dayIndex, current.mealType, recipeId, servings);
+              showScreen(null);
+            }}
+          />
+        );
+      case "recipe": {
+        const recipe = recipesById.get(current.recipeId);
+        if (!recipe) return null;
+        return (
+          <RecipeDemoScreen
+            key={recipe.id}
+            recipe={recipe}
+            tags={tagsById[recipe.id] ?? []}
+            isNew={recipe.id === IMPORTED_RECIPE_ID}
+            initialServings={current.servings}
+            selectedDay={selectedDay}
+            onBack={() => showScreen(null)}
+            onPlan={(dayIndex, mealType, servings) => {
+              addMeal(dayIndex, mealType, recipe.id, servings);
+              showScreen(null);
+            }}
+          />
+        );
+      }
+      case "create":
+        return <CreateRecipeDemoScreen onBack={() => showScreen(null)} onStart={startImport} />;
+      case "importing": {
+        const stages: RecipeStreamStage[] = ["reading", "reading", "ingredients", "steps", "nutrition"];
+        const draft =
+          importStep < 2
+            ? null
+            : importedDraft(importStep === 2 ? 2 : 5, importStep === 2 ? 0 : importStep === 3 ? 2 : 4, importStep >= 4);
+        return (
+          <RecipeAiProgress
+            title="Wird erkannt …"
+            extraSteps={[
+              importStep === 0
+                ? { label: `${IMPORT_HOST} wird gelesen`, status: "active" }
+                : { label: `${IMPORT_HOST} gelesen`, status: "done" },
+            ]}
+            stage={stages[importStep]}
+            draft={draft}
+            isIdea={false}
+            onCancel={cancelImport}
+          />
+        );
       }
     }
-    return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
-  }, [plan]);
+  };
 
-  const openItems = shopping.filter((item) => !checked[item.key]);
-  const mealCount = plan.reduce((sum, dayPlan) => sum + Object.keys(dayPlan).length, 0);
-  const doneCount = shopping.length - openItems.length;
-  const detail = RECIPES[openRecipe];
-  const dayName = DAYS[day][1];
+  const dayView =
+    todayIndex === null ? null : (
+      <div className="mx-auto max-w-xl space-y-2.5">
+        <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">
+          {SHORT_DAYS.map((day, index) => {
+            const selected = index === selectedDay;
+            const hasMeals = meals.some((meal) => meal.day_of_week === index);
+
+            return (
+              <button
+                key={day}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
+                onClick={() => setSelectedDay(index)}
+                className={cn(
+                  "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
+                  selected
+                    ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
+                    : index === todayIndex
+                      ? "bg-white text-brand-ink ring-2 ring-brand-accent"
+                      : "bg-white text-brand-ink ring-1 ring-brand-card-border",
+                )}
+              >
+                <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>{day}</span>
+                <span className="font-heading text-[17px] font-extrabold leading-none">{weekDates[index]}</span>
+                <span
+                  className={cn("size-1.5 rounded-full", hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent")}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        <DayView
+          dayIndex={selectedDay}
+          isToday={selectedDay === todayIndex}
+          meals={meals.filter((meal) => meal.day_of_week === selectedDay)}
+          recipesById={recipesById}
+          onRemove={(id) => setMeals((current) => current.filter((meal) => meal.id !== id))}
+        />
+      </div>
+    );
+
+  const recipeLibrary = (
+    <RecipeLibraryDemo recipes={recipes} tagsById={tagsById} onNew={() => showScreen({ kind: "create" })} />
+  );
+  const shoppingList = <ShoppingList items={shoppingItems} pantryStaples={DEMO_PANTRY_STAPLES} persist={false} />;
 
   return (
-    <div className="overflow-hidden rounded-[32px] border border-brand-card-border bg-white shadow-[0_30px_60px_-30px_rgba(28,43,34,0.22)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-divider bg-brand-app-bg-alt px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <span className="rounded-full bg-brand-highlight px-3 py-1.5 text-[13px] font-bold text-brand-ink">Interaktive Demo</span>
-          <h2 id="demo-heading" className="text-sm font-medium text-brand-secondary">
-            Beispieldaten · nichts wird gespeichert
-          </h2>
-        </div>
-        <div role="tablist" aria-label="Bereiche der Demo" className="flex h-11 rounded-full bg-brand-chip-neutral p-[3px]">
-          {TABS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={tab === value}
-              onClick={() => {
-                setTab(value);
-                setPicking(null);
-              }}
-              className={cn(
-                "rounded-full px-[18px] text-sm font-bold transition-all",
-                tab === value ? "bg-white text-brand-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-brand-secondary",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="min-h-[620px] p-4 sm:p-6">
-        {tab === "plan" && (
-          <div className="flex flex-wrap items-start gap-6">
-            <div className="min-w-0 flex-[999_1_520px]">
-              <div className="mb-3.5 grid grid-cols-7 gap-1.5">
-                {DAYS.map(([short], index) => (
-                  <button
-                    key={short}
-                    type="button"
-                    aria-pressed={index === day}
-                    aria-label={`${DAYS[index][1]}, ${Object.keys(plan[index]).length} von 3 Mahlzeiten`}
-                    onClick={() => {
-                      setDay(index);
-                      setPicking(null);
-                    }}
-                    className={cn(
-                      "flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-[14px] py-2",
-                      index === day ? "bg-brand-accent-dark text-white" : "bg-brand-accent-bg-light text-brand-ink",
+    <div className="overflow-hidden rounded-[28px] bg-brand-app-bg shadow-[0_30px_60px_-30px_rgba(28,43,34,0.3)] ring-1 ring-brand-card-border">
+      <div ref={scrollRef} className="h-[680px] overflow-y-auto overscroll-contain lg:h-[760px]">
+        <StaticScreenStackProvider onOpenScreen={handleOpenScreen}>
+          {screen ? (
+            renderScreen(screen)
+          ) : (
+            <div className="flex min-h-full flex-col">
+              <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white/90 backdrop-blur-lg">
+                <div className="flex h-[60px] items-center justify-between gap-3 px-4">
+                  <p className="flex min-w-0 items-center gap-2 font-heading text-[22px] font-extrabold text-brand-ink">
+                    {mobileTab === "plan" || isDesktop ? (
+                      <>
+                        <span aria-hidden="true" className="text-[26px]">🥗</span>
+                        <span className="sm:hidden">WMP</span>
+                        <span className="hidden sm:inline">Wochen-Essensplaner</span>
+                      </>
+                    ) : (
+                      <span>{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>
                     )}
-                  >
-                    <span className="text-sm font-bold">{short}</span>
-                    <span className={cn("text-[11px]", index === day ? "opacity-90" : "text-brand-secondary")}>
-                      {Object.keys(plan[index]).length}/3
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {SLOTS.map(([slot, label]) => {
-                  const id = plan[day][slot];
-                  const recipe = id ? RECIPES[id] : null;
-                  const options = library.includes(IMPORTED_RECIPE) && slot !== "lunch" ? [...CHOICES[slot], IMPORTED_RECIPE] : CHOICES[slot];
-                  return (
-                    <div key={slot} className="rounded-[18px] border border-brand-card-border bg-white px-3.5 py-3">
-                      <div className="flex items-center gap-3.5">
-                        <span className="w-[88px] flex-none text-xs font-bold uppercase tracking-[0.06em] text-brand-tertiary sm:w-[104px]">
-                          {label}
-                        </span>
-                        {recipe ? (
-                          <>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[15px] font-bold">{recipe.name}</p>
-                              <p className="mt-0.5 text-xs text-brand-secondary">{recipeMeta(recipe)}</p>
-                            </div>
-                            <button
-                              type="button"
-                              aria-label={`${recipe.name} entfernen`}
-                              onClick={() => assign(day, slot, null)}
-                              className="flex size-11 flex-none items-center justify-center rounded-full bg-brand-chip-neutral text-brand-secondary"
-                            >
-                              <X className="size-4" aria-hidden="true" />
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            aria-expanded={picking === slot}
-                            onClick={() => setPicking(picking === slot ? null : slot)}
-                            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-brand-icon-muted bg-brand-app-bg-alt text-sm font-bold text-brand-accent-dark"
-                          >
-                            <Plus className="size-4" strokeWidth={2.4} aria-hidden="true" />
-                            Rezept hinzufügen
-                          </button>
-                        )}
-                      </div>
-                      {!recipe && picking === slot && (
-                        <div className="mt-2.5 flex flex-wrap gap-1.5">
-                          {options.map((option) => (
-                            <button
-                              key={option}
-                              type="button"
-                              onClick={() => assign(day, slot, option)}
-                              className="min-h-11 flex-[1_1_180px] rounded-xl border border-brand-today-border bg-brand-accent-bg-light px-3 py-2.5 text-left text-brand-ink"
-                            >
-                              <span className="block text-sm font-bold">{RECIPES[option].name}</span>
-                              <span className="mt-0.5 block text-xs text-brand-secondary">{recipeMeta(RECIPES[option], false)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-x-5 gap-y-3 rounded-[18px] bg-brand-stat-bg p-3.5">
-                <NutritionBar label={`${dayName} · kcal`} value={`${totals.kcal.toLocaleString("de-DE")} / 2.000`} ratio={totals.kcal / TARGETS.kcal} />
-                <NutritionBar label="Protein" value={`${totals.protein} / ${TARGETS.protein} g`} ratio={totals.protein / TARGETS.protein} dark />
-              </div>
-            </div>
-
-            <aside aria-label="Einkaufsliste (Vorschau)" className="min-w-0 flex-[1_1_300px] rounded-[22px] bg-brand-app-bg p-5">
-              <div className="mb-1 flex items-center justify-between gap-2.5">
-                <h3 className="font-heading text-xl font-black">Einkaufsliste</h3>
-                <button type="button" onClick={() => setTab("shop")} className="min-h-11 px-1 text-sm font-bold text-brand-accent-dark">
-                  Alle ansehen
-                </button>
-              </div>
-              <p className="mb-2 text-[13px] text-brand-secondary">
-                {mealCount} Mahlzeiten geplant · {openItems.length} Zutaten offen
-              </p>
-              <ul>
-                {openItems.slice(0, 7).map((item) => (
-                  <li key={item.key} className="flex justify-between gap-3 border-b border-[#ebeae5] px-0.5 py-2.5 text-[15px]">
-                    <span className="font-medium">{item.name}</span>
-                    <span className="text-sm text-brand-secondary">{formatQuantity(item.quantity, item.unit)}</span>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          </div>
-        )}
-
-        {tab === "shop" && (
-          <div className="mx-auto max-w-[760px]">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="font-heading text-[26px] font-black">Einkaufsliste dieser Woche</h3>
-              <p className="text-sm text-brand-secondary">
-                {doneCount} von {shopping.length} abgehakt
-              </p>
-            </div>
-            <div className="mb-[18px] mt-3.5 h-2 overflow-hidden rounded-full bg-brand-track">
-              <div
-                className="h-2 rounded-full bg-brand-accent transition-[width]"
-                style={{ width: `${shopping.length ? Math.round((doneCount / shopping.length) * 100) : 0}%` }}
-              />
-            </div>
-            <ul className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-x-7">
-              {shopping.map((item) => {
-                const done = Boolean(checked[item.key]);
-                return (
-                  <li key={item.key}>
-                    <button
-                      type="button"
-                      aria-pressed={done}
-                      onClick={() => setChecked((current) => ({ ...current, [item.key]: !done }))}
-                      className="flex min-h-12 w-full items-center gap-3 border-b border-brand-divider px-0.5 py-2.5 text-left"
-                    >
-                      <span
-                        className={cn(
-                          "flex size-[22px] flex-none items-center justify-center rounded-[7px] border-2",
-                          done ? "border-brand-accent bg-brand-accent" : "border-brand-icon-muted",
-                        )}
-                      >
-                        {done && <Check className="size-3.5 text-white" strokeWidth={3} aria-hidden="true" />}
-                      </span>
-                      <span className={cn("flex-1 text-[15px]", done ? "text-brand-tertiary line-through" : "font-medium")}>
-                        {item.name}
-                      </span>
-                      <span className="text-sm text-brand-secondary">{formatQuantity(item.quantity, item.unit)}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="mt-[18px] text-sm text-brand-secondary">
-              Gleiche Zutaten aus allen Rezepten der Woche werden zusammengerechnet.
-            </p>
-          </div>
-        )}
-
-        {tab === "recipes" && (
-          <div className="flex flex-wrap items-start gap-6">
-            <div className="min-w-0 flex-[999_1_520px]">
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  runImport();
-                }}
-                className="rounded-[20px] border border-brand-today-border bg-brand-accent-bg-light p-4"
-              >
-                <label htmlFor="demo-import-url" className="mb-2 block text-sm font-bold">
-                  Rezept per KI importieren
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    id="demo-import-url"
-                    type="url"
-                    value={importUrl}
-                    onChange={(event) => setImportUrl(event.target.value)}
-                    placeholder="Link, z. B. von einem Foodblog, einfügen"
-                    className="min-h-12 min-w-0 flex-[1_1_240px] rounded-xl border border-brand-input-border bg-white px-3.5 text-[15px] text-brand-ink"
-                  />
-                  {importStep < 0 ? (
-                    <button
-                      type="submit"
-                      className="flex min-h-12 items-center gap-2 rounded-xl bg-brand-accent-dark px-[18px] text-[15px] font-bold text-white"
-                    >
-                      <Sparkles className="size-[18px]" aria-hidden="true" />
-                      Importieren
-                    </button>
-                  ) : (
-                    <p role="status" className="flex min-h-12 animate-soft-pulse items-center px-1.5 text-[15px] font-bold text-brand-accent-dark motion-reduce:animate-none">
-                      {IMPORT_STEPS[importStep]}
-                    </p>
-                  )}
+                  </p>
+                  <span className="rounded-full bg-brand-highlight px-2.5 py-1 text-xs font-bold text-brand-ink">Demo</span>
                 </div>
-                <p className="mt-2 text-[13px] text-brand-secondary">
-                  Auch Fotos und PDFs funktionieren. In der Demo wird ein Beispielrezept erzeugt.
-                </p>
-              </form>
+              </header>
 
-              <div className="mb-3 mt-5 flex items-center justify-between gap-3">
-                <h3 className="font-heading text-xl font-black">
-                  Meine Rezepte <span className="font-bold text-brand-tertiary">{library.length}</span>
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setExported(true)}
-                  className="flex min-h-11 items-center gap-2 rounded-full border border-brand-input-border bg-white px-3.5 text-sm font-bold"
-                >
-                  <Download className="size-4" aria-hidden="true" />
-                  Exportieren
-                </button>
-              </div>
-              {exported && (
-                <p role="status" className="mb-3 rounded-xl bg-brand-ink px-3.5 py-3 text-sm text-white">
-                  {library.length} Rezepte als Markdown (ZIP) exportiert – in der Demo nur simuliert.
-                </p>
-              )}
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2.5">
-                {library.map((id) => {
-                  const recipe = RECIPES[id];
-                  const selected = id === openRecipe;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => setOpenRecipe(id)}
-                      className={cn(
-                        "flex min-h-[84px] items-center gap-3 rounded-2xl border-2 p-3 text-left text-brand-ink",
-                        selected ? "border-brand-accent bg-brand-accent-bg-light" : "border-brand-card-border bg-white",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-11 flex-none items-center justify-center rounded-xl font-heading text-lg font-black",
-                          selected ? "bg-brand-accent-dark text-white" : "bg-brand-accent-bg text-brand-accent-dark",
-                        )}
-                      >
-                        {recipe.name.charAt(0)}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold">{recipe.name}</span>
-                        <span className="mt-0.5 block text-xs text-brand-secondary">{recipeMeta(recipe, false)}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <main className="flex-1 p-3 sm:p-4">
+                {todayIndex === null ? (
+                  <PlannerSkeleton />
+                ) : isDesktop ? (
+                  <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6">
+                    <div className="min-w-0">{dayView}</div>
+                    <Card className="p-3">
+                      <div className="flex gap-1 rounded-xl bg-brand-chip-neutral p-1">
+                        {(
+                          [
+                            ["recipes", "Rezepte"],
+                            ["shopping", "Einkaufsliste"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <Button
+                            key={value}
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPanelTab(value)}
+                            className={cn("flex-1 rounded-full", panelTab === value && "bg-white text-brand-accent-dark shadow-sm")}
+                          >
+                            {label}
+                          </Button>
+                        ))}
+                      </div>
+                      <div>{panelTab === "recipes" ? recipeLibrary : shoppingList}</div>
+                    </Card>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {mobileTab === "plan" && dayView}
+                    {mobileTab === "shopping" && shoppingList}
+                    {mobileTab === "recipes" && recipeLibrary}
+                  </div>
+                )}
+              </main>
+
+              {!isDesktop && todayIndex !== null && <DemoTabBar activeTab={mobileTab} onTabChange={setMobileTab} />}
             </div>
-
-            <article aria-label="Rezeptdetails" className="min-w-0 flex-[1_1_300px] rounded-[22px] bg-brand-app-bg p-5">
-              {openRecipe === IMPORTED_RECIPE && (
-                <p className="mb-2.5 inline-block rounded-full bg-brand-highlight px-2.5 py-1 text-xs font-bold">Neu per KI importiert</p>
-              )}
-              <h3 className="font-heading text-[22px] font-black">{detail.name}</h3>
-              <p className="mb-4 mt-1.5 text-sm text-brand-secondary">{recipeMeta(detail)}</p>
-              <h4 className="mb-1.5 text-xs font-bold uppercase tracking-[0.06em] text-brand-tertiary">Zutaten</h4>
-              <ul className="mb-5">
-                {detail.ingredients.map(([name, quantity, unit]) => (
-                  <li key={name} className="flex justify-between border-b border-[#ebeae5] py-2 text-[15px]">
-                    <span>{name}</span>
-                    <span className="text-brand-secondary">{formatQuantity(quantity, unit)}</span>
-                  </li>
-                ))}
-              </ul>
-              <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.06em] text-brand-tertiary">Einplanen am {dayName}</h4>
-              <div className="flex flex-wrap gap-1.5">
-                {SLOTS.map(([slot, label]) => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => {
-                      assign(day, slot, openRecipe);
-                      setTab("plan");
-                    }}
-                    className="min-h-11 flex-[1_1_90px] rounded-xl bg-brand-accent-dark text-[13px] font-bold text-white"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </article>
-          </div>
-        )}
+          )}
+        </StaticScreenStackProvider>
       </div>
     </div>
   );
 }
 
-function NutritionBar({ label, value, ratio, dark }: { label: string; value: string; ratio: number; dark?: boolean }) {
+function PlannerSkeleton() {
   return (
-    <div>
-      <div className="flex justify-between text-[13px] font-bold">
-        <span>{label}</span>
-        <span className="font-medium text-brand-secondary">{value}</span>
+    <div className="mx-auto max-w-xl space-y-2.5" aria-busy="true" aria-label="Lädt">
+      <div className="grid grid-cols-7 gap-1">
+        {SHORT_DAYS.map((day) => (
+          <Skeleton key={day} className="h-[62px] rounded-[14px]" />
+        ))}
       </div>
-      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-brand-track">
-        <div
-          className={cn("h-2 rounded-full transition-[width]", dark ? "bg-brand-accent-dark" : "bg-brand-accent")}
-          style={{ width: `${Math.min(100, Math.round(ratio * 100))}%` }}
-        />
+      <Skeleton className="h-[104px] rounded-[18px]" />
+      {[0, 1, 2, 3].map((index) => (
+        <Skeleton key={index} className="h-[86px] rounded-[18px]" />
+      ))}
+    </div>
+  );
+}
+
+// Same structure as the planner's DayCard on phones: summary, the four fixed meals, extras.
+function DayView({
+  dayIndex,
+  isToday,
+  meals,
+  recipesById,
+  onRemove,
+}: {
+  dayIndex: number;
+  isToday: boolean;
+  meals: DemoMeal[];
+  recipesById: Map<string, Recipe>;
+  onRemove: (mealId: string) => void;
+}) {
+  const extraMeals = meals.filter((meal) => meal.meal_type === "extra");
+
+  return (
+    <div className="w-full space-y-2.5">
+      <DaySummary
+        title={DAYS[dayIndex]}
+        isToday={isToday}
+        totals={sumMealNutrition(meals, recipesById)}
+        targets={DEMO_TARGETS}
+      />
+      {FIXED_MEAL_TYPES.map((mealType) => {
+        const meal = meals.find((candidate) => candidate.meal_type === mealType);
+        const recipe = meal ? recipesById.get(meal.recipe_id) : undefined;
+
+        return meal && recipe ? (
+          <MealSlotCard
+            key={mealType}
+            recipe={recipe}
+            mealType={mealType}
+            servingSize={meal.serving_size}
+            nutritionTargets={DEMO_TARGETS}
+            onRemove={() => onRemove(meal.id)}
+          />
+        ) : (
+          <AddMealButton key={mealType} dayOfWeek={dayIndex} mealType={mealType} />
+        );
+      })}
+      <div className="space-y-2.5">
+        {extraMeals.map((meal) => {
+          const recipe = recipesById.get(meal.recipe_id);
+          if (!recipe) return null;
+          return (
+            <MealSlotCard
+              key={meal.id}
+              recipe={recipe}
+              mealType="extra"
+              servingSize={meal.serving_size}
+              nutritionTargets={DEMO_TARGETS}
+              onRemove={() => onRemove(meal.id)}
+            />
+          );
+        })}
+        <AddMealButton dayOfWeek={dayIndex} mealType="extra" label="Extras" />
       </div>
     </div>
+  );
+}
+
+// The app's floating tab pill, kept inside the demo frame instead of fixed to the window.
+const TAB_ACTIVE_WIDTH = 108;
+const TAB_INACTIVE_WIDTH = 48;
+const TAB_GAP = 4;
+const TAB_PADDING = 6;
+const TAB_EASE = "duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
+
+function DemoTabBar({ activeTab, onTabChange }: { activeTab: MobileTab; onTabChange: (tab: MobileTab) => void }) {
+  const activeIndex = MOBILE_TABS.findIndex((tab) => tab.value === activeTab);
+
+  return (
+    <nav aria-label="Bereiche der Demo" className="pointer-events-none sticky bottom-4 z-40 mt-2 flex justify-center pb-1">
+      <div
+        className="pointer-events-auto relative flex h-14 items-center rounded-full bg-white/75 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6),0_0_0_1px_rgba(28,43,34,0.05),0_8px_24px_rgba(28,43,34,0.14)] backdrop-blur-xl backdrop-saturate-150"
+        style={{ gap: TAB_GAP, paddingInline: TAB_PADDING }}
+      >
+        <span
+          aria-hidden="true"
+          className={cn("absolute left-0 top-1.5 h-11 rounded-full bg-brand-accent-dark transition-transform", TAB_EASE)}
+          style={{
+            width: TAB_ACTIVE_WIDTH,
+            transform: `translateX(${TAB_PADDING + activeIndex * (TAB_INACTIVE_WIDTH + TAB_GAP)}px)`,
+          }}
+        />
+        {MOBILE_TABS.map(({ value, label, Icon }) => {
+          const isActive = value === activeTab;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onTabChange(value)}
+              aria-label={label}
+              aria-current={isActive ? "page" : undefined}
+              style={{ width: isActive ? TAB_ACTIVE_WIDTH : TAB_INACTIVE_WIDTH }}
+              className={cn(
+                "relative flex h-11 shrink-0 touch-manipulation items-center overflow-hidden rounded-full pl-[13px] text-[13px] font-bold transition-[width,color]",
+                TAB_EASE,
+                isActive ? "text-white" : "text-[#7d8a83] active:bg-black/5",
+              )}
+            >
+              <Icon className="size-[22px] shrink-0" strokeWidth={isActive ? 2.2 : 2} />
+              <span
+                className={cn(
+                  "ml-1.5 whitespace-nowrap transition-opacity motion-reduce:transition-none",
+                  isActive ? "opacity-100 delay-150 duration-200" : "opacity-0 duration-100",
+                )}
+              >
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function RecipeLibraryDemo({
+  recipes,
+  tagsById,
+  onNew,
+}: {
+  recipes: Recipe[];
+  tagsById: Record<string, string[]>;
+  onNew: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div role="tablist" aria-label="Rezepte" className="grid h-10 grid-cols-2 rounded-xl bg-brand-chip-neutral p-[3px] text-sm font-bold">
+        <button type="button" role="tab" aria-selected="true" className="rounded-[10px] bg-white text-brand-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+          Meine · {recipes.length}
+        </button>
+        <button type="button" role="tab" aria-selected="false" onClick={notInDemo} className="rounded-[10px] text-brand-secondary">
+          Entdecken
+        </button>
+      </div>
+      <RecipeList
+        recipes={recipes}
+        recipeTagsById={tagsById}
+        loading={false}
+        disableDrag
+        toolbarActions={
+          <Button type="button" onClick={onNew} className="h-11 shrink-0 gap-1 rounded-xl px-3.5 text-sm font-bold">
+            <Plus className="size-4" strokeWidth={2.5} />
+            Neu
+          </Button>
+        }
+      />
+    </div>
+  );
+}
+
+// Mirrors the app's "add meal" screen: recipes that fit the rest of the day come first.
+function AddMealDemoScreen({
+  dayIndex,
+  mealType,
+  recipes,
+  tagsById,
+  plannedForDay,
+  recipesById,
+  onBack,
+  onAdd,
+}: {
+  dayIndex: number;
+  mealType: MealType;
+  recipes: Recipe[];
+  tagsById: Record<string, string[]>;
+  plannedForDay: DemoMeal[];
+  recipesById: Map<string, Recipe>;
+  onBack: () => void;
+  onAdd: (recipeId: string, servings: number) => void;
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [servings, setServings] = useState(1);
+  const [search, setSearch] = useState("");
+  const [onlyFits, setOnlyFits] = useState(false);
+
+  const planned = sumMealNutrition(plannedForDay, recipesById);
+  const remaining = {
+    calories: DEMO_TARGETS.calories_target - planned.calories,
+    protein: DEMO_TARGETS.protein_target - planned.protein,
+  };
+
+  const fits = (recipe: Recipe) =>
+    remaining.calories > 0 &&
+    recipe.calories != null &&
+    recipe.calories * servings <= remaining.calories + 50 &&
+    recipe.calories * servings >= Math.min(remaining.calories * 0.4, 400);
+
+  const mealLabel = MEAL_TYPE_LABELS[mealType].toLowerCase();
+  const query = search.trim().toLowerCase();
+  const visibleRecipes = recipes
+    .filter((recipe) => {
+      if (query && ![recipe.name, recipe.ingredients].join(" ").toLowerCase().includes(query)) return false;
+      return !onlyFits || fits(recipe);
+    })
+    .sort((a, b) => {
+      const score = (recipe: Recipe) =>
+        (fits(recipe) ? 2 : 0) +
+        ((tagsById[recipe.id] ?? []).some((tag) => tag.toLowerCase().startsWith(mealLabel)) ? 1 : 0);
+      return score(b) - score(a);
+    });
+
+  const subtitle =
+    remaining.calories > 0
+      ? `Noch ${formatNumber(remaining.calories)} kcal${remaining.protein > 0 ? ` und ${formatNumber(remaining.protein)} g Protein` : ""} frei`
+      : "Tagesziel schon erreicht";
+
+  return (
+    <SubPage
+      title={`${MEAL_TYPE_LABELS[mealType]} · ${DAYS[dayIndex]}`}
+      subtitle={subtitle}
+      onBack={onBack}
+      headerExtra={
+        <div className="space-y-2.5">
+          <label className="flex h-11 items-center gap-2 rounded-xl bg-brand-chip-neutral px-3">
+            <Search className="size-4 text-brand-secondary" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Rezept suchen"
+              aria-label="Rezept suchen"
+              type="search"
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
+            />
+          </label>
+          <div className="flex gap-1.5">
+            {(
+              [
+                [false, "Alle"],
+                [true, "Passt heute"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setOnlyFits(value)}
+                aria-pressed={onlyFits === value}
+                className={cn(
+                  "h-8 shrink-0 rounded-full px-3 text-[13px] font-semibold transition-all active:scale-95",
+                  onlyFits === value ? "bg-brand-accent-dark font-bold text-white" : "bg-brand-chip-neutral text-brand-ink",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      }
+      footer={
+        <div className="flex items-center gap-2.5">
+          <Stepper value={servings} onChange={setServings} min={0.5} max={12} step={0.5} label="Portionen" />
+          <Button
+            onClick={() => selectedId && onAdd(selectedId, servings)}
+            disabled={!selectedId}
+            className="h-[52px] flex-1 rounded-[14px] text-base font-bold"
+          >
+            {servings === 1 ? "Hinzufügen" : `${servings.toLocaleString("de-DE")} Portionen hinzufügen`}
+          </Button>
+        </div>
+      }
+    >
+      {visibleRecipes.length === 0 ? (
+        <p className="py-10 text-center text-sm text-brand-secondary">Nichts gefunden</p>
+      ) : (
+        <ul className="-mt-2">
+          {visibleRecipes.map((recipe) => {
+            const selected = recipe.id === selectedId;
+            const facts = [
+              recipe.calories != null && `${formatNumber(recipe.calories * servings)} kcal`,
+              recipe.protein != null && `${formatNumber(recipe.protein * servings)} g Protein`,
+              recipe.prep_time,
+            ].filter(Boolean);
+
+            return (
+              <li key={recipe.id} className="border-b border-brand-divider last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(selected ? null : recipe.id)}
+                  aria-pressed={selected}
+                  aria-label={`${recipe.name} auswählen`}
+                  className="flex w-full touch-manipulation items-center gap-3 py-2.5 text-left transition-transform active:scale-[0.98]"
+                >
+                  <span className="flex size-[60px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-chip-neutral">
+                    <UtensilsCrossed className="size-6 text-brand-muted" />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-[15px] font-bold text-brand-ink">{recipe.name}</span>
+                    <span className="truncate text-[13px] text-brand-secondary">{facts.join(" · ")}</span>
+                    {fits(recipe) && (
+                      <span className="self-start rounded-md bg-brand-accent-bg px-1.5 py-0.5 text-[11px] font-bold text-brand-accent-dark">
+                        Passt gut
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      "flex size-7 shrink-0 items-center justify-center rounded-full transition-all duration-150",
+                      selected ? "bg-brand-accent-dark text-white" : "border-2 border-brand-disabled",
+                    )}
+                  >
+                    {selected && <Check className="size-4 animate-pop-in" strokeWidth={3} />}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </SubPage>
+  );
+}
+
+// The app's recipe screen (same body), with "Einplanen" picking a day and meal inline.
+function RecipeDemoScreen({
+  recipe,
+  tags,
+  isNew,
+  initialServings,
+  selectedDay,
+  onBack,
+  onPlan,
+}: {
+  recipe: Recipe;
+  tags: string[];
+  isNew: boolean;
+  initialServings?: number;
+  selectedDay: number;
+  onBack: () => void;
+  onPlan: (dayIndex: number, mealType: MealType, servings: number) => void;
+}) {
+  const [servings, setServings] = useState(initialServings ?? recipe.serving_size);
+  const [planning, setPlanning] = useState(false);
+  const [planDay, setPlanDay] = useState(selectedDay);
+  const [planMeal, setPlanMeal] = useState<MealType>("dinner");
+
+  return (
+    <div className="flex min-h-dvh flex-col bg-white">
+      <div className="flex-1">
+        <RecipeBody
+          recipe={recipe}
+          tags={tags}
+          servings={servings}
+          onServingsChange={setServings}
+          attribution={
+            isNew ? (
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-brand-highlight px-2.5 py-1 text-xs font-bold text-brand-ink">
+                <Sparkles className="size-3.5" />
+                Gerade per KI importiert
+              </p>
+            ) : undefined
+          }
+          heroActions={
+            <HeroButton label="Zurück" onClick={onBack}>
+              <ChevronLeft className="size-6" />
+            </HeroButton>
+          }
+        />
+      </div>
+
+      <footer className="sticky bottom-0 z-30 border-t border-brand-card-border bg-white shadow-[0_-6px_16px_rgba(28,43,34,0.06)]">
+        {planning && (
+          <div className="mx-auto w-full max-w-2xl animate-fade-up space-y-2.5 px-4 pt-3">
+            <div className="grid grid-cols-7 gap-1">
+              {SHORT_DAYS.map((day, index) => (
+                <button
+                  key={day}
+                  type="button"
+                  aria-pressed={planDay === index}
+                  onClick={() => setPlanDay(index)}
+                  className={cn(
+                    "h-10 rounded-xl text-[13px] font-bold transition-all active:scale-95",
+                    planDay === index ? "bg-brand-accent-dark text-white" : "bg-brand-chip-neutral text-brand-ink",
+                  )}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {FIXED_MEAL_TYPES.map((mealType) => (
+                <button
+                  key={mealType}
+                  type="button"
+                  aria-pressed={planMeal === mealType}
+                  onClick={() => setPlanMeal(mealType)}
+                  className={cn(
+                    "h-10 rounded-xl text-[13px] font-bold transition-all active:scale-95",
+                    planMeal === mealType ? "bg-brand-accent-dark text-white" : "bg-brand-chip-neutral text-brand-ink",
+                  )}
+                >
+                  {MEAL_TYPE_LABELS[mealType]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="mx-auto flex w-full max-w-2xl gap-2.5 px-4 pb-3 pt-2.5">
+          {planning ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setPlanning(false)}
+                className="flex h-[52px] items-center whitespace-nowrap rounded-[14px] border border-[#d9e6dc] bg-white px-4 text-[15px] font-bold text-brand-ink transition-transform active:scale-[0.97]"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={() => onPlan(planDay, planMeal, servings)}
+                className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] bg-brand-accent-dark text-base font-bold text-white transition-transform active:scale-[0.97]"
+              >
+                <CalendarPlus className="size-[18px]" />
+                {SHORT_DAYS[planDay]} · {MEAL_TYPE_LABELS[planMeal]} einplanen
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setPlanning(true)}
+                className="flex h-[52px] items-center gap-1.5 whitespace-nowrap rounded-[14px] border border-[#d9e6dc] bg-white px-4 text-[15px] font-bold text-brand-accent-dark transition-transform active:scale-[0.97] active:bg-brand-accent-bg"
+              >
+                <CalendarPlus className="size-[18px]" />
+                Einplanen
+              </button>
+              <button
+                type="button"
+                onClick={notInDemo}
+                className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[14px] bg-brand-accent-dark text-base font-bold text-white transition-transform active:scale-[0.97]"
+              >
+                <ChefHat className="size-[18px]" />
+                Kochen starten
+              </button>
+            </>
+          )}
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+const CREATE_MODES = [
+  { value: "import", label: "Importieren", Icon: Download },
+  { value: "idea", label: "Aus Idee", Icon: Lightbulb },
+  { value: "manual", label: "Manuell", Icon: PencilLine },
+] as const;
+
+// The app's "Neues Rezept" screen with an example link already pasted in.
+function CreateRecipeDemoScreen({ onBack, onStart }: { onBack: () => void; onStart: () => void }) {
+  return (
+    <SubPage
+      title="Neues Rezept"
+      onBack={onBack}
+      footer={
+        <Button className="h-12 w-full rounded-xl text-base font-bold" onClick={onStart}>
+          <Sparkles className="size-5" />
+          Rezept erkennen
+        </Button>
+      }
+    >
+      <div role="tablist" aria-label="Art" className="grid grid-cols-3 gap-1 rounded-2xl bg-brand-chip-neutral p-1">
+        {CREATE_MODES.map(({ value, label, Icon }) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={value === "import"}
+            onClick={value === "import" ? undefined : notInDemo}
+            className={cn(
+              "flex h-10 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.97]",
+              value === "import" ? "bg-white text-brand-accent-dark shadow-sm" : "text-brand-secondary",
+            )}
+          >
+            {value === "import" && <Icon className="size-4" />}
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <section className="space-y-3 rounded-2xl border-[1.5px] border-brand-accent bg-white p-3.5 shadow-[0_0_0_4px_#eaf3ec]">
+        <p className="text-xs font-bold uppercase tracking-wide text-brand-secondary">Alles hier rein</p>
+        <p className="break-all text-[15px] leading-relaxed text-brand-ink">{IMPORT_LINK}</p>
+        <div className="flex items-center gap-2.5 rounded-xl border border-brand-track bg-brand-stat-bg p-2.5">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-accent-bg text-brand-accent-dark">
+            <Link2 className="size-[18px]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-brand-ink">{IMPORT_HOST}</p>
+            <p className="truncate text-xs text-brand-secondary">{IMPORT_LINK}</p>
+          </div>
+          <span className="flex size-8 items-center justify-center text-brand-muted" aria-hidden="true">
+            <X className="size-4" />
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-brand-divider pt-3">
+          {(
+            [
+              [ClipboardPaste, "Einfügen"],
+              [Plus, "Fotos"],
+              [Camera, "Kamera"],
+              [FileText, "PDF"],
+            ] as const
+          ).map(([Icon, label]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={notInDemo}
+              className="flex h-9 items-center gap-1.5 rounded-full border border-brand-input-border bg-white px-3 text-[13px] font-semibold text-brand-ink transition-all active:scale-95 active:bg-brand-accent-bg"
+            >
+              <Icon className="size-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex items-start gap-2.5 px-1">
+        <Sparkles className="mt-0.5 size-4 shrink-0 text-brand-accent-dark" />
+        <p className="text-[13px] leading-relaxed text-brand-secondary">
+          Link, Text, Fotos oder PDF – die KI macht daraus <strong className="text-brand-ink">ein</strong> Rezept mit Zutaten,
+          Schritten und Nährwerten.
+        </p>
+      </div>
+    </SubPage>
   );
 }

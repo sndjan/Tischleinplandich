@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
-import { sumMealNutrition } from "./day-card";
+import { sumMealNutrition } from "./day-summary";
 import { useScreenStack } from "./screen-stack";
 
 const MEAL_TYPE_ORDER: MealType[] = ["breakfast", "lunch", "dinner", "snack", "extra"];

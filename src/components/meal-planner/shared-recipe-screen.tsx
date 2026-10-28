@@ -7,7 +7,7 @@ import type { Recipe } from "@/types/database";
 import { useRecipesQuery } from "@/hooks/use-planner-data";
 import { PlanRecipeSheet } from "./plan-recipe-sheet";
 import { cn } from "@/lib/utils";
-import { HeroButton, RecipeBody } from "./recipe-view";
+import { HeroButton, RecipeBody } from "./recipe-body";
 import { useSavedSharedRecipes } from "./discover-recipes";
 
 export function SharedByLine({ name }: { name: string | null }) {

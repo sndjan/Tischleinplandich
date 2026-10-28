@@ -4,7 +4,7 @@ import { Activity, Check, Clock, Download, Plus, Share2, ShoppingCart, Sparkles,
 import { cn } from "@/lib/utils";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { FAQ, LIFETIME_PRICE, MONTHLY_PRICE } from "./content";
-import { LandingDemo } from "./landing-demo";
+import { LazyLandingDemo } from "./landing-demo-lazy";
 import { RotatingHeadline } from "./rotating-headline";
 
 const SIGN_IN = "/auth/signin";
@@ -178,7 +178,17 @@ export function LandingPage() {
         </section>
 
         <section id="demo" aria-labelledby="demo-heading" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 pb-[104px] pt-8 sm:px-6">
-          <LandingDemo />
+          <div className="mx-auto mb-6 flex max-w-[620px] flex-col items-center gap-3 text-center">
+            <span className="rounded-full bg-brand-highlight px-3 py-1.5 text-[13px] font-bold text-brand-ink">Interaktive Demo</span>
+            <h2 id="demo-heading" className="font-heading text-[clamp(26px,3vw,34px)] font-black leading-tight">
+              Probier den Essensplaner aus
+            </h2>
+            <p className="text-[15px] leading-relaxed text-brand-secondary">
+              Plane ein Gericht, öffne ein Rezept oder importiere eins per KI – die Einkaufsliste rechnet mit.
+              Beispieldaten, nichts wird gespeichert.
+            </p>
+          </div>
+          <LazyLandingDemo />
         </section>
 
         <section aria-labelledby="steps-heading" className="bg-white px-6 py-24">

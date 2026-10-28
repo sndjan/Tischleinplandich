@@ -144,6 +144,25 @@ export function ScreenStackProvider({ children }: { children: React.ReactNode })
   return <ScreenStackContext.Provider value={value}>{children}</ScreenStackContext.Provider>;
 }
 
+/**
+ * Hands screen requests to the given handler instead of stacking pages with browser
+ * history, for a self-contained copy of the planner such as the landing page demo.
+ */
+export function StaticScreenStackProvider({
+  onOpenScreen,
+  children,
+}: {
+  onOpenScreen: (screen: Screen) => void;
+  children: React.ReactNode;
+}) {
+  const value = useMemo<ScreenStackValue>(
+    () => ({ stack: [], openScreen: onOpenScreen, replaceScreen: onOpenScreen, closeScreen: () => {} }),
+    [onOpenScreen],
+  );
+
+  return <ScreenStackContext.Provider value={value}>{children}</ScreenStackContext.Provider>;
+}
+
 export function useScreenStack(): ScreenStackValue {
   const value = useContext(ScreenStackContext);
 

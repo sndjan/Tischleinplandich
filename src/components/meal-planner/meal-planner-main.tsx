@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
-import { sumMealNutrition } from "./day-card";
+import { sumMealNutrition } from "./day-summary";
 import { useEntrance } from "@/hooks/use-entrance";
 
 type DesktopRightPanelTab = "recipes" | "shopping";
