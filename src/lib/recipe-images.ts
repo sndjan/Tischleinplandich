@@ -1,5 +1,9 @@
 export const RECIPE_IMAGE_BUCKET = 'recipe-images';
 
+// Mirrors the bucket's own limits (migration 016), which Storage enforces.
+export const RECIPE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const RECIPE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
 const STORAGE_PUBLIC_MARKER = `/storage/v1/object/public/${RECIPE_IMAGE_BUCKET}/`;
 
 const sanitizeFileName = (fileName: string) => {

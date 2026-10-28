@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/client";
 import type { PlannedMeal, Recipe } from "@/types/database";
+import { withSafeLinks } from "@/lib/safe-links";
 
 export function getCurrentWeekStartDateString(): string {
   const today = new Date();
@@ -77,7 +78,7 @@ export async function fetchRecipes(userId: string): Promise<RecipesData> {
 
   for (const row of (data ?? []) as Array<Recipe & { recipe_tags?: unknown }>) {
     const { recipe_tags: recipeTags, ...recipe } = row;
-    recipes.push(recipe);
+    recipes.push(withSafeLinks(recipe));
     tagsById[recipe.id] = getTagNames(recipeTags);
   }
 

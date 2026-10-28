@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { SharedRecipe } from '@/lib/recipe-sharing';
 import { PublicRecipe } from './public-recipe';
+import { withSafeLinks } from '@/lib/safe-links';
 
 type PageProps = { params: { shareId: string } };
 
@@ -19,7 +20,8 @@ const loadSharedRecipe = cache(async (shareId: string) => {
     return null;
   }
 
-  return (data as unknown as SharedRecipe | null) ?? null;
+  const recipe = data as unknown as SharedRecipe | null;
+  return recipe ? withSafeLinks(recipe) : null;
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

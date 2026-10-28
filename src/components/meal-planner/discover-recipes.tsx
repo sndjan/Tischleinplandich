@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useScreenStack } from "./screen-stack";
 import { useShowNutrition } from "./nutrition-target-settings";
+import { withSafeLinks } from "@/lib/safe-links";
 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
 
@@ -97,7 +98,7 @@ export function DiscoverRecipes() {
       // The function does not exist until migration 011 has run.
       if (rpcError?.code === "PGRST202" || rpcError?.code === "42883") throw new MissingMigrationError();
       if (rpcError) throw rpcError;
-      return (rows ?? []) as unknown as SharedRecipe[];
+      return ((rows ?? []) as unknown as SharedRecipe[]).map(withSafeLinks);
     },
   });
 
