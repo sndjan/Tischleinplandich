@@ -1,0 +1,47 @@
+<!-- Supabase Auth email for "Magic Link" and "Confirm signup" (paste into both).
+     Subject: Dein Anmeldelink für den Essensplaner
+     Inline styles and tables only, since mail clients drop <style> and flexbox. -->
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Dein Anmeldelink</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f7f6f3;">
+    <!-- Preview text shown next to the subject in the inbox. -->
+    <div style="display:none;max-height:0;overflow:hidden;">Ein Klick und du bist drin – oder gib den Code {{ .Token }} ein.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f6f3;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+            <tr>
+              <td align="center" style="padding-bottom:20px;font-family:Nunito,'Arial Rounded MT Bold',Helvetica,Arial,sans-serif;font-size:20px;font-weight:900;color:#1c2b22;">
+                <span style="display:inline-block;width:32px;height:32px;line-height:32px;border-radius:9px;background:#4f9d6e;font-size:18px;vertical-align:middle;">🍴</span>
+                <span style="vertical-align:middle;padding-left:8px;">Essensplaner</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;border:1px solid #ececec;border-radius:24px;padding:36px 28px;text-align:center;">
+                <div style="display:inline-block;width:72px;height:72px;line-height:72px;border-radius:22px;background:#eaf3ec;font-size:40px;">🥗</div>
+                <h1 style="margin:20px 0 8px;font-family:Nunito,'Arial Rounded MT Bold',Helvetica,Arial,sans-serif;font-size:26px;font-weight:800;line-height:1.2;color:#1c2b22;">Dein Anmeldelink</h1>
+                <p style="margin:0 0 28px;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#63706a;">Ein Klick und deine Woche ist wieder da.</p>
+                <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email" style="display:inline-block;background:#2f7a52;color:#ffffff;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:17px;font-weight:700;text-decoration:none;padding:16px 36px;border-radius:999px;">Jetzt anmelden</a>
+                <p style="margin:32px 0 10px;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:#1c2b22;">Oder diesen Code in der App eingeben</p>
+                <div style="display:inline-block;background:#f3faf4;border:1px solid #d8e8dc;border-radius:16px;padding:14px 14px 14px 22px;font-family:Nunito,'Arial Rounded MT Bold',Helvetica,Arial,sans-serif;font-size:30px;font-weight:800;letter-spacing:8px;color:#1c2b22;">{{ .Token }}</div>
+                <p style="margin:12px 0 0;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#75837b;">Praktisch, wenn die App auf dem Homescreen liegt.<br />Link und Code gelten eine Stunde.</p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:24px 12px 0;font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#9aa79f;">
+                Du hast keine Anmeldung angefordert? Dann ignoriere diese Mail einfach.<br />
+                <a href="{{ .SiteURL }}/impressum" style="color:#9aa79f;">Impressum</a> &nbsp;·&nbsp; <a href="{{ .SiteURL }}/datenschutz" style="color:#9aa79f;">Datenschutz</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

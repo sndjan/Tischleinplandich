@@ -446,6 +446,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Launch waitlist with double opt-in; server (service role) only. Migration 015.
+      waitlist: {
+        Row: {
+          id: string;
+          email: string;
+          token: string;
+          consent_text: string;
+          confirmed_at: string | null;
+          last_mail_sent_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          token?: string;
+          consent_text: string;
+          confirmed_at?: string | null;
+          last_mail_sent_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          token?: string;
+          consent_text?: string;
+          confirmed_at?: string | null;
+          last_mail_sent_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       // Written only by consume_ai_quota; users can read their own rows. Migration 010.
       ai_usage: {
         Row: {

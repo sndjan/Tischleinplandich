@@ -24,21 +24,23 @@ Feedback, das eine Neugestaltung braucht (Einträge in `feedback` bleiben auf `n
 - Wochenpläne teilen und gemeinsam bearbeiten (z. B. mit der Familie)
 - Drag & Drop: Rezept halten, Tage erscheinen, auf einen Tag ziehen
 
+## Entwicklung
+
+`.env.example` nach `.env.local` kopieren und ausfüllen, dann `npm install` und `npm run dev`. Vor dem Pushen: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` – dasselbe prüft die CI bei jedem Pull Request. Hinweise für Claude Code stehen in `CLAUDE.md`.
+
 ## Landingpage
 
 Abgemeldete Besucher sehen unter `/` die öffentliche Landingpage (`src/components/landing/`) mit interaktiver Demo (nur Beispieldaten), Preisen und FAQ; angemeldete werden direkt zu `/meal-planner` weitergeleitet. Preise und FAQ stehen in `content.ts` und landen von dort auch in den strukturierten Daten für Google.
+
+Während der Beta ist die App kostenlos; die Preiskarten zeigen die geplanten Preise und verweisen auf die Warteliste.
 
 Für Canonical-URL, Sitemap, `robots.txt` und Vorschaubilder beim Build `NEXT_PUBLIC_SITE_URL` setzen (z. B. `https://deine-domain.de`).
 
 ## Anmelden per Link oder Code
 
-Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Email Templates → Magic Link** diese Vorlage eintragen:
+Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Emails → Templates** den Inhalt von `supabase/templates/sign-in.html` in **Magic Link** und **Confirm signup** eintragen (Betreff: „Dein Anmeldelink für den Essensplaner“).
 
-```html
-<h2>Dein Anmeldelink</h2>
-<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email">Jetzt anmelden</a></p>
-<p>Oder diesen Code in der App eingeben: <strong>{{ .Token }}</strong></p>
-```
+Für den Versand im Livebetrieb unter **Authentication → Emails → SMTP Settings** eigenes SMTP einrichten (Resend: Host `smtp.resend.com`, Port `465`, Benutzer `resend`, Passwort = API-Key mit „Sending access“) und unter **Authentication → Rate Limits** das Mail-Limit erhöhen. Der eingebaute Versand von Supabase schafft nur wenige Mails pro Stunde.
 
 Unter **Authentication → URL Configuration** muss die **Site URL** die Adresse der App sein und `https://<deine-domain>/auth/callback` bei den Redirect URLs stehen. Bestehende Konten melden sich einfach mit ihrer E-Mail an.
 
@@ -97,3 +99,31 @@ INSERT INTO changelog (title, description) VALUES ('Kurzer Titel', 'Ein Satz, wa
 ## Nährwerte ausblenden
 
 Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros in der ganzen App aus (Planer, Wochenübersicht, Rezeptkarten und -ansicht). Gespeichert wird das in `user_preferences.show_nutrition` (Migration `014_add_show_nutrition.sql`, im SQL Editor ausführen). Ohne die Migration bleiben Nährwerte sichtbar und der Schalter zeigt einen Hinweis.
+
+## Warteliste (Double-Opt-in)
+
+Die Landingpage sammelt E-Mails für den Start (Migration `015_create_waitlist.sql`, im SQL Editor ausführen). Ablauf: Eintragen → Bestätigungsmail über Resend → Klick auf `/warteliste?token=…` und dort auf „Anmeldung bestätigen“ (ein Knopf statt direktem Link, damit Mail-Scanner nicht automatisch bestätigen). Jede Mail enthält einen Abmeldelink, der den Eintrag löscht. Unbestätigte Einträge werden nach 30 Tagen gelöscht.
+
+Benötigt `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` und `WAITLIST_FROM_EMAIL` (Absenderdomain in Resend verifizieren). Bestätigte Adressen:
+
+```sql
+SELECT email, confirmed_at FROM waitlist WHERE confirmed_at IS NOT NULL ORDER BY confirmed_at;
+```
+
+## Konto löschen
+
+Profil → „Konto löschen“ (unten) löscht Fotos im Storage und den Auth-Nutzer; alle Tabellen hängen per `ON DELETE CASCADE` daran. Braucht `SUPABASE_SERVICE_ROLE_KEY`.
+
+## Impressum und Datenschutz
+
+`/impressum` und `/datenschutz` lesen die Betreiberdaten aus `src/lib/legal.ts`. Alle `[PLATZHALTER]` vor dem Livegang ausfüllen und die Texte prüfen lassen. Kommt ein neuer Dienst dazu, die Datenschutzerklärung anpassen.
+
+## Captcha (Cloudflare Turnstile)
+
+Schützt Anmeldung und Warteliste vor Bots, die massenhaft Mails auslösen. Reihenfolge beachten, sonst klappt keine Anmeldung mehr:
+
+1. Im Cloudflare-Dashboard unter **Turnstile** ein Widget anlegen (Domain eintragen, Modus „Managed“).
+2. In Vercel `NEXT_PUBLIC_TURNSTILE_SITE_KEY` und `TURNSTILE_SECRET_KEY` setzen und neu deployen.
+3. Erst danach in Supabase unter **Authentication → Attack Protection** „Enable CAPTCHA protection“ einschalten, Anbieter Turnstile, Secret Key eintragen.
+
+Ohne die Schlüssel ist der Captcha aus und beide Formulare funktionieren wie bisher.

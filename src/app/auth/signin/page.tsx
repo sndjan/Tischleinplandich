@@ -2,18 +2,22 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, Mail } from 'lucide-react';
 import type { AuthError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { safeNextPath } from '@/lib/auth/next-path';
 import { StatusButton, useActionStatus } from '@/components/ui/status-button';
+import { CAPTCHA_PENDING_MESSAGE, useCaptcha } from '@/components/ui/captcha';
 import { cn } from '@/lib/utils';
 
 const RESEND_SECONDS = 30;
+// Must match Authentication → Providers → Email → "Email OTP Length" in Supabase.
 const CODE_LENGTH = 6;
 
 const authErrorMessage = (error: AuthError) => {
   if (error.status === 429) return 'Zu viele Versuche. Bitte kurz warten.';
+  if (/captcha/i.test(error.message)) return 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.';
   if (/expired|invalid/i.test(error.message)) return 'Code falsch oder abgelaufen';
   if (/email/i.test(error.message) && /valid/i.test(error.message)) return 'Bitte eine gültige E-Mail eingeben';
   return 'Das hat nicht geklappt. Bitte erneut versuchen.';
@@ -43,6 +47,7 @@ function SignIn() {
   const sendStatus = useActionStatus();
   const verifyStatus = useActionStatus();
   const codeInputRef = useRef<HTMLInputElement>(null);
+  const captcha = useCaptcha();
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -57,12 +62,16 @@ function SignIn() {
   const sendLink = () =>
     sendStatus.run(async () => {
       setError(null);
+      if (!captcha.ready) {
+        setError(CAPTCHA_PENDING_MESSAGE);
+        throw new Error('Captcha not ready');
+      }
       const callback = new URL('/auth/callback', window.location.origin);
       if (next !== '/meal-planner') callback.searchParams.set('next', next);
 
       const { error: sendError } = await createClient().auth.signInWithOtp({
         email: email.trim(),
-        options: { shouldCreateUser: true, emailRedirectTo: callback.toString() },
+        options: { shouldCreateUser: true, emailRedirectTo: callback.toString(), captchaToken: captcha.take() },
       });
 
       if (sendError) {
@@ -94,7 +103,7 @@ function SignIn() {
     }).catch(() => undefined);
 
   const handleCodeChange = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
+    const digits = value.replace(/\D/g, '').slice(0, CODE_LENGTH);
     setCode(digits);
     if (digits.length === CODE_LENGTH && verifyStatus.status === 'idle') void verifyCode(digits);
   };
@@ -173,7 +182,11 @@ function SignIn() {
               Anmeldelink senden
             </StatusButton>
             <p className="text-center text-[13px] leading-relaxed text-brand-secondary">
-              Kein Passwort nötig. Neu hier? Mit demselben Knopf wird dein Konto angelegt.
+              Kein Passwort nötig. Neu hier? Mit demselben Knopf wird dein Konto angelegt. Es gilt unsere{' '}
+              <Link href="/datenschutz" className="underline hover:text-brand-ink">
+                Datenschutzerklärung
+              </Link>
+              .
             </p>
           </form>
         ) : (
@@ -188,7 +201,7 @@ function SignIn() {
               onChange={(event) => handleCodeChange(event.target.value)}
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder="······"
+              placeholder={'·'.repeat(CODE_LENGTH)}
               aria-invalid={Boolean(error)}
               className={cn(
                 'h-16 rounded-2xl border bg-white text-center font-heading text-[30px] font-extrabold tracking-[0.45em] text-brand-ink outline-none transition-colors placeholder:text-brand-icon-muted focus:border-2 focus:border-brand-accent',
@@ -215,11 +228,14 @@ function SignIn() {
           </section>
         )}
 
+        {/* Outside the steps, so "Erneut senden" gets a fresh token too. */}
+        {captcha.widget && <div className="mt-4">{captcha.widget}</div>}
+
         {step === 'code' && (
           <div className="mt-auto flex justify-center pt-8">
             <button
               type="button"
-              disabled={resendIn > 0 || sendStatus.status === 'pending'}
+              disabled={resendIn > 0 || sendStatus.status === 'pending' || !captcha.ready}
               onClick={() => void sendLink()}
               className="h-11 px-3 text-sm font-semibold text-brand-accent-dark transition-transform active:scale-95 disabled:text-brand-muted"
             >
