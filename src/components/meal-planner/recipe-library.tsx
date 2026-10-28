@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useRecipesQuery } from "@/hooks/use-planner-data";
-import { cn } from "@/lib/utils";
 import { RecipeList } from "./recipe-list";
 import { DiscoverRecipes } from "./discover-recipes";
+import { SegmentedTabs } from "./segmented-tabs";
+import { useShowNutrition } from "./nutrition-target-settings";
 import { useScreenStack } from "./screen-stack";
 
 export type LibraryTab = "mine" | "discover";
@@ -17,6 +18,7 @@ export type LibraryTab = "mine" | "discover";
 export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {}) {
   const { openScreen } = useScreenStack();
   const { data, isPending } = useRecipesQuery();
+  const showNutrition = useShowNutrition();
   const [ownTab, setTab] = useState<LibraryTab>("mine");
   const tab = controlledTab ?? ownTab;
   const count = data?.recipes.length;
@@ -40,6 +42,7 @@ export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {})
           recipes={data?.recipes ?? []}
           recipeTagsById={data?.tagsById ?? {}}
           loading={isPending}
+          showNutrition={showNutrition}
           toolbarActions={
             <button
               type="button"
@@ -54,46 +57,6 @@ export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {})
       ) : (
         <DiscoverRecipes />
       )}
-    </div>
-  );
-}
-
-/** Grey track with the selected tab as a white chip. */
-export function SegmentedTabs<T extends string>({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: T;
-  onChange: (value: T) => void;
-  options: { value: T; label: string }[];
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label={label}
-      className="grid h-10 rounded-xl bg-brand-chip-neutral p-[3px] text-sm font-bold"
-      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
-    >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="tab"
-          aria-selected={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "truncate rounded-[10px] px-1 transition-all active:scale-[0.97]",
-            value === option.value
-              ? "bg-white text-brand-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-              : "text-brand-secondary",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
     </div>
   );
 }

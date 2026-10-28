@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquarePlus, WifiOff } from "lucide-react";
 import { MealWeekView, useViewMode, ViewModeToggle } from "./meal-week-view";
-import { RecipeLibrary, SegmentedTabs } from "./recipe-library";
+import { RecipeLibrary } from "./recipe-library";
+import { SegmentedTabs } from "./segmented-tabs";
 import { RecipeEditor } from "./recipe-editor";
 import { RecipeCreateScreen } from "./recipe-create-screen";
 import { RecipeView } from "./recipe-view";
@@ -30,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
-import { sumMealNutrition } from "./day-card";
+import { sumMealNutrition } from "./day-summary";
 import { useEntrance } from "@/hooks/use-entrance";
 
 type DesktopRightPanelTab = "mine" | "discover" | "shopping";

@@ -16,7 +16,6 @@ import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
 import { Clock, Info, Search, SlidersHorizontal, Star, UtensilsCrossed } from "lucide-react";
 import { formatPrepMinutes, parsePrepMinutes } from "@/lib/prep-time";
-import { useShowNutrition } from "./nutrition-target-settings";
 
 type VisibilityFilter = "all" | "private" | "public";
 type SortOption =
@@ -65,6 +64,8 @@ interface RecipeListProps {
   disableDrag?: boolean;
   selectedRecipeId?: string | null;
   toolbarActions?: React.ReactNode;
+  // Calories and protein on the cards and the protein sort; off when the user hides nutrition.
+  showNutrition?: boolean;
 }
 
 export function RecipeList({
@@ -76,9 +77,9 @@ export function RecipeList({
   disableDrag = false,
   selectedRecipeId = null,
   toolbarActions,
+  showNutrition = true,
 }: RecipeListProps) {
   const { openScreen } = useScreenStack();
-  const showNutrition = useShowNutrition();
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] =
     useState<VisibilityFilter>("all");

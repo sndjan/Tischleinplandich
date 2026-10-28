@@ -81,7 +81,23 @@ module.exports = {
           orange: "#e0a72e",
           purple: "#8a6fc7",
           brown: "#b08b5c",
+          // Marker yellow, used on the public landing page only.
+          highlight: "#ffe58a",
         },
+      },
+      keyframes: {
+        "word-in": {
+          from: { opacity: "0", transform: "translateY(0.35em)" },
+          to: { opacity: "1", transform: "none" },
+        },
+        "soft-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.45" },
+        },
+      },
+      animation: {
+        "word-in": "word-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1)",
+        "soft-pulse": "soft-pulse 1s ease-in-out infinite",
       },
       borderRadius: {
         lg: "var(--radius)",

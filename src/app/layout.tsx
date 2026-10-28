@@ -3,11 +3,12 @@ import { DM_Sans, Nunito } from "next/font/google";
 import { AuthProvider } from "@/lib/auth/context";
 import { Toaster } from "react-hot-toast";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const nunito = Nunito({
   subsets: ["latin"],
-  weight: ["700", "800"],
+  weight: ["700", "800", "900"],
   variable: "--font-nunito",
 });
 
@@ -17,6 +18,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Wochen-Essensplaner",
   description:
     "Plane deine wöchentlichen Mahlzeiten und erstelle automatisch Einkaufslisten",

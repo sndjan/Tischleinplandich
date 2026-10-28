@@ -18,6 +18,11 @@ import { useEntrance } from "@/hooks/use-entrance";
 interface ShoppingListProps {
   items: ShoppingListItem[];
   pantryStaples: string[];
+  // Off for the landing page demo, so it never touches a real list on this device.
+  persist?: boolean;
+  // Keep the header card on large screens too, e.g. in the demo's phone frame.
+  // By default it drops the card there, since the desktop side panel is already one.
+  alwaysCard?: boolean;
 }
 
 type CustomItem = { id: string; label: string };
@@ -80,7 +85,7 @@ function buildShareText(sections: { label: string; emoji: string; rows: Row[] }[
   return [`🛒 Einkauf ${formatWeekRange()}`, ...blocks].join("\n\n");
 }
 
-export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
+export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard = false }: ShoppingListProps) {
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
   const [customItems, setCustomItems] = useState<CustomItem[]>([]);
   const [hideBasics, setHideBasics] = useState(true);
@@ -90,6 +95,7 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
   const addInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!persist) return;
     const storedChecked = readStorage<unknown>(CHECKED_ITEMS_STORAGE_KEY, []);
     setCheckedKeys(
       new Set(Array.isArray(storedChecked) ? storedChecked.filter((key) => typeof key === "string") : []),
@@ -98,15 +104,15 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
     setCustomItems(Array.isArray(storedCustom) ? (storedCustom as CustomItem[]) : []);
     setHideBasics(readStorage<unknown>(HIDE_BASICS_STORAGE_KEY, true) !== false);
     setHydrated(true);
-  }, []);
+  }, [persist]);
 
   useEffect(() => {
-    if (hydrated) writeStorage(CHECKED_ITEMS_STORAGE_KEY, Array.from(checkedKeys));
-  }, [checkedKeys, hydrated]);
+    if (persist && hydrated) writeStorage(CHECKED_ITEMS_STORAGE_KEY, Array.from(checkedKeys));
+  }, [checkedKeys, hydrated, persist]);
 
   useEffect(() => {
-    if (hydrated) writeStorage(CUSTOM_ITEMS_STORAGE_KEY, customItems);
-  }, [customItems, hydrated]);
+    if (persist && hydrated) writeStorage(CUSTOM_ITEMS_STORAGE_KEY, customItems);
+  }, [customItems, hydrated, persist]);
 
   useEffect(() => {
     if (adding) addInputRef.current?.focus();
@@ -137,13 +143,13 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
 
   // Forget checks for items that left the list (e.g. a meal was removed).
   useEffect(() => {
-    if (!hydrated) return;
+    if (persist && !hydrated) return;
     const validKeys = new Set(rows.map((row) => row.key));
     setCheckedKeys((prev) => {
       const next = new Set([...prev].filter((key) => validKeys.has(key)));
       return next.size === prev.size ? prev : next;
     });
-  }, [rows, hydrated]);
+  }, [rows, hydrated, persist]);
 
   const hiddenBasics = hideBasics ? rows.filter((row) => row.basic) : [];
   const visibleRows = hideBasics ? rows.filter((row) => !row.basic) : rows;
@@ -172,7 +178,7 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
 
   const toggleHideBasics = () => {
     setHideBasics((prev) => {
-      writeStorage(HIDE_BASICS_STORAGE_KEY, !prev);
+      if (persist) writeStorage(HIDE_BASICS_STORAGE_KEY, !prev);
       return !prev;
     });
   };
@@ -218,7 +224,12 @@ export function ShoppingList({ items, pantryStaples }: ShoppingListProps) {
 
   return (
     <div className="space-y-3">
-      <div className="space-y-3 rounded-[18px] bg-white p-4 ring-1 ring-brand-card-border lg:p-0 lg:ring-0">
+      <div
+        className={cn(
+          "space-y-3 rounded-[18px] bg-white p-4 ring-1 ring-brand-card-border",
+          !alwaysCard && "lg:p-0 lg:ring-0",
+        )}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-brand-ink">Diese Woche</p>

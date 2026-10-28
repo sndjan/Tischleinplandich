@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Check, Loader2, Plus } from 'lucide-react';
 import { saveSharedRecipeCopy, type SharedRecipe } from '@/lib/recipe-sharing';
-import { RecipeBody } from '@/components/meal-planner/recipe-view';
+import { RecipeBody } from '@/components/meal-planner/recipe-body';
 import { SharedByLine } from '@/components/meal-planner/shared-recipe-screen';
 import { cn } from '@/lib/utils';
 
