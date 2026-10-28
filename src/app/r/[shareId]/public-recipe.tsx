@@ -7,6 +7,8 @@ import { saveSharedRecipeCopy, type SharedRecipe } from '@/lib/recipe-sharing';
 import { RecipeBody } from '@/components/meal-planner/recipe-body';
 import { SharedByLine } from '@/components/meal-planner/shared-recipe-screen';
 import { cn } from '@/lib/utils';
+import { LegalLinks } from '@/components/legal/legal-links';
+import { OPERATOR } from '@/lib/legal';
 
 /**
  * A shared recipe for anyone with the link. Signed-in users can save a copy;
@@ -61,6 +63,16 @@ export function PublicRecipe({
           onServingsChange={setServings}
           attribution={<SharedByLine name={recipe.author_name} />}
         />
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 px-4 pb-6 text-[13px] text-brand-secondary">
+          <LegalLinks />
+          {/* Notice path for illegal or infringing content (Art. 16 DSA). */}
+          <a
+            href={`mailto:${OPERATOR.email}?subject=${encodeURIComponent(`Rezept melden: /r/${shareId}`)}`}
+            className="hover:text-brand-ink"
+          >
+            Rezept melden
+          </a>
+        </div>
       </div>
 
       <footer className="sticky bottom-0 z-30 border-t border-brand-card-border bg-white shadow-[0_-6px_16px_rgba(28,43,34,0.06)]">

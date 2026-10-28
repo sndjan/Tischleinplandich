@@ -6,6 +6,8 @@ import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { FAQ, LIFETIME_PRICE, MONTHLY_PRICE } from "./content";
 import { LazyLandingDemo } from "./landing-demo-lazy";
 import { RotatingHeadline } from "./rotating-headline";
+import { WaitlistForm } from "./waitlist-form";
+import { LegalLinks } from "@/components/legal/legal-links";
 
 const SIGN_IN = "/auth/signin";
 
@@ -65,18 +67,16 @@ const PLANS = [
     name: "Monatlich",
     price: MONTHLY_PRICE.label,
     period: "/ Monat",
-    note: "inkl. MwSt. · monatlich kündbar",
+    note: "geplant · inkl. MwSt. · monatlich kündbar",
     perks: ["Unbegrenzt Rezepte & Wochenpläne", "KI-Import per Link, Foto & PDF", "Einkaufsliste, Nährwerte, Export"],
-    cta: "Monatlich starten",
     featured: false,
   },
   {
     name: "Lifetime",
     price: LIFETIME_PRICE.label,
     period: "einmalig",
-    note: "inkl. MwSt. · kein Abo",
+    note: "geplant · inkl. MwSt. · kein Abo",
     perks: ["Alles aus Monatlich", "Alle künftigen Funktionen inklusive", "Nie wieder an Kündigung denken"],
-    cta: "Lifetime sichern",
     featured: true,
   },
 ];
@@ -85,6 +85,7 @@ const NAV_LINKS = [
   { href: "#demo", label: "Demo" },
   { href: "#funktionen", label: "Funktionen" },
   { href: "#preise", label: "Preise" },
+  { href: "#warteliste", label: "Warteliste" },
   { href: "#faq", label: "FAQ" },
 ];
 
@@ -105,10 +106,8 @@ const structuredData = {
       inLanguage: "de",
       description:
         "Wochenplaner für Essen: Rezepte per KI importieren, Mahlzeiten planen, Kalorien und Protein im Blick behalten und die Einkaufsliste automatisch erstellen.",
-      offers: [
-        { "@type": "Offer", name: "Monatlich", price: MONTHLY_PRICE.value, priceCurrency: "EUR" },
-        { "@type": "Offer", name: "Lifetime", price: LIFETIME_PRICE.value, priceCurrency: "EUR" },
-      ],
+      // Free during the beta; add the paid plans here once they can be bought.
+      offers: [{ "@type": "Offer", name: "Beta", price: "0", priceCurrency: "EUR" }],
     },
     {
       "@type": "FAQPage",
@@ -146,7 +145,7 @@ export function LandingPage() {
             href={SIGN_IN}
             className="hidden rounded-full bg-brand-accent-dark px-[18px] py-3 font-bold text-white transition-colors hover:bg-brand-ink sm:inline-block"
           >
-            Jetzt starten
+            Kostenlos testen
           </Link>
         </nav>
       </header>
@@ -159,7 +158,7 @@ export function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href={SIGN_IN} className={primaryButton}>
-              Jetzt starten
+              Beta kostenlos testen
             </Link>
             <a
               href="#demo"
@@ -241,7 +240,8 @@ export function LandingPage() {
               Einfache Preise
             </h2>
             <p className="mx-auto mt-3.5 max-w-[520px] text-center text-lg text-[#c9d6cd]">
-              Ein Plan, alle Funktionen. Zahl monatlich oder einmal für immer.
+              Während der Beta ist alles kostenlos. Danach gibt es einen Plan mit allen Funktionen – monatlich oder
+              einmal für immer.
             </p>
             <div className="mt-12 grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-5">
               {PLANS.map((plan) => (
@@ -275,8 +275,8 @@ export function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link
-                    href={SIGN_IN}
+                  <a
+                    href="#warteliste"
                     className={cn(
                       "rounded-full p-4 text-center text-[17px] font-bold transition-colors",
                       plan.featured
@@ -284,11 +284,24 @@ export function LandingPage() {
                         : "bg-brand-accent-bg text-brand-accent-dark hover:bg-brand-track",
                     )}
                   >
-                    {plan.cta}
-                  </Link>
+                    Zum Start benachrichtigen
+                  </a>
                 </article>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="warteliste" aria-labelledby="waitlist-heading" className="scroll-mt-6 px-6 pt-24">
+          <div className="mx-auto max-w-[760px] text-center">
+            <span className="rounded-full bg-brand-highlight px-3 py-1.5 text-[13px] font-bold text-brand-ink">Warteliste</span>
+            <h2 id="waitlist-heading" className={cn(sectionHeading, "mt-4")}>
+              Als Erstes vom Start erfahren
+            </h2>
+            <p className="mx-auto mb-8 mt-3.5 max-w-[520px] text-lg text-[#4a5750]">
+              Trag dich ein und wir sagen dir Bescheid, sobald die Bezahlpläne starten.
+            </p>
+            <WaitlistForm />
           </div>
         </section>
 
@@ -319,9 +332,11 @@ export function LandingPage() {
             <h2 id="cta-heading" className="font-heading text-[clamp(28px,3.4vw,42px)] font-black">
               Nächste Woche ist schon geplant.
             </h2>
-            <p className="mb-7 mt-3.5 text-lg text-[#4a5750]">In fünf Minuten steht dein erster Wochenplan.</p>
+            <p className="mb-7 mt-3.5 text-lg text-[#4a5750]">
+              In fünf Minuten steht dein erster Wochenplan. Während der Beta kostenlos.
+            </p>
             <Link href={SIGN_IN} className={primaryButton}>
-              Jetzt starten
+              Beta kostenlos testen
             </Link>
           </div>
         </section>
@@ -330,9 +345,12 @@ export function LandingPage() {
       <footer className="border-t border-brand-card-border px-6 py-8">
         <div className="mx-auto flex max-w-[1200px] flex-wrap justify-between gap-4 text-sm text-brand-secondary">
           <p>© {new Date().getFullYear()} {SITE_NAME}</p>
-          <Link href={SIGN_IN} className="hover:text-brand-ink">
-            Anmelden
-          </Link>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <LegalLinks />
+            <Link href={SIGN_IN} className="hover:text-brand-ink">
+              Anmelden
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

@@ -34,8 +34,8 @@ export const FAQ: { question: string; answer: string }[] = [
       "Aus allen Mahlzeiten deiner Woche. Gleiche Zutaten werden zusammengerechnet, und Vorräte, die du immer daheim hast, kannst du ausblenden.",
   },
   {
-    question: "Was ist der Unterschied zwischen Monatlich und Lifetime?",
-    answer: `Beide enthalten alle Funktionen. Monatlich zahlst du ${MONTHLY_PRICE.label} und kannst jederzeit kündigen. Lifetime zahlst du einmal und nutzt den Essensplaner für immer.`,
+    question: "Was kostet der Essensplaner?",
+    answer: `Während der Beta nichts. Danach sind zwei Pläne mit allen Funktionen geplant: Monatlich für ${MONTHLY_PRICE.label}, jederzeit kündbar, oder Lifetime als Einmalzahlung. Wer auf der Warteliste steht, erfährt als Erstes vom Start.`,
   },
   {
     question: "Brauche ich ein Passwort?",

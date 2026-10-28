@@ -5,7 +5,7 @@ import { LandingPage } from '@/components/landing/landing-page';
 
 const title = 'Essensplaner – Wochenplaner fürs Essen mit Einkaufsliste & Kalorien';
 const description =
-  'Plane dein Essen für die ganze Woche: Rezepte per KI importieren, Kalorien und Protein im Blick, Einkaufsliste automatisch. Web-App für Handy und Computer, ab 4,90 €.';
+  'Plane dein Essen für die ganze Woche: Rezepte per KI importieren, Kalorien und Protein im Blick, Einkaufsliste automatisch. Web-App für Handy und Computer, in der Beta kostenlos.';
 
 export const metadata: Metadata = {
   title,

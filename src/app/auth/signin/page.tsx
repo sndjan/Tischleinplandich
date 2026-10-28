@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, Mail } from 'lucide-react';
 import type { AuthError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
@@ -173,7 +174,11 @@ function SignIn() {
               Anmeldelink senden
             </StatusButton>
             <p className="text-center text-[13px] leading-relaxed text-brand-secondary">
-              Kein Passwort nötig. Neu hier? Mit demselben Knopf wird dein Konto angelegt.
+              Kein Passwort nötig. Neu hier? Mit demselben Knopf wird dein Konto angelegt. Es gilt unsere{' '}
+              <Link href="/datenschutz" className="underline hover:text-brand-ink">
+                Datenschutzerklärung
+              </Link>
+              .
             </p>
           </form>
         ) : (

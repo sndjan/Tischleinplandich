@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ChevronRight, LogOut, Pencil } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -11,6 +12,8 @@ import { queryKeys, useProfileQuery, useRecipesQuery, useUserId } from "@/hooks/
 import { DAILY_AI_LIMIT } from "@/lib/recipe-draft";
 import { exportRecipesAsZip } from "@/lib/recipe-export";
 import { cn } from "@/lib/utils";
+import { CACHE_STORAGE_KEY } from "@/lib/query-provider";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { SubPage } from "./sub-page";
 import { useHasUnseenChanges } from "./whats-new-screen";
@@ -140,6 +143,7 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
   const { data: aiUsage } = useAiUsageToday();
   const exportRecipes = useExportRecipes();
   const hasUnseenChanges = useHasUnseenChanges();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => setCanInstall(!isStandalone()), []);
 
@@ -293,7 +297,74 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
           </button>
         </form>
       </section>
+
+      <footer className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-2 text-[13px] text-brand-secondary">
+        <Link href="/impressum" className="hover:text-brand-ink">
+          Impressum
+        </Link>
+        <Link href="/datenschutz" className="hover:text-brand-ink">
+          Datenschutz
+        </Link>
+        <button type="button" onClick={() => setConfirmingDelete(true)} className="hover:text-brand-red">
+          Konto löschen
+        </button>
+      </footer>
+
+      {confirmingDelete && (
+        <DeleteAccountSheet
+          onExport={() => void exportRecipes.run()}
+          onClose={() => setConfirmingDelete(false)}
+        />
+      )}
     </SubPage>
+  );
+}
+
+function DeleteAccountSheet({ onExport, onClose }: { onExport: () => void; onClose: () => void }) {
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/account", { method: "DELETE" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      try {
+        window.localStorage.removeItem(CACHE_STORAGE_KEY);
+      } catch {
+        // No on-device cache to clear.
+      }
+      window.location.assign("/");
+    } catch (error) {
+      console.error(error);
+      toast.error("Konto konnte nicht gelöscht werden");
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <BottomSheet
+      title="Konto löschen?"
+      description="Alle Rezepte, Fotos, Wochenpläne und Einstellungen werden endgültig gelöscht. Geteilte Links funktionieren danach nicht mehr."
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={onExport}
+          className="min-h-12 rounded-full bg-brand-accent-bg px-4 font-bold text-brand-accent-dark transition-transform active:scale-[0.98]"
+        >
+          Vorher Rezepte exportieren
+        </button>
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={() => void deleteAccount()}
+          className="min-h-12 rounded-full bg-brand-red px-4 font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+        >
+          {deleting ? "Wird gelöscht …" : "Endgültig löschen"}
+        </button>
+      </div>
+    </BottomSheet>
   );
 }
 

@@ -24,9 +24,15 @@ Feedback, das eine Neugestaltung braucht (Einträge in `feedback` bleiben auf `n
 - Wochenpläne teilen und gemeinsam bearbeiten (z. B. mit der Familie)
 - Drag & Drop: Rezept halten, Tage erscheinen, auf einen Tag ziehen
 
+## Entwicklung
+
+`.env.example` nach `.env.local` kopieren und ausfüllen, dann `npm install` und `npm run dev`. Vor dem Pushen: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` – dasselbe prüft die CI bei jedem Pull Request. Hinweise für Claude Code stehen in `CLAUDE.md`.
+
 ## Landingpage
 
 Abgemeldete Besucher sehen unter `/` die öffentliche Landingpage (`src/components/landing/`) mit interaktiver Demo (nur Beispieldaten), Preisen und FAQ; angemeldete werden direkt zu `/meal-planner` weitergeleitet. Preise und FAQ stehen in `content.ts` und landen von dort auch in den strukturierten Daten für Google.
+
+Während der Beta ist die App kostenlos; die Preiskarten zeigen die geplanten Preise und verweisen auf die Warteliste.
 
 Für Canonical-URL, Sitemap, `robots.txt` und Vorschaubilder beim Build `NEXT_PUBLIC_SITE_URL` setzen (z. B. `https://deine-domain.de`).
 
@@ -97,3 +103,21 @@ INSERT INTO changelog (title, description) VALUES ('Kurzer Titel', 'Ein Satz, wa
 ## Nährwerte ausblenden
 
 Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros in der ganzen App aus (Planer, Wochenübersicht, Rezeptkarten und -ansicht). Gespeichert wird das in `user_preferences.show_nutrition` (Migration `014_add_show_nutrition.sql`, im SQL Editor ausführen). Ohne die Migration bleiben Nährwerte sichtbar und der Schalter zeigt einen Hinweis.
+
+## Warteliste (Double-Opt-in)
+
+Die Landingpage sammelt E-Mails für den Start (Migration `015_create_waitlist.sql`, im SQL Editor ausführen). Ablauf: Eintragen → Bestätigungsmail über Resend → Klick auf `/warteliste?token=…` und dort auf „Anmeldung bestätigen“ (ein Knopf statt direktem Link, damit Mail-Scanner nicht automatisch bestätigen). Jede Mail enthält einen Abmeldelink, der den Eintrag löscht. Unbestätigte Einträge werden nach 30 Tagen gelöscht.
+
+Benötigt `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` und `WAITLIST_FROM_EMAIL` (Absenderdomain in Resend verifizieren). Bestätigte Adressen:
+
+```sql
+SELECT email, confirmed_at FROM waitlist WHERE confirmed_at IS NOT NULL ORDER BY confirmed_at;
+```
+
+## Konto löschen
+
+Profil → „Konto löschen“ (unten) löscht Fotos im Storage und den Auth-Nutzer; alle Tabellen hängen per `ON DELETE CASCADE` daran. Braucht `SUPABASE_SERVICE_ROLE_KEY`.
+
+## Impressum und Datenschutz
+
+`/impressum` und `/datenschutz` lesen die Betreiberdaten aus `src/lib/legal.ts`. Alle `[PLATZHALTER]` vor dem Livegang ausfüllen und die Texte prüfen lassen. Kommt ein neuer Dienst dazu, die Datenschutzerklärung anpassen.
