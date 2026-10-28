@@ -11,7 +11,8 @@ import { StatusButton, useActionStatus } from '@/components/ui/status-button';
 import { cn } from '@/lib/utils';
 
 const RESEND_SECONDS = 30;
-const CODE_LENGTH = 6;
+// Must match Authentication → Providers → Email → "Email OTP Length" in Supabase.
+const CODE_LENGTH = 8;
 
 const authErrorMessage = (error: AuthError) => {
   if (error.status === 429) return 'Zu viele Versuche. Bitte kurz warten.';
@@ -95,7 +96,7 @@ function SignIn() {
     }).catch(() => undefined);
 
   const handleCodeChange = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
+    const digits = value.replace(/\D/g, '').slice(0, CODE_LENGTH);
     setCode(digits);
     if (digits.length === CODE_LENGTH && verifyStatus.status === 'idle') void verifyCode(digits);
   };
@@ -193,7 +194,7 @@ function SignIn() {
               onChange={(event) => handleCodeChange(event.target.value)}
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder="······"
+              placeholder={'·'.repeat(CODE_LENGTH)}
               aria-invalid={Boolean(error)}
               className={cn(
                 'h-16 rounded-2xl border bg-white text-center font-heading text-[30px] font-extrabold tracking-[0.45em] text-brand-ink outline-none transition-colors placeholder:text-brand-icon-muted focus:border-2 focus:border-brand-accent',

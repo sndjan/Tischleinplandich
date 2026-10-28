@@ -38,7 +38,7 @@ Für Canonical-URL, Sitemap, `robots.txt` und Vorschaubilder beim Build `NEXT_PU
 
 ## Anmelden per Link oder Code
 
-Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 6-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Emails → Templates** den Inhalt von `supabase/templates/sign-in.html` in **Magic Link** und **Confirm signup** eintragen (Betreff: „Dein Anmeldelink für den Essensplaner“).
+Es gibt keine Passwörter mehr: `/auth/signin` schickt eine E-Mail mit Link und 8-stelligem Code (gleicher Knopf für neue Konten). Damit der Link in jedem Browser klappt und der Code in der Mail steht, im Supabase-Dashboard unter **Authentication → Emails → Templates** den Inhalt von `supabase/templates/sign-in.html` in **Magic Link** und **Confirm signup** eintragen (Betreff: „Dein Anmeldelink für den Essensplaner“).
 
 Für den Versand im Livebetrieb unter **Authentication → Emails → SMTP Settings** eigenes SMTP einrichten (Resend: Host `smtp.resend.com`, Port `465`, Benutzer `resend`, Passwort = API-Key mit „Sending access“) und unter **Authentication → Rate Limits** das Mail-Limit erhöhen. Der eingebaute Versand von Supabase schafft nur wenige Mails pro Stunde.
 
