@@ -6,6 +6,7 @@ import type { Recipe } from "@/types/database";
 import { scaleIngredients } from "@/lib/recipe-scaling";
 import { Stepper } from "@/components/ui/controls";
 import { cn } from "@/lib/utils";
+import { safeHttpUrl } from "@/lib/safe-links";
 
 const formatNumber = (value: number | null) =>
   value === null ? null : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
@@ -17,12 +18,8 @@ const getSteps = (text: string | null) =>
     .filter(Boolean);
 
 export function sourceHost(url: string | null) {
-  if (!url) return null;
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return null;
-  }
+  const safeUrl = safeHttpUrl(url);
+  return safeUrl ? new URL(safeUrl).hostname.replace(/^www\./, "") : null;
 }
 
 /**
@@ -101,7 +98,7 @@ export function RecipeBody({
             ))}
             {host && (
               <a
-                href={recipe.source_url!}
+                href={safeHttpUrl(recipe.source_url)!}
                 target="_blank"
                 rel="noreferrer"
                 className="flex h-[30px] items-center gap-1.5 rounded-full bg-brand-chip-neutral px-2.5 text-brand-ink transition-transform active:scale-95"

@@ -6,8 +6,20 @@ import {
 } from "@/lib/recipe-images";
 import { draftFromEditable, type EditableRecipe } from "@/lib/editable-recipe";
 import type { Recipe } from "@/types/database";
+import { toSourceUrl } from "@/lib/safe-links";
+import { toUploadableImage } from "@/lib/image-utils";
 
 export class SaveRecipeError extends Error {}
+
+/**
+ * The database limits from migration 016 in words people understand; other
+ * errors keep their message.
+ */
+export function recipeSaveErrorMessage(error: { code?: string; message: string }) {
+  if (error.message.includes("recipe_limit_reached")) return "Du hast die Höchstzahl von 2000 Rezepten erreicht";
+  if (error.code === "23514") return "Rezept ist zu lang – bitte Name, Zutaten oder Schritte kürzen";
+  return error.message;
+}
 
 type ImageChange =
   | { kind: "keep" }
@@ -99,12 +111,15 @@ export async function saveRecipe(
   let previousImagePath: string | null = null;
 
   if (image.kind === "replace") {
-    const imagePath = createRecipeImagePath(user.id, image.file.name);
+    const file = await toUploadableImage(image.file);
+    if (!file) throw new SaveRecipeError("Bildformat wird nicht unterstützt – bitte ein JPG oder PNG wählen");
+
+    const imagePath = createRecipeImagePath(user.id, file.name);
     const { error: uploadError } = await supabase.storage
       .from(RECIPE_IMAGE_BUCKET)
-      .upload(imagePath, image.file, {
+      .upload(imagePath, file, {
         cacheControl: "3600",
-        contentType: image.file.type,
+        contentType: file.type,
         upsert: false,
       });
 
@@ -122,7 +137,7 @@ export async function saveRecipe(
     name: draft.name,
     ingredients: draft.ingredients,
     preparation_steps: draft.preparation_steps || null,
-    source_url: draft.source_url || null,
+    source_url: toSourceUrl(draft.source_url),
     prep_time: draft.prep_time || null,
     calories: draft.calories,
     protein: draft.protein,
@@ -143,7 +158,7 @@ export async function saveRecipe(
         .eq("id", existing.id)
         .eq("user_id", user.id);
 
-      if (error) throw new SaveRecipeError(error.message);
+      if (error) throw new SaveRecipeError(recipeSaveErrorMessage(error));
       recipeId = existing.id;
     } else {
       const { data, error } = await supabase
@@ -152,7 +167,7 @@ export async function saveRecipe(
         .select("id")
         .single<{ id: string }>();
 
-      if (error || !data) throw new SaveRecipeError(error?.message || "Speichern fehlgeschlagen");
+      if (error || !data) throw new SaveRecipeError(error ? recipeSaveErrorMessage(error) : "Speichern fehlgeschlagen");
       recipeId = data.id;
     }
   } catch (error) {

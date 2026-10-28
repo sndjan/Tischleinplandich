@@ -38,6 +38,7 @@ import { IngredientRowsEditor } from "./ingredient-rows-editor";
 import { RecipeRefineSheet, type RefineExchange } from "./recipe-refine-sheet";
 import { Switch } from "@/components/ui/controls";
 import { ImageCropper } from "@/components/ui/image-cropper";
+import { safeHttpUrl } from "@/lib/safe-links";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const HINT_DISMISSED_KEY = "weekly-meal-planner:editor-hint-dismissed";
@@ -485,6 +486,7 @@ export function RecipeEditor({
               ref={nameRef}
               aria-label="Rezeptname"
               value={value.name}
+              maxLength={200}
               onChange={(event) => update({ name: event.target.value.replace(/\n/g, " ") })}
               placeholder="Rezeptname"
               className="font-heading -mx-1 px-1 text-[26px] font-extrabold leading-tight text-brand-ink"
@@ -520,9 +522,9 @@ export function RecipeEditor({
                   <Plus className="size-3" strokeWidth={3} />
                 </button>
               </div>
-              {value.source_url && (
+              {safeHttpUrl(value.source_url) && (
                 <a
-                  href={value.source_url}
+                  href={safeHttpUrl(value.source_url)!}
                   target="_blank"
                   rel="noreferrer"
                   className="flex h-9 max-w-[12rem] items-center gap-1.5 rounded-full bg-brand-chip-neutral px-3 text-[13px] font-semibold text-brand-ink no-underline"

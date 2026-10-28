@@ -38,6 +38,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on every P
 - Features that need a new migration should keep working (with a hint) while the migration is missing, as the existing ones do.
 - `SECURITY DEFINER` functions use `SET search_path = ''` and revoke access from `PUBLIC`/`anon` unless they are meant for it.
 - Fetching user-supplied URLs on the server goes through `safeFetch` (`src/lib/server/safe-fetch.ts`), never plain `fetch`.
+- Recipes loaded from the database go through `withSafeLinks` (`src/lib/safe-links.ts`) before `source_url` or `image_url` reach an `href`/`src`; other people's recipes can contain anything the API accepts.
 - The service-role client (`src/lib/supabase/admin.ts`) is for server routes only and only where RLS can't express the action.
 - When a change affects what data is processed or which service receives it, update `src/app/datenschutz/page.tsx` too.
 - Add unit tests for new pure logic in `src/lib/`.
