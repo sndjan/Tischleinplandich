@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod/v4";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAILY_AI_LIMIT, type RecipeDraft } from "@/lib/recipe-draft";
+import { safeFetch } from "@/lib/server/safe-fetch";
 
 // Haiku is plenty for reading and adapting recipes and keeps each request at a
 // fraction of a cent. Low effort keeps the hidden reasoning (and its cost) short.
@@ -225,21 +226,18 @@ export async function fetchRecipePage(rawUrl: string): Promise<RecipePage> {
   let html: string;
 
   try {
-    const response = await fetch(url, {
+    const { response, body } = await safeFetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; WeeklyMealPlanner/1.0)",
         Accept: "text/html,application/xhtml+xml",
       },
-      redirect: "follow",
       signal: AbortSignal.timeout(10_000),
+      maxBytes: 3 * 1024 * 1024,
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const contentLength = Number(response.headers.get("content-length") ?? 0);
-    if (contentLength > 3 * 1024 * 1024) throw new Error("Page too large");
-
-    html = await response.text();
+    html = body.toString("utf8");
   } catch (error) {
     console.error("Recipe page fetch failed", error);
     throw new UserFacingError("Webseite nicht erreichbar – nutze Text oder Screenshot", 422);
@@ -340,19 +338,16 @@ export async function fetchCoverImage(
   imageUrl: string,
 ): Promise<{ mediaType: string; data: string } | null> {
   try {
-    const response = await fetch(imageUrl, {
+    const { response, body: bytes } = await safeFetch(imageUrl, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; WeeklyMealPlanner/1.0)", Accept: "image/*" },
-      redirect: "follow",
       signal: AbortSignal.timeout(8_000),
+      maxBytes: MAX_COVER_BYTES,
     });
     if (!response.ok) return null;
 
     const mediaType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
     if (!COVER_TYPES.includes(mediaType)) return null;
-    if (Number(response.headers.get("content-length") ?? 0) > MAX_COVER_BYTES) return null;
-
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length === 0 || bytes.length > MAX_COVER_BYTES) return null;
+    if (bytes.length === 0) return null;
 
     return { mediaType, data: bytes.toString("base64") };
   } catch (error) {
