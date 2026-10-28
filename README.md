@@ -117,3 +117,13 @@ Profil → „Konto löschen“ (unten) löscht Fotos im Storage und den Auth-Nu
 ## Impressum und Datenschutz
 
 `/impressum` und `/datenschutz` lesen die Betreiberdaten aus `src/lib/legal.ts`. Alle `[PLATZHALTER]` vor dem Livegang ausfüllen und die Texte prüfen lassen. Kommt ein neuer Dienst dazu, die Datenschutzerklärung anpassen.
+
+## Captcha (Cloudflare Turnstile)
+
+Schützt Anmeldung und Warteliste vor Bots, die massenhaft Mails auslösen. Reihenfolge beachten, sonst klappt keine Anmeldung mehr:
+
+1. Im Cloudflare-Dashboard unter **Turnstile** ein Widget anlegen (Domain eintragen, Modus „Managed“).
+2. In Vercel `NEXT_PUBLIC_TURNSTILE_SITE_KEY` und `TURNSTILE_SECRET_KEY` setzen und neu deployen.
+3. Erst danach in Supabase unter **Authentication → Attack Protection** „Enable CAPTCHA protection“ einschalten, Anbieter Turnstile, Secret Key eintragen.
+
+Ohne die Schlüssel ist der Captcha aus und beide Formulare funktionieren wie bisher.

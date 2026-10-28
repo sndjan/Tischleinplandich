@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod/v4';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { sendWaitlistConfirmation } from '@/lib/server/waitlist-mail';
+import { verifyTurnstile } from '@/lib/server/turnstile';
 import { WAITLIST_CONSENT_TEXT } from '@/lib/waitlist';
 
 // A repeated sign-up resends the confirmation mail at most this often.
@@ -12,6 +13,7 @@ const SignUpSchema = z.object({
   email: z.email().max(254),
   // Honeypot: hidden from people, filled in by simple bots.
   website: z.string().optional(),
+  captchaToken: z.string().max(2048).optional(),
 });
 
 /**
@@ -25,6 +27,12 @@ export async function POST(request: Request) {
   }
   if (parsed.data.website) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Vercel puts the visitor's address first in x-forwarded-for.
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+  if (!(await verifyTurnstile(parsed.data.captchaToken, ip))) {
+    return NextResponse.json({ error: 'Sicherheitsprüfung fehlgeschlagen. Bitte erneut versuchen.' }, { status: 400 });
   }
 
   const email = parsed.data.email.trim().toLowerCase();

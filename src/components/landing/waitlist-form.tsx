@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { WAITLIST_CONSENT_TEXT } from "@/lib/waitlist";
+import { CAPTCHA_PENDING_MESSAGE, useCaptcha } from "@/components/ui/captcha";
 
 /**
  * Email field for launch news. The address only counts after the link in the
@@ -13,14 +14,20 @@ export function WaitlistForm() {
   const [website, setWebsite] = useState("");
   const [state, setState] = useState<"idle" | "pending" | "sent" | "error">("idle");
   const [error, setError] = useState("");
+  const captcha = useCaptcha();
 
   const submit = async () => {
+    if (!captcha.ready) {
+      setError(CAPTCHA_PENDING_MESSAGE);
+      setState("error");
+      return;
+    }
     setState("pending");
     try {
       const response = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, website }),
+        body: JSON.stringify({ email, website, captchaToken: captcha.take() }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Das hat nicht geklappt");
@@ -81,6 +88,7 @@ export function WaitlistForm() {
           {state === "pending" ? "Wird gesendet …" : "Eintragen"}
         </button>
       </div>
+      {captcha.widget}
       {state === "error" && (
         <p role="alert" className="text-sm font-medium text-brand-red">
           {error}
