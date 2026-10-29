@@ -17,6 +17,7 @@ German-language web app (PWA) for planning meals per week, with AI recipe import
 - `src/lib/` pure helpers (shopping list, scaling, prep time); `src/lib/server/` server-only code (`import "server-only"`)
 - `src/lib/legal.ts` operator details for Impressum and Datenschutz
 - `supabase/migrations/NNN_*.sql` numbered migrations; `src/types/database.ts` hand-written types matching them
+- `.claude/skills/`: `/new-migration` (adding a migration) and `/release` (drafting "Was ist neu?" entries); `.claude/hooks/session-start.sh` installs dependencies in cloud sessions
 
 ## Commands
 

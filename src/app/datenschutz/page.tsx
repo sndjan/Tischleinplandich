@@ -82,8 +82,12 @@ export default function DatenschutzPage() {
       <h2>8. Feedback</h2>
       <p>
         Schickst du uns Feedback aus der App, speichern wir deine Nachricht, die Stelle in der App und deine
-        Browserkennung, um Fehler nachvollziehen zu können (Art. 6 Abs. 1 lit. f DSGVO). Das Feedback ist mit
-        deinem Konto verknüpft, damit wir dich belohnen können, wenn wir es umsetzen (siehe{" "}
+        Browserkennung, um Fehler nachvollziehen zu können (Art. 6 Abs. 1 lit. f DSGVO). Zum Sortieren lassen
+        wir Nachricht und Stelle in der App von Anthropic PBC (USA) zusammenfassen, ohne deine E-Mail-Adresse und
+        Browserkennung. Daraus entstehen Aufgaben in unserem öffentlichen Code-Verzeichnis bei GitHub, Inc. (USA):
+        nur in eigenen Worten, ohne deine Nachricht im Wortlaut und ohne Angaben, die auf dich schließen lassen.
+        Die Übermittlung in die USA stützt sich auf Standardvertragsklauseln. Das Feedback ist mit deinem Konto
+        verknüpft, damit wir dich belohnen können, wenn wir es umsetzen (siehe{" "}
         <Link href="/feedback-belohnung">Premium für Feedback</Link>). Dafür speichern wir zu deinem Konto, wofür und
         wie viele Tage Premium du bekommen hast (Art. 6 Abs. 1 lit. b DSGVO).
       </p>

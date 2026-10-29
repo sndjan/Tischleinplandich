@@ -67,6 +67,8 @@ ORDER BY f.created_at DESC;
 
 Erledigtes mit `UPDATE feedback SET status = 'done' WHERE id = '…';` markieren.
 
+Automatisch: Eine geplante Claude-Code-Aufgabe (täglich, 5:47 Uhr) liest alle Einträge mit `status = 'new'`, fasst ähnliche zusammen und legt dafür GitHub-Issues mit dem Label `feedback` an – in eigenen Worten, ohne Zitate und ohne Angaben zur Person, weil das Repo öffentlich ist. Danach stehen die Einträge auf `seen`, mit Issue-Nummer und geschätzter Größe für die Belohnung (siehe „Premium für Feedback“). Verwalten unter claude.ai/code → Geplante Aufgaben.
+
 ## KI-Nutzung und Kosten
 
 Rezept-Import, „Aus Idee“ und „Mit KI ändern“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.

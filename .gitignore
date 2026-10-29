@@ -40,3 +40,8 @@ next-env.d.ts
 
 # claude
 .claude/*
+# Shared with everyone: hooks, skills and project settings. Local files
+# (settings.local.json, worktrees) stay ignored.
+!.claude/settings.json
+!.claude/hooks/
+!.claude/skills/
