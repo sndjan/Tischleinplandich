@@ -31,6 +31,18 @@ export type Screen =
   | { kind: "pantry-staples" }
   | { kind: "whats-new" };
 
+// On desktop these open in a side panel next to the planner, so recipes can
+// still be dragged onto days; everything else (cooking, settings) takes the page.
+const PANEL_SCREEN_KINDS: ReadonlySet<Screen["kind"]> = new Set([
+  "recipe-form",
+  "recipe-create",
+  "recipe-preview",
+  "shared-recipe",
+  "add-meal",
+]);
+
+export const isPanelScreen = (screen: Screen) => PANEL_SCREEN_KINDS.has(screen.kind);
+
 export type ScreenEntry = {
   key: number;
   screen: Screen;

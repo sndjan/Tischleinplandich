@@ -300,13 +300,15 @@ export function MealWeekView({
             />
           </div>
 
-          {/* Desktop: day cards wrap into as many columns as fit, so narrower
-              screens like an iPad don't need sideways scrolling. */}
-          <div className="hidden gap-3 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
+          {/* Desktop: the whole week in one row once there is room; narrower
+              screens like an iPad wrap the days instead of scrolling sideways. */}
+          <div className="hidden items-start gap-2 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] xl:grid-cols-7">
             {DAYS.map((day, index) => (
               <DayCard
                 key={day}
-                dayLabel={day}
+                // Short, so the label fits a seventh of the width.
+                dayLabel={`${SHORT_DAYS[index]} ${weekDates[index]}`}
+                compact
                 dayIndex={index}
                 isToday={index === todayIndex}
                 recipesById={recipesById}

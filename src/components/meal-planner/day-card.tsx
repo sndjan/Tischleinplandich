@@ -21,6 +21,9 @@ interface DayCardProps {
   isToday?: boolean;
   // Fill the available width without the desktop column's own card.
   fullWidth?: boolean;
+  // Narrow desktop week column: stacked meal cards and a single calorie line
+  // instead of the full summary.
+  compact?: boolean;
   recipesById: Map<string, Recipe>;
   plannedMealsForDay: PlannedMeal[];
   nutritionTargets: NutritionTargetSettings;
@@ -38,6 +41,7 @@ export function DayCard({
   dayIndex,
   isToday = false,
   fullWidth = false,
+  compact = false,
   recipesById,
   plannedMealsForDay,
   nutritionTargets,
@@ -79,19 +83,52 @@ export function DayCard({
   return (
     <div
       className={cn(
-        "w-full shrink-0 space-y-2.5",
-        !fullWidth && "rounded-[22px] bg-brand-app-bg p-2.5 ring-1 ring-brand-card-border",
+        "w-full shrink-0",
+        compact ? "space-y-2" : "space-y-2.5",
+        !fullWidth && "rounded-[22px] bg-brand-app-bg ring-1 ring-brand-card-border",
+        !fullWidth && (compact ? "p-2" : "p-2.5"),
         !fullWidth && isToday && "ring-2 ring-brand-accent",
       )}
     >
-      {dayLabel && (
-        <h3 className="pt-1 text-center font-heading text-sm font-extrabold uppercase tracking-wide text-brand-secondary">
-          {dayLabel}
-          {isToday && <span className="ml-1 text-brand-accent-dark">· Heute</span>}
-        </h3>
-      )}
+      {dayLabel &&
+        (compact ? (
+          <h3
+            className={cn(
+              "pt-1 text-center font-heading text-sm font-extrabold uppercase tracking-wide",
+              isToday ? "text-brand-accent-dark" : "text-brand-secondary",
+            )}
+          >
+            {dayLabel}
+            {isToday && <span className="sr-only"> · Heute</span>}
+          </h3>
+        ) : (
+          <h3 className="pt-1 text-center font-heading text-sm font-extrabold uppercase tracking-wide text-brand-secondary">
+            {dayLabel}
+            {isToday && <span className="ml-1 text-brand-accent-dark">· Heute</span>}
+          </h3>
+        ))}
 
-      {nutritionTargets.show_nutrition ? (
+      {compact ? (
+        nutritionTargets.show_nutrition &&
+        nutritionTargets.calories_target_enabled && (
+          <div className="space-y-1 px-1">
+            <p className="text-center text-xs text-brand-secondary">
+              <b className="text-[13px] text-brand-ink">{Math.round(totals.calories).toLocaleString("de-DE")}</b> kcal
+            </p>
+            <div className="h-1 overflow-hidden rounded-full bg-brand-track">
+              <div
+                className={cn(
+                  "h-full rounded-full",
+                  totals.calories > nutritionTargets.calories_target ? "bg-brand-warn" : "bg-brand-accent",
+                )}
+                style={{
+                  width: `${Math.min(100, (totals.calories / Math.max(1, nutritionTargets.calories_target)) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        )
+      ) : nutritionTargets.show_nutrition ? (
         <DaySummary title={summaryTitle} isToday={isToday} totals={totals} targets={nutritionTargets} />
       ) : (
         summaryTitle && (
@@ -118,9 +155,10 @@ export function DayCard({
                   nutritionTargets={nutritionTargets}
                   pending={isPendingId(meal.id)}
                   onRemove={() => onRemoveMeal(meal)}
+                  compact={compact}
                 />
               ) : (
-                <AddMealButton dayOfWeek={dayIndex} mealType={mealType} />
+                <AddMealButton dayOfWeek={dayIndex} mealType={mealType} compact={compact} />
               ),
             )}
           </div>
@@ -129,7 +167,7 @@ export function DayCard({
 
       {renderDropZone(
         "extra",
-        <div className="space-y-2.5">
+        <div className={compact ? "space-y-2" : "space-y-2.5"}>
           {extraMeals.map((meal) => {
             const recipe = recipesById.get(meal.recipe_id);
             if (!recipe) return null;
@@ -143,10 +181,11 @@ export function DayCard({
                 nutritionTargets={nutritionTargets}
                 pending={isPendingId(meal.id)}
                 onRemove={() => onRemoveMeal(meal)}
+                compact={compact}
               />
             );
           })}
-          <AddMealButton dayOfWeek={dayIndex} mealType="extra" label="Extras" />
+          <AddMealButton dayOfWeek={dayIndex} mealType="extra" label="Extras" compact={compact} />
         </div>,
       )}
     </div>

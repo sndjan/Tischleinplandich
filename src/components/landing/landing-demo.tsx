@@ -41,6 +41,7 @@ import { StaticScreenStackProvider, type Screen } from "@/components/meal-planne
 import { SegmentedTabs } from "@/components/meal-planner/segmented-tabs";
 import { ShoppingList } from "@/components/meal-planner/shopping-list";
 import { SubPage } from "@/components/meal-planner/sub-page";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import {
   DEMO_PANTRY_STAPLES,
   DEMO_RECIPES,
@@ -81,20 +82,6 @@ const MOBILE_TABS: { value: MobileTab; label: string; Icon: typeof CalendarDays 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
 
 const notInDemo = () => toast("Das geht in der echten App – hier ist nur die Demo.");
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const list = window.matchMedia(query);
-    const update = () => setMatches(list.matches);
-    update();
-    list.addEventListener("change", update);
-    return () => list.removeEventListener("change", update);
-  }, [query]);
-
-  return matches;
-}
 
 type DemoData = {
   todayIndex: number;

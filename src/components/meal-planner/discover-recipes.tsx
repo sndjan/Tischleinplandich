@@ -123,7 +123,7 @@ export function DiscoverRecipes() {
       ) : error ? (
         <p className="py-8 text-center text-sm text-brand-secondary">Konnte nicht geladen werden</p>
       ) : isPending ? (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-2" aria-busy="true" aria-label="Lädt">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]" aria-busy="true" aria-label="Lädt">
           {[0, 1, 2, 3].map((index) => (
             <Skeleton key={index} className="h-[196px] rounded-2xl" />
           ))}
@@ -141,7 +141,7 @@ export function DiscoverRecipes() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
           {data.map((recipe) => {
             const saved = savedIds.has(recipe.id);
             return (
