@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bug, Lightbulb, Loader2, MessageSquare, Send, X } from "lucide-react";
+import Link from "next/link";
+import { Bug, Gift, Lightbulb, Loader2, MessageSquare, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
 import type { FeedbackCategory } from "@/types/database";
@@ -169,6 +170,17 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
         }
         className="block w-full resize-none rounded-xl bg-brand-chip-neutral px-3 py-2.5 text-[15px] text-brand-ink outline-none placeholder:text-brand-muted focus:ring-2 focus:ring-brand-accent-bg"
       />
+
+      <p className="flex items-start gap-1.5 text-xs leading-snug text-brand-secondary">
+        <Gift className="mt-px size-3.5 shrink-0 text-brand-accent-dark" aria-hidden="true" />
+        <span>
+          Bauen wir es ein, schenken wir dir bis zu 1 Monat Premium.{" "}
+          {/* New tab, so a half-written message stays where it is. */}
+          <Link href="/feedback-belohnung" target="_blank" className="font-semibold text-brand-accent-dark underline">
+            Bedingungen
+          </Link>
+        </span>
+      </p>
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-brand-muted">Ein kurzer Satz reicht.</span>

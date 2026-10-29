@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalPage } from "@/components/legal/legal-page";
 import { LEGAL_UPDATED, OPERATOR, SUPABASE_REGION } from "@/lib/legal";
 import { SITE_NAME } from "@/lib/site";
@@ -85,7 +86,10 @@ export default function DatenschutzPage() {
         wir Nachricht und Stelle in der App von Anthropic PBC (USA) zusammenfassen, ohne deine E-Mail-Adresse und
         Browserkennung. Daraus entstehen Aufgaben in unserem öffentlichen Code-Verzeichnis bei GitHub, Inc. (USA):
         nur in eigenen Worten, ohne deine Nachricht im Wortlaut und ohne Angaben, die auf dich schließen lassen.
-        Die Übermittlung in die USA stützt sich auf Standardvertragsklauseln.
+        Die Übermittlung in die USA stützt sich auf Standardvertragsklauseln. Das Feedback ist mit deinem Konto
+        verknüpft, damit wir dich belohnen können, wenn wir es umsetzen (siehe{" "}
+        <Link href="/feedback-belohnung">Premium für Feedback</Link>). Dafür speichern wir zu deinem Konto, wofür und
+        wie viele Tage Premium du bekommen hast (Art. 6 Abs. 1 lit. b DSGVO).
       </p>
 
       <h2>9. Warteliste</h2>
@@ -108,8 +112,8 @@ export default function DatenschutzPage() {
       <h2>11. Speicherdauer</h2>
       <p>
         Wir speichern deine Daten, solange du dein Konto hast. Im Profil kannst du dein Konto jederzeit löschen;
-        dann werden alle Rezepte, Fotos, Pläne und Einstellungen sofort gelöscht. Feedback bleibt ohne Bezug zu
-        deinem Konto erhalten. Gesetzliche Aufbewahrungspflichten (z. B. für Rechnungen) bleiben unberührt.
+        dann werden alle Rezepte, Fotos, Pläne, Einstellungen und Premium-Gutschriften sofort gelöscht. Feedback
+        bleibt ohne Bezug zu deinem Konto erhalten. Gesetzliche Aufbewahrungspflichten (z. B. für Rechnungen) bleiben unberührt.
       </p>
 
       <h2>12. Deine Rechte</h2>

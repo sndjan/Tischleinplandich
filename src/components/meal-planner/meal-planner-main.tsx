@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MessageSquarePlus, WifiOff } from "lucide-react";
+import { MessageSquarePlus, Plus, WifiOff } from "lucide-react";
 import { MealWeekView, useViewMode, ViewModeToggle } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
-import { SegmentedTabs } from "./segmented-tabs";
+import { DesktopNavRail, type DesktopPanelTab } from "./desktop-nav-rail";
+import { SidePanel } from "./side-panel";
 import { RecipeEditor } from "./recipe-editor";
 import { RecipeCreateScreen } from "./recipe-create-screen";
 import { RecipeView } from "./recipe-view";
@@ -16,8 +17,15 @@ import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
 import { FeedbackPopover } from "./feedback-popover";
 import { WhatsNewScreen } from "./whats-new-screen";
+import { useRewardThanks } from "./feedback-rewards";
 import { PantryStaplesScreen, usePantryStaples } from "./pantry-staples-settings";
-import { ScreenStackProvider, useScreenStack, type Screen } from "./screen-stack";
+import {
+  isPanelScreen,
+  ScreenStackProvider,
+  useScreenStack,
+  type Screen,
+  type ScreenEntry,
+} from "./screen-stack";
 import type { Recipe } from "@/types/database";
 import {
   NutritionTargetsScreen,
@@ -33,8 +41,7 @@ import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
 import { sumMealNutrition } from "./day-summary";
 import { useEntrance } from "@/hooks/use-entrance";
-
-type DesktopRightPanelTab = "mine" | "discover" | "shopping";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 export function MealPlannerMain() {
   return (
@@ -74,9 +81,11 @@ function MealPlanner() {
   const [viewMode, setViewMode] = useViewMode();
   const { user } = useAuth();
   const { data: profile } = useProfileQuery();
-  const [desktopRightPanelTab, setDesktopRightPanelTab] =
-    useState<DesktopRightPanelTab>("mine");
+  const [desktopRightPanelTab, setDesktopRightPanelTab] = useState<DesktopPanelTab>("mine");
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const isOnline = useIsOnline();
+  // Thanks once for each feedback that earned Premium days.
+  useRewardThanks();
   // Where feedback was opened from, or null while the feedback card is closed.
   const [feedbackContext, setFeedbackContext] = useState<string | null>(null);
 
@@ -257,68 +266,101 @@ function MealPlanner() {
     }
   };
 
+  const topEntry = stack[stack.length - 1];
+  const inPanel = (entry: ScreenEntry) => isDesktop && isPanelScreen(entry.screen);
+  const panelOpen = topEntry !== undefined && inPanel(topEntry);
+  const fullPageOpen = topEntry !== undefined && !panelOpen;
+  const panelEntries = stack.filter(inPanel);
+  const recipeCount = mealPlanData.loading ? null : mealPlanData.recipes.length;
+
+  const panelHeading = {
+    mine: {
+      title: "Meine Rezepte",
+      subtitle: recipeCount === null ? "Zum Planen auf einen Tag ziehen" : `${recipeCount} · zum Planen auf einen Tag ziehen`,
+    },
+    discover: { title: "Entdecken", subtitle: "Rezepte, die andere geteilt haben" },
+    shopping: { title: "Einkaufsliste", subtitle: "Aus den Mahlzeiten dieser Woche" },
+  }[desktopRightPanelTab];
+
   return (
     <>
-      {/* The planner stays mounted underneath open screens so it keeps its state. */}
+      {/* The planner stays mounted underneath open screens so it keeps its state.
+          On desktop it stays visible next to the side panel. */}
       <div
         className={cn(
-          "min-h-screen bg-brand-app-bg pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0",
-          stack.length > 0 && "hidden",
+          "min-h-screen bg-brand-app-bg pb-[calc(6rem+env(safe-area-inset-bottom))] lg:flex lg:h-dvh lg:min-h-0 lg:pb-0",
+          fullPageOpen && "hidden lg:hidden",
         )}
       >
-        <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
-          <div className="flex h-[60px] items-center justify-between gap-3 px-4">
-            <h1 className="flex min-w-0 items-center gap-2 font-heading text-[22px] font-extrabold text-brand-ink">
-              {mobileTab === "plan" ? (
-                <>
-                  <span aria-hidden="true" className="text-[26px]">🥗</span>
-                  <span className="sm:hidden">WMP</span>
-                  <span className="hidden sm:inline">Wochen-Essensplaner</span>
-                </>
-              ) : (
-                <>
-                  <span className="lg:hidden">{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>
-                  <span className="hidden items-center gap-2 lg:flex">
-                    <span aria-hidden="true" className="text-[26px]">🥗</span>
-                    Wochen-Essensplaner
-                  </span>
-                </>
-              )}
-            </h1>
-            <div className="flex items-center gap-2">
-              <div className={cn(mobileTab !== "plan" && "hidden lg:block")}>
-                <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        <DesktopNavRail value={desktopRightPanelTab} onChange={setDesktopRightPanelTab} />
+
+        <div className="lg:flex lg:min-w-0 lg:flex-1 lg:flex-col">
+          <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
+            <div className="flex h-[60px] items-center justify-between gap-3 px-4 lg:px-6">
+              <h1 className="flex min-w-0 items-center gap-2 font-heading text-[22px] font-extrabold text-brand-ink">
+                {mobileTab === "plan" ? (
+                  <>
+                    <span aria-hidden="true" className="text-[26px] lg:hidden">🥗</span>
+                    <span className="sm:hidden">WMP</span>
+                    <span className="hidden sm:inline">Wochen-Essensplaner</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="lg:hidden">{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>
+                    <span className="hidden lg:inline">Wochen-Essensplaner</span>
+                  </>
+                )}
+              </h1>
+              <div className="flex items-center gap-2">
+                <div className={cn(mobileTab !== "plan" && "hidden lg:block")}>
+                  <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openScreen({ kind: "recipe-create" })}
+                  className="hidden h-9 shrink-0 items-center gap-1.5 rounded-xl bg-brand-accent-dark px-3.5 text-sm font-bold text-white transition-transform active:scale-[0.97] lg:flex"
+                >
+                  <Plus className="size-4" strokeWidth={2.5} />
+                  Rezept hinzufügen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleFeedback()}
+                  data-feedback-trigger
+                  aria-label="Feedback senden"
+                  aria-expanded={feedbackContext !== null}
+                  className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-brand-chip-neutral text-brand-secondary transition-transform active:scale-90 lg:flex"
+                >
+                  <MessageSquarePlus className="size-[18px]" />
+                </button>
+                {avatar}
               </div>
-              <button
-                type="button"
-                onClick={() => toggleFeedback()}
-                data-feedback-trigger
-                aria-label="Feedback senden"
-                aria-expanded={feedbackContext !== null}
-                className="hidden size-9 shrink-0 items-center justify-center rounded-full bg-brand-chip-neutral text-brand-secondary transition-transform active:scale-90 lg:flex"
-              >
-                <MessageSquarePlus className="size-[18px]" />
-              </button>
-              {avatar}
             </div>
-          </div>
-        </header>
+          </header>
 
-        {!isOnline && (
-          <div
-            role="status"
-            className="mx-4 mt-3 flex items-center gap-2 rounded-full bg-[#fdf0d5] px-4 py-2 text-[13px] font-semibold text-[#7a4f0e]"
-          >
-            <WifiOff className="size-4 shrink-0" />
-            Offline · Änderungen werden gespeichert, sobald du wieder online bist
-          </div>
-        )}
+          {!isOnline && (
+            <div
+              role="status"
+              className="mx-4 mt-3 flex items-center gap-2 rounded-full bg-[#fdf0d5] px-4 py-2 text-[13px] font-semibold text-[#7a4f0e] lg:mx-6"
+            >
+              <WifiOff className="size-4 shrink-0" />
+              Offline · Änderungen werden gespeichert, sobald du wieder online bist
+            </div>
+          )}
 
-        <main className="p-3 sm:p-4">
-          {/* Desktop layout: week view next to the recipe-library-or-shopping-list panel */}
-          <div className="hidden lg:block">
-            <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6">
-              <div className="min-w-0 space-y-4">
+          <main className="p-3 sm:p-4 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:p-0">
+            {/* Desktop: plan and panel side by side, each scrolling by itself. The
+                week gets the room in week view; in day view the plan shrinks to
+                the phone-sized column and the recipes get the room. */}
+            <div
+              className={cn(
+                "hidden gap-5 px-6 pt-5 motion-safe:transition-[grid-template-columns] motion-safe:duration-300 lg:grid lg:min-h-0 lg:flex-1",
+                viewMode === "week"
+                  ? "lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_440px]"
+                  : "lg:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[440px_minmax(0,1fr)]",
+              )}
+            >
+              <div className="min-w-0 space-y-4 overflow-y-auto overscroll-contain pb-6">
                 <MealWeekView
                   recipes={mealPlanData.recipes}
                   plannedMeals={mealPlanData.plannedMeals}
@@ -328,54 +370,43 @@ function MealPlanner() {
                   onViewModeChange={setViewMode}
                 />
               </div>
-              {/* Stays in view next to the week and scrolls by itself, so a long
-                  recipe list doesn't stretch the page (iPad). */}
-              <div className="sticky top-[calc(76px+env(safe-area-inset-top))] flex max-h-[calc(100dvh-92px-env(safe-area-inset-top))] flex-col gap-3 self-start rounded-xl bg-white p-3 ring-1 ring-brand-card-border">
-                {/* One row for all three, instead of "Rezepte | Einkaufsliste"
-                    with "Meine | Entdecken" stacked underneath. */}
-                <SegmentedTabs
-                  label="Seitenleiste"
-                  value={desktopRightPanelTab}
-                  onChange={setDesktopRightPanelTab}
-                  options={[
-                    {
-                      value: "mine",
-                      label: mealPlanData.loading ? "Meine" : `Meine · ${mealPlanData.recipes.length}`,
-                    },
-                    { value: "discover", label: "Entdecken" },
-                    { value: "shopping", label: "Einkauf" },
-                  ]}
-                />
-
-                <div className="-mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-1">
+              <aside
+                aria-label={panelHeading.title}
+                className="flex min-h-0 min-w-0 flex-col gap-3 rounded-t-[22px] bg-white px-4 pt-4 ring-1 ring-brand-card-border"
+              >
+                <div className="flex shrink-0 items-baseline gap-2.5">
+                  <h2 className="shrink-0 whitespace-nowrap font-heading text-xl font-extrabold text-brand-ink">{panelHeading.title}</h2>
+                  <p className="min-w-0 truncate text-[13px] text-brand-secondary">{panelHeading.subtitle}</p>
+                </div>
+                <div className="-mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
                   {desktopRightPanelTab === "shopping" ? (
                     <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
                   ) : (
                     <RecipeLibrary tab={desktopRightPanelTab} />
                   )}
                 </div>
-              </div>
+              </aside>
             </div>
-          </div>
 
-          {/* Mobile layout: single active tab, switched via the bottom nav */}
-          <Entrance key={mobileTab} className="space-y-4 lg:hidden" animation="animate-rise">
-            {mobileTab === "plan" && (
-              <MealWeekView
-                recipes={mealPlanData.recipes}
-                plannedMeals={mealPlanData.plannedMeals}
-                loading={mealPlanData.loading}
-                nutritionTargets={nutritionTargets}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-              />
-            )}
-            {mobileTab === "shopping" && (
-              <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
-            )}
-            {mobileTab === "recipes" && <RecipeLibrary />}
-          </Entrance>
-        </main>
+            {/* Mobile layout: single active tab, switched via the bottom nav */}
+            <Entrance key={mobileTab} className="space-y-4 lg:hidden" animation="animate-rise">
+              {mobileTab === "plan" && (
+                <MealWeekView
+                  recipes={mealPlanData.recipes}
+                  plannedMeals={mealPlanData.plannedMeals}
+                  loading={mealPlanData.loading}
+                  nutritionTargets={nutritionTargets}
+                  viewMode={viewMode}
+                  onViewModeChange={setViewMode}
+                />
+              )}
+              {mobileTab === "shopping" && (
+                <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
+              )}
+              {mobileTab === "recipes" && <RecipeLibrary />}
+            </Entrance>
+          </main>
+        </div>
 
         <MobileTabBar
           activeTab={mobileTab}
@@ -385,15 +416,32 @@ function MealPlanner() {
         />
       </div>
 
-      {stack.map((entry, index) => (
-        <Entrance
-          key={entry.key}
-          className={cn(index < stack.length - 1 && "hidden")}
-          animation="animate-screen-in"
-        >
-          {renderScreen(entry.screen)}
-        </Entrance>
-      ))}
+      {stack.map((entry) =>
+        inPanel(entry) ? null : (
+          <Entrance
+            key={entry.key}
+            className={cn(entry !== topEntry && "hidden")}
+            animation="animate-screen-in"
+          >
+            {renderScreen(entry.screen)}
+          </Entrance>
+        ),
+      )}
+
+      {panelEntries.length > 0 && (
+        <SidePanel open={panelOpen} label="Rezept" onClose={closeScreen}>
+          {panelEntries.map((entry, index) => (
+            <Entrance
+              key={entry.key}
+              className={cn(entry !== topEntry && "hidden")}
+              // The panel slides in itself; only screens opened inside it move.
+              animation={index === 0 ? "" : "animate-screen-in"}
+            >
+              {renderScreen(entry.screen)}
+            </Entrance>
+          ))}
+        </SidePanel>
+      )}
 
       {feedbackContext !== null && (
         <FeedbackPopover context={feedbackContext} onClose={() => setFeedbackContext(null)} />

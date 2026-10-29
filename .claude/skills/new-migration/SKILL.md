@@ -10,7 +10,7 @@ Migrations are plain SQL files that the owner runs by hand in the Supabase SQL e
 
 ## 1. Pick the file
 
-- List `supabase/migrations/` and take the next number: `NNN_short_snake_case.sql`, three digits (after `016_…` comes `017_…`).
+- List `supabase/migrations/` and take the next number: `NNN_short_snake_case.sql`, three digits, one above the highest existing file (after `019_…` comes `020_…`).
 - Never edit an existing migration, not even a typo. Fix it in the new one.
 
 ## 2. Write the SQL

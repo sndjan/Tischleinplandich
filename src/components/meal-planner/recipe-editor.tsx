@@ -39,6 +39,7 @@ import { RecipeRefineSheet, type RefineExchange } from "./recipe-refine-sheet";
 import { Switch } from "@/components/ui/controls";
 import { ImageCropper } from "@/components/ui/image-cropper";
 import { safeHttpUrl } from "@/lib/safe-links";
+import { usePanelCloseGuard } from "./side-panel";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const HINT_DISMISSED_KEY = "weekly-meal-planner:editor-hint-dismissed";
@@ -152,6 +153,8 @@ export function RecipeEditor({
     }
     onBack();
   };
+
+  usePanelCloseGuard(handleBack);
 
   const handleCoverChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

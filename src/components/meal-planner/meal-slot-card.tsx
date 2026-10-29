@@ -16,6 +16,8 @@ interface MealSlotCardProps {
   // Added a moment ago and still being saved.
   pending?: boolean;
   onRemove: () => void;
+  // Narrow desktop week column: photo on top, name below, calories only.
+  compact?: boolean;
 }
 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
@@ -27,6 +29,7 @@ export function MealSlotCard({
   nutritionTargets,
   pending = false,
   onRemove,
+  compact = false,
 }: MealSlotCardProps) {
   const { openScreen } = useScreenStack();
 
@@ -39,6 +42,62 @@ export function MealSlotCard({
       `${formatNumber(recipe.protein * servingSize)} g Protein`,
     servingSize !== 1 && `${servingSize.toLocaleString("de-DE")} Portionen`,
   ].filter(Boolean);
+
+  if (compact) {
+    return (
+      <div className={cn("group relative", pending && "animate-fade-up")}>
+        <button
+          type="button"
+          onClick={openRecipe}
+          className="flex w-full touch-manipulation flex-col overflow-hidden rounded-[14px] bg-white text-left ring-1 ring-brand-card-border transition-all duration-150 hover:ring-brand-accent/40 active:scale-[0.98]"
+        >
+          <span className="flex h-14 w-full items-center justify-center bg-brand-chip-neutral">
+            {recipe.image_url ? (
+              <Image
+                src={recipe.image_url}
+                alt=""
+                width={240}
+                height={112}
+                draggable={false}
+                className="h-full w-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <UtensilsCrossed className="size-5 text-brand-muted" />
+            )}
+          </span>
+          <span className="block space-y-0.5 px-2 pb-2 pt-1.5">
+            <span className="block truncate text-[11px] font-bold uppercase tracking-[0.06em] text-brand-tertiary">
+              {MEAL_TYPE_LABELS[mealType]}
+            </span>
+            <span className="line-clamp-2 hyphens-auto break-words text-[13px] font-bold leading-tight text-brand-ink" title={recipe.name}>
+              {recipe.name}
+            </span>
+            {facts.length > 0 && (
+              <span className="block truncate text-xs font-semibold text-brand-accent-dark">{facts[0]}</span>
+            )}
+          </span>
+        </button>
+        {pending ? (
+          <span
+            role="status"
+            aria-label="Wird gespeichert"
+            title="Wird gespeichert"
+            className="absolute right-2 top-2 size-2 animate-pulse rounded-full bg-brand-orange"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-white text-brand-muted opacity-0 shadow-sm transition-opacity hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100"
+            aria-label={`${recipe.name} entfernen`}
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
