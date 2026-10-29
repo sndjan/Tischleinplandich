@@ -65,7 +65,7 @@ export function SidePanel({
   }, [open]);
 
   return (
-    <div className={cn("fixed inset-0 z-50", !open && "hidden")}>
+    <div data-overlay={open || undefined} className={cn("fixed inset-0 z-50", !open && "hidden")}>
       <button
         type="button"
         aria-label="Panel schließen"

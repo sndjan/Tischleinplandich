@@ -50,6 +50,7 @@ export default function RootLayout({
           {children}
           <Toaster
             position="bottom-center"
+            containerClassName="app-toaster"
             // Above the mobile tab bar and the sticky page footers.
             containerStyle={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
             toastOptions={{

@@ -103,7 +103,7 @@ export function ImageCropper({ src, onCancel, onDone }: ImageCropperProps) {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Bild zuschneiden" className="fixed inset-0 z-[60] flex flex-col bg-[#111412] text-white">
+    <div data-overlay role="dialog" aria-modal="true" aria-label="Bild zuschneiden" className="fixed inset-0 z-[60] flex flex-col bg-[#111412] text-white">
       <header className="flex shrink-0 items-center justify-between px-2 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <button
           type="button"

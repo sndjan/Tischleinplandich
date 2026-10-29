@@ -113,9 +113,11 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
       ref={cardRef}
       onSubmit={send}
       aria-label="Feedback"
+      data-overlay
       style={{ "--keyboard": `${keyboardInset}px` } as React.CSSProperties}
       className={cn(
-        "fixed z-50 w-[min(22rem,calc(100vw-2rem))] animate-pop-up space-y-2.5 rounded-[20px] bg-white p-3 shadow-[0_0_0_1px_rgba(28,43,34,0.06),0_12px_32px_rgba(28,43,34,0.18)]",
+        // Glides with the keyboard instead of jumping when it opens or closes.
+        "fixed z-50 w-[min(22rem,calc(100vw-2rem))] animate-pop-up motion-safe:transition-[bottom] motion-safe:duration-300 motion-safe:ease-out space-y-2.5 rounded-[20px] bg-white p-3 shadow-[0_0_0_1px_rgba(28,43,34,0.06),0_12px_32px_rgba(28,43,34,0.18)]",
         // Above the tab bar's feedback button on mobile, under the header button on desktop.
         "bottom-[calc(5.5rem+env(safe-area-inset-bottom)+var(--keyboard))] right-4 origin-bottom-right",
         "lg:bottom-auto lg:top-[68px] lg:origin-top-right",
@@ -129,6 +131,8 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
               type="button"
               role="radio"
               aria-checked={category === value}
+              // Keeps the focus in the text field, so the keyboard stays open.
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => setCategory(value)}
               className={cn(
                 "flex h-8 items-center gap-1 rounded-full px-2.5 text-[13px] font-bold transition-all active:scale-95",

@@ -37,16 +37,21 @@ export function showUndoToast({ message, onUndo, onCommit }: UndoToastOptions) {
   ensureFlushListener();
 
   let settled = false;
+  const toastId = `undo-${crypto.randomUUID()}`;
 
+  // The toast is closed here and not by its own duration: react-hot-toast pauses
+  // while a toast is touched and on phones never sees the finger leave, so it
+  // would stay on screen after the countdown.
   const commit = () => {
     if (settled) return;
     settled = true;
     clearTimeout(timer);
     pendingCommits.delete(commit);
+    toast.dismiss(toastId);
     onCommit();
   };
 
-  const undo = (toastId: string) => {
+  const undo = () => {
     if (settled) return;
     settled = true;
     clearTimeout(timer);
@@ -70,7 +75,7 @@ export function showUndoToast({ message, onUndo, onCommit }: UndoToastOptions) {
           <span className="min-w-0 flex-1 truncate text-sm">{message}</span>
           <button
             type="button"
-            onClick={() => undo(t.id)}
+            onClick={undo}
             className="h-9 shrink-0 rounded-lg px-3 text-sm font-bold text-[#9fe0b7] transition-transform active:scale-95 active:bg-white/10"
           >
             Rückgängig
@@ -84,6 +89,6 @@ export function showUndoToast({ message, onUndo, onCommit }: UndoToastOptions) {
         </div>
       </div>
     ),
-    { duration: UNDO_WINDOW_MS },
+    { id: toastId, duration: Infinity },
   );
 }

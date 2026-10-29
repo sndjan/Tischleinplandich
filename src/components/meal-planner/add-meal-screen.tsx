@@ -113,8 +113,7 @@ export function AddMealScreen({
         const aMeal = mealTags.includes(a.toLowerCase()) ? 1 : 0;
         const bMeal = mealTags.includes(b.toLowerCase()) ? 1 : 0;
         return bMeal - aMeal || count(b) - count(a) || a.localeCompare(b, "de");
-      })
-      .slice(0, 8);
+      });
   }, [tagsById, mealTags]);
 
   const visibleRecipes = useMemo(() => {

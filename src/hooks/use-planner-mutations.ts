@@ -10,6 +10,7 @@ import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import {
   getCurrentWeekStartDateString,
   isPendingId,
+  mealsAwaitingRemoval,
   PENDING_ID_PREFIX,
   queryKeys,
   useUserId,
@@ -159,7 +160,10 @@ export function useRemoveMeal(recipesById: Map<string, Recipe>) {
       console.error(error);
       toast.error("Entfernen fehlgeschlagen");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: weekKey }),
+    onSettled: (_data, _error, mealId) => {
+      mealsAwaitingRemoval.delete(mealId);
+      return queryClient.invalidateQueries({ queryKey: weekKey });
+    },
   });
 
   return useCallback(
@@ -172,16 +176,19 @@ export function useRemoveMeal(recipesById: Map<string, Recipe>) {
         meals: (current?.meals ?? []).filter((entry) => entry.id !== meal.id),
       });
 
+      mealsAwaitingRemoval.add(meal.id);
       queryClient.setQueryData<WeekData>(weekKey, hide);
       const recipeName = recipesById.get(meal.recipe_id)?.name;
 
       showUndoToast({
         message: recipeName ? `„${recipeName}“ entfernt` : "Mahlzeit entfernt",
-        onUndo: () =>
+        onUndo: () => {
+          mealsAwaitingRemoval.delete(meal.id);
           queryClient.setQueryData<WeekData>(weekKey, (current) => ({
             mealPlanId: current?.mealPlanId ?? null,
             meals: [...(current?.meals ?? []), meal],
-          })),
+          }));
+        },
         onCommit: () => deleteMutation.mutate(meal.id),
       });
     },

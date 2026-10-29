@@ -205,3 +205,10 @@
     animation: none;
   }
 }
+
+/* On the planner, toasts slide out behind the floating tab bar instead of over
+   it. Sheets, panels and the feedback card sit above the tab bar, so while one
+   is open toasts stay on top of everything. */
+body:has([data-tab-bar]):not(:has([data-overlay])) .app-toaster {
+  z-index: 39 !important;
+}
