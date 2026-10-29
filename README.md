@@ -91,6 +91,26 @@ INSERT INTO changelog (title, description) VALUES ('Kurzer Titel', 'Ein Satz, wa
 
 `released_on` ist standardmäßig heute. Neue Einträge zeigen im Profil ein „Neu“, bis die Seite geöffnet wurde.
 
+## Premium für Feedback
+
+Wer Feedback schickt, das umgesetzt wird, bekommt Premium-Tage gutgeschrieben (Migration `017_create_feedback_rewards.sql`, im SQL Editor ausführen). Die Bedingungen stehen unter `/feedback-belohnung` und sind im Feedback-Fenster verlinkt. Belohnt wird von Hand, sobald etwas live ist:
+
+```sql
+-- Wer hat es zuerst geschickt? (noch nicht belohnt, älteste zuerst)
+SELECT f.id, f.created_at, f.category, f.message
+FROM feedback f
+LEFT JOIN feedback_rewards r ON r.feedback_id = f.id
+WHERE r.id IS NULL AND f.user_id IS NOT NULL AND f.message ILIKE '%gemeinsam%'
+ORDER BY f.created_at;
+
+-- small = 1 Woche, medium = 2 Wochen, large = 1 Monat; Notiz optional
+SELECT grant_feedback_reward('<feedback id>', 'large', 'Gemeinsame Rezepte');
+```
+
+Automatisch: Die tägliche Feedback-Triage (geplante Aufgabe in Claude Code, 5:47 Uhr) ordnet jedes Feedback einem GitHub-Issue zu und schätzt die Größe (`feedback.issue_number`, `feedback.reward_size`, Migration `018_feedback_triage_fields.sql`). Ist ein Feedback-Issue als erledigt geschlossen, schlägt sie die Belohnungen als Tabelle vor und vergibt sie erst, wenn du in der Sitzung zustimmst. `reward_size = 'none'` heißt: keine Belohnung. Ein Trigger setzt beim Einfügen `created_at` und leert die Triage-Felder, damit niemand „zuerst“ vortäuschen kann.
+
+Pro Konto gibt es höchstens 90 Tage in zwölf Monaten (die letzte Belohnung wird gekürzt), jedes Feedback nur einmal. Die Funktion setzt das Feedback auf `done` und gibt die vergebenen Tage zurück. Beim nächsten Öffnen der App bekommt die Person einmalig ein Dankeschön, im Profil steht ihr „Premium-Guthaben“. Premium selbst gibt es noch nicht; die Tage sind eine Gutschrift für den Start.
+
 ## Bewertungen und Export
 
 - **Bewertung**: Migration `012_add_recipe_rating.sql` (im SQL Editor ausführen) fügt `recipes.rating` (1–5 Sterne) hinzu. Bewertet wird in der Rezeptansicht; die Rezeptliste kann nach „Beste Bewertung“ sortieren. Ohne die Migration zeigt das Antippen der Sterne einen Hinweis.

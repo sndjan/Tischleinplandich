@@ -17,6 +17,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { SubPage } from "./sub-page";
 import { useHasUnseenChanges } from "./whats-new-screen";
+import { RewardCreditCard, useFeedbackRewards } from "./feedback-rewards";
 import { useScreenStack } from "./screen-stack";
 
 const formatNumber = (value: number) => value.toLocaleString("de-DE", { maximumFractionDigits: 0 });
@@ -141,6 +142,7 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
   const [canInstall, setCanInstall] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { data: aiUsage } = useAiUsageToday();
+  const { data: rewards = [] } = useFeedbackRewards();
   const exportRecipes = useExportRecipes();
   const hasUnseenChanges = useHasUnseenChanges();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -261,6 +263,7 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
       </section>
 
       {aiUsage !== null && aiUsage !== undefined && <AiUsageCard used={aiUsage} />}
+      {rewards.length > 0 && <RewardCreditCard rewards={rewards} />}
 
       <section className="overflow-hidden rounded-[18px] bg-white ring-1 ring-brand-card-border">
         {rows.map(({ key, ...row }) => (
@@ -281,7 +284,7 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
           emoji="💬"
           tint="bg-brand-chip-neutral"
           title="Feedback senden"
-          subtitle="Fehler oder Idee melden"
+          subtitle="Fehler oder Idee melden · mit Belohnung"
           onClick={onFeedback}
           feedbackTrigger
         />

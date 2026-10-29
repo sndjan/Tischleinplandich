@@ -16,6 +16,7 @@ import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
 import { FeedbackPopover } from "./feedback-popover";
 import { WhatsNewScreen } from "./whats-new-screen";
+import { useRewardThanks } from "./feedback-rewards";
 import { PantryStaplesScreen, usePantryStaples } from "./pantry-staples-settings";
 import { ScreenStackProvider, useScreenStack, type Screen } from "./screen-stack";
 import type { Recipe } from "@/types/database";
@@ -77,6 +78,8 @@ function MealPlanner() {
   const [desktopRightPanelTab, setDesktopRightPanelTab] =
     useState<DesktopRightPanelTab>("mine");
   const isOnline = useIsOnline();
+  // Thanks once for each feedback that earned Premium days.
+  useRewardThanks();
   // Where feedback was opened from, or null while the feedback card is closed.
   const [feedbackContext, setFeedbackContext] = useState<string | null>(null);
 
