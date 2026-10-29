@@ -14,7 +14,7 @@ export const ROTATING_WORDS = [
 
 export const FAQ: { question: string; answer: string }[] = [
   {
-    question: "Funktioniert der Essensplaner auf dem Handy?",
+    question: "Funktioniert Tischleinplandich auf dem Handy?",
     answer:
       "Ja. Er läuft in jedem Browser und lässt sich auf iPhone und Android auf den Startbildschirm legen. Deine Pläne sind auf allen Geräten gleich.",
   },
@@ -34,7 +34,7 @@ export const FAQ: { question: string; answer: string }[] = [
       "Aus allen Mahlzeiten deiner Woche. Gleiche Zutaten werden zusammengerechnet, und Vorräte, die du immer daheim hast, kannst du ausblenden.",
   },
   {
-    question: "Was kostet der Essensplaner?",
+    question: "Was kostet Tischleinplandich?",
     answer: `Während der Beta nichts. Danach sind zwei Pläne mit allen Funktionen geplant: Monatlich für ${MONTHLY_PRICE.label}, jederzeit kündbar, oder Lifetime als Einmalzahlung. Wer auf der Warteliste steht, erfährt als Erstes vom Start.`,
   },
   {

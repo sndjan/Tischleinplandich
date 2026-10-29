@@ -1,7 +1,7 @@
 {
-  "name": "weekly-meal-planner",
+  "name": "tischleinplandich",
   "version": "1.0.0",
-  "description": "A weekly meal planning application with automatic shopping list generation",
+  "description": "Tischleinplandich: weekly meal planner with AI recipe import and an automatic shopping list",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

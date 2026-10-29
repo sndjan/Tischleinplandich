@@ -180,7 +180,7 @@ export function LandingPage() {
           <div className="mx-auto mb-6 flex max-w-[620px] flex-col items-center gap-3 text-center">
             <span className="rounded-full bg-brand-highlight px-3 py-1.5 text-[13px] font-bold text-brand-ink">Interaktive Demo</span>
             <h2 id="demo-heading" className="font-heading text-[clamp(26px,3vw,34px)] font-black leading-tight">
-              Probier den Essensplaner aus
+              Probier Tischleinplandich aus
             </h2>
             <p className="text-[15px] leading-relaxed text-brand-secondary">
               Plane ein Gericht, öffne ein Rezept oder importiere eins per KI – die Einkaufsliste rechnet mit.

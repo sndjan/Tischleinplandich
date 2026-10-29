@@ -324,13 +324,13 @@ function MealPlanner() {
                 {mobileTab === "plan" ? (
                   <>
                     <span aria-hidden="true" className="text-[26px] lg:hidden">🥗</span>
-                    <span className="sm:hidden">WMP</span>
-                    <span className="hidden sm:inline">Wochen-Essensplaner</span>
+                    <span className="sm:hidden">Tischlein</span>
+                    <span className="hidden sm:inline">Tischleinplandich</span>
                   </>
                 ) : (
                   <>
                     <span className="lg:hidden">{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>
-                    <span className="hidden lg:inline">Wochen-Essensplaner</span>
+                    <span className="hidden lg:inline">Tischleinplandich</span>
                   </>
                 )}
               </h1>

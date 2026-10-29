@@ -1,4 +1,4 @@
-# Essensplaner (Weekly Meal Planner)
+# Tischleinplandich (Weekly Meal Planner)
 
 German-language web app (PWA) for planning meals per week, with AI recipe import and an automatic shopping list. Public landing page at `/`, the app at `/meal-planner`.
 

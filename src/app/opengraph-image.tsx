@@ -1,11 +1,11 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Essensplaner – Essensplanung, die Kalorien mitzählt";
+export const alt = "Tischleinplandich – Essensplanung, die Kalorien mitzählt";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const BRAND = "Essensplaner";
+const BRAND = "Tischleinplandich";
 const HEADLINE = ["Essensplanung, die", "Kalorien mitzählt."];
 const TAGLINE = "Wochenplan · KI-Rezeptimport · Einkaufsliste automatisch";
 

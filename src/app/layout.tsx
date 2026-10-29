@@ -20,13 +20,13 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Wochen-Essensplaner",
+  title: "Tischleinplandich",
   description:
     "Plane deine wöchentlichen Mahlzeiten und erstelle automatisch Einkaufslisten",
-  applicationName: "Essensplaner",
+  applicationName: "Tischleinplandich",
   appleWebApp: {
     capable: true,
-    title: "Essensplaner",
+    title: "Tischlein",
     statusBarStyle: "default",
   },
 };
