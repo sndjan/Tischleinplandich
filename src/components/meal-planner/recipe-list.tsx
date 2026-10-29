@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
-import { Clock, Info, Search, SlidersHorizontal, Star, UtensilsCrossed } from "lucide-react";
+import { Clock, Info, Search, SlidersHorizontal, Star } from "lucide-react";
 import { formatPrepMinutes, parsePrepMinutes } from "@/lib/prep-time";
+import { RecipePlaceholder } from "./recipe-placeholder";
 
 type VisibilityFilter = "all" | "private" | "public";
 type SortOption =
@@ -406,9 +407,7 @@ export function RecipeList({
                         unoptimized
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <UtensilsCrossed className="size-8 text-brand-muted" />
-                      </div>
+                      <RecipePlaceholder name={recipe.name} className="text-4xl" />
                     )}
                     {minutes !== null && (
                       <span className="absolute bottom-1.5 left-1.5 flex h-6 items-center gap-1 rounded-full bg-white/90 px-2 text-[11px] font-bold text-brand-ink shadow-sm backdrop-blur">

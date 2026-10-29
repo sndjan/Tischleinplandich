@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { Plus, UtensilsCrossed } from "lucide-react";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { sumMealNutrition } from "./day-summary";
 import { useScreenStack } from "./screen-stack";
+import { RecipePlaceholder } from "./recipe-placeholder";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 const MEAL_TYPE_ORDER: MealType[] = ["breakfast", "lunch", "dinner", "snack", "extra"];
 const SHORT_DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -165,7 +167,7 @@ export function WeekAgenda({
         const isToday = dayIndex === todayIndex;
         const isPast = dayIndex < todayIndex;
         const meals = [...(plannedMealsByDay.get(dayIndex) ?? [])]
-          .filter((meal) => recipesById.has(meal.recipe_id))
+          .filter((meal) => getMealRecipe(meal, recipesById))
           .sort((a, b) => MEAL_TYPE_ORDER.indexOf(a.meal_type) - MEAL_TYPE_ORDER.indexOf(b.meal_type));
         const totals = sumMealNutrition(meals, recipesById);
         const left = nutritionTargets.calories_target - totals.calories;
@@ -212,13 +214,16 @@ export function WeekAgenda({
               ) : (
                 <>
                   {meals.map((meal) => {
-                    const recipe = recipesById.get(meal.recipe_id)!;
+                    const { recipe, isRecipe } = getMealRecipe(meal, recipesById)!;
                     return (
                       <button
                         key={meal.id}
                         type="button"
+                        // Eating out has no recipe to open; the day has its details.
                         onClick={() =>
-                          openScreen({ kind: "recipe-preview", recipe, servings: meal.serving_size })
+                          isRecipe
+                            ? openScreen({ kind: "recipe-preview", recipe, servings: meal.serving_size })
+                            : onSelectDay(dayIndex)
                         }
                         className="flex w-full touch-manipulation items-center gap-2.5 py-1.5 text-left transition-transform active:scale-[0.98]"
                       >
@@ -233,7 +238,7 @@ export function WeekAgenda({
                               unoptimized
                             />
                           ) : (
-                            <UtensilsCrossed className="size-4 text-brand-muted" />
+                            <RecipePlaceholder name={recipe.name} className="text-xl" />
                           )}
                         </span>
                         <span className="flex min-w-0 flex-col">

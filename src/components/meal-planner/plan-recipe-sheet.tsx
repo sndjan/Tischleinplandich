@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { rememberPlannedRecipe, WEEK_DAYS } from "./add-meal-screen";
 import { WeekSwitcher } from "./meal-week-view";
 import { useSelectedWeek } from "@/hooks/use-selected-week";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 const SHORT_DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack", "extra"];
@@ -48,7 +49,7 @@ export function PlanRecipeSheet({ recipe, onClose }: { recipe: Recipe; servings?
     mealType === "extra"
       ? undefined
       : plannedMeals.find((meal) => meal.day_of_week === dayIndex && meal.meal_type === mealType);
-  const replacedRecipe = replacedMeal ? recipesById.get(replacedMeal.recipe_id) : undefined;
+  const replacedRecipe = replacedMeal ? getMealRecipe(replacedMeal, recipesById)?.recipe : undefined;
 
   const plan = () => {
     if (navigator.vibrate) navigator.vibrate(10);

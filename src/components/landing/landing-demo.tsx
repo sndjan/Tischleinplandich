@@ -55,6 +55,7 @@ import {
   initialDemoMeals,
   type DemoMeal,
 } from "./demo-data";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 // The planner's own components running on sample data. Screens that need the
 // database (adding a meal, a recipe, the AI import) are rebuilt here with the
@@ -479,7 +480,7 @@ function DayView({
       />
       {FIXED_MEAL_TYPES.map((mealType) => {
         const meal = meals.find((candidate) => candidate.meal_type === mealType);
-        const recipe = meal ? recipesById.get(meal.recipe_id) : undefined;
+        const recipe = meal ? getMealRecipe(meal, recipesById)?.recipe : undefined;
 
         return meal && recipe ? (
           <MealSlotCard
@@ -496,7 +497,7 @@ function DayView({
       })}
       <div className="space-y-2.5">
         {extraMeals.map((meal) => {
-          const recipe = recipesById.get(meal.recipe_id);
+          const recipe = getMealRecipe(meal, recipesById)?.recipe;
           if (!recipe) return null;
           return (
             <MealSlotCard

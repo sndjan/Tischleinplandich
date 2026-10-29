@@ -170,29 +170,38 @@ export type Database = {
         Row: {
           id: string;
           meal_plan_id: string;
-          recipe_id: string;
+          // Null for a meal without a recipe, e.g. eating out. Migration 020.
+          recipe_id: string | null;
           day_of_week: number;
           meal_type: "breakfast" | "lunch" | "dinner" | "snack" | "extra";
           serving_size: number;
           created_at: string;
+          // What a meal without a recipe was, e.g. "Auswärts". Migration 020.
+          label?: string | null;
+          // Calories entered by hand for a meal without a recipe. Migration 020.
+          calories?: number | null;
         };
         Insert: {
           id?: string;
           meal_plan_id: string;
-          recipe_id: string;
+          recipe_id?: string | null;
           day_of_week: number;
           meal_type: "breakfast" | "lunch" | "dinner" | "snack" | "extra";
           serving_size?: number;
           created_at?: string;
+          label?: string | null;
+          calories?: number | null;
         };
         Update: {
           id?: string;
           meal_plan_id?: string;
-          recipe_id?: string;
+          recipe_id?: string | null;
           day_of_week?: number;
           meal_type?: "breakfast" | "lunch" | "dinner" | "snack" | "extra";
           serving_size?: number;
           created_at?: string;
+          label?: string | null;
+          calories?: number | null;
         };
         Relationships: [];
       };

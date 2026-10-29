@@ -407,7 +407,8 @@ export function generateShoppingListFromPlannedMeals(
   }
 
   for (const plannedMeal of plannedMeals) {
-    const recipe = recipesById.get(plannedMeal.recipe_id);
+    // Meals without a recipe (eating out) have nothing to buy.
+    const recipe = plannedMeal.recipe_id ? recipesById.get(plannedMeal.recipe_id) : undefined;
     if (!recipe || excluded.has(recipe.id)) {
       continue;
     }

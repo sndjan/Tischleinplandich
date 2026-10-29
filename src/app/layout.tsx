@@ -3,6 +3,7 @@ import { DM_Sans, Nunito } from "next/font/google";
 import { AuthProvider } from "@/lib/auth/context";
 import { Toaster } from "react-hot-toast";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { UpdateBanner } from "@/components/pwa/update-banner";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -46,6 +47,7 @@ export default function RootLayout({
     <html lang="de" className={`${nunito.variable} ${dmSans.variable}`}>
       <body>
         <ServiceWorkerRegistration />
+        <UpdateBanner />
         <AuthProvider>
           {children}
           <Toaster

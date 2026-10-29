@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Loader2, Plus, Search, UtensilsCrossed } from "lucide-react";
+import { Check, Loader2, Plus, Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/hooks/use-planner-data";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useScreenStack } from "./screen-stack";
 import { useShowNutrition } from "./nutrition-target-settings";
 import { withSafeLinks } from "@/lib/safe-links";
+import { RecipePlaceholder } from "./recipe-placeholder";
 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
 
@@ -156,9 +157,7 @@ export function DiscoverRecipes() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={recipe.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
                     ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <UtensilsCrossed className="size-8 text-brand-muted" />
-                      </div>
+                      <RecipePlaceholder name={recipe.name} className="text-4xl" />
                     )}
                   </div>
                   <div className="space-y-0.5 px-2.5 pb-3 pt-2">

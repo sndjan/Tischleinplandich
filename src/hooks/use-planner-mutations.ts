@@ -17,9 +17,13 @@ import {
   type RecipesData,
   type WeekData,
 } from "./use-planner-data";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 export type AddMealInput = {
-  recipeId: string;
+  // Null for a meal without a recipe, which then needs a label (migration 020).
+  recipeId: string | null;
+  label?: string;
+  calories?: number | null;
   dayIndex: number;
   mealType: MealType;
   servingSize: number;
@@ -84,6 +88,8 @@ export function useAddMeal() {
           day_of_week: input.dayIndex,
           meal_type: input.mealType,
           serving_size: input.servingSize,
+          // Only sent when used, so recipes still plan before migration 020 has run.
+          ...(input.recipeId === null && { label: input.label, calories: input.calories ?? null }),
         })
         .select("*")
         .single<PlannedMeal>();
@@ -103,6 +109,8 @@ export function useAddMeal() {
         day_of_week: input.dayIndex,
         meal_type: input.mealType,
         serving_size: input.servingSize,
+        label: input.label ?? null,
+        calories: input.calories ?? null,
         created_at: now,
         updated_at: now,
       } as PlannedMeal;
@@ -125,10 +133,16 @@ export function useAddMeal() {
         ),
       }));
     },
-    onError: (error, _input, context) => {
+    onError: (error, input, context) => {
       console.error(error);
       if (context?.previous) {
         queryClient.setQueryData(weekKey, context.previous);
+      }
+      // Missing column (42703) or recipe_id still required (23502).
+      const code = (error as { code?: string } | null)?.code;
+      if (input.recipeId === null && (code === "42703" || code === "23502")) {
+        toast("Auswärts essen braucht noch ein kleines Datenbank-Update (Migration 020).");
+        return;
       }
       toast.error("Hinzufügen fehlgeschlagen");
     },
@@ -179,7 +193,7 @@ export function useRemoveMeal(recipesById: Map<string, Recipe>) {
 
       mealsAwaitingRemoval.add(meal.id);
       queryClient.setQueryData<WeekData>(weekKey, hide);
-      const recipeName = recipesById.get(meal.recipe_id)?.name;
+      const recipeName = getMealRecipe(meal, recipesById)?.recipe.name;
 
       showUndoToast({
         message: recipeName ? `„${recipeName}“ entfernt` : "Mahlzeit entfernt",

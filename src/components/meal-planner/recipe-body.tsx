@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { Clock, ExternalLink, UtensilsCrossed } from "lucide-react";
+import { Clock, ExternalLink } from "lucide-react";
 import type { Recipe } from "@/types/database";
 import { scaleIngredients } from "@/lib/recipe-scaling";
 import { Stepper } from "@/components/ui/controls";
 import { cn } from "@/lib/utils";
 import { safeHttpUrl } from "@/lib/safe-links";
+import { RecipePlaceholder } from "./recipe-placeholder";
 
 const formatNumber = (value: number | null) =>
   value === null ? null : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
@@ -69,9 +70,7 @@ export function RecipeBody({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={recipe.image_url} alt="" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full items-center justify-center bg-brand-accent-bg">
-            <UtensilsCrossed className="size-10 text-brand-accent/60" />
-          </div>
+          <RecipePlaceholder name={recipe.name} className="text-6xl" />
         )}
         {heroActions && (
           <div className="absolute inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] flex justify-between">

@@ -111,7 +111,7 @@ function MealPlanner() {
   // Each planned recipe once, in plan order, for leaving it off the list.
   const shoppingRecipes = useMemo(() => {
     const recipesById = new Map(mealPlanData.recipes.map((recipe) => [recipe.id, recipe]));
-    const ids = [...new Set(mealPlanData.plannedMeals.map((meal) => meal.recipe_id))];
+    const ids = [...new Set(mealPlanData.plannedMeals.flatMap((meal) => meal.recipe_id ?? []))];
     return ids.flatMap((id) => {
       const recipe = recipesById.get(id);
       return recipe
