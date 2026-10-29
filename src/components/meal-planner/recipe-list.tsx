@@ -319,7 +319,7 @@ export function RecipeList({
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2" aria-busy="true" aria-label="Lädt">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]" aria-busy="true" aria-label="Lädt">
           {[0, 1, 2, 3].map((index) => (
             <div key={index} className="overflow-hidden rounded-xl border border-brand-card-border bg-white">
               <Skeleton className="aspect-[4/3] w-full rounded-none" />
@@ -341,7 +341,7 @@ export function RecipeList({
             : "Keine Treffer"}
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
           {filteredRecipes.map((recipe, index) => {
             const primaryNutritionItems = showNutrition ? getPrimaryNutritionItems(recipe) : [];
             const isSelected = selectedRecipeId === recipe.id;
