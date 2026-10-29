@@ -397,6 +397,9 @@ export type Database = {
           context: string | null;
           user_agent: string | null;
           status: 'new' | 'seen' | 'done';
+          // Set by the triage task, never by the app (a trigger clears them on insert). Migration 018.
+          issue_number: number | null;
+          reward_size: FeedbackRewardSize | 'none' | null;
           created_at: string;
         };
         Insert: {
@@ -407,6 +410,8 @@ export type Database = {
           context?: string | null;
           user_agent?: string | null;
           status?: 'new' | 'seen' | 'done';
+          issue_number?: number | null;
+          reward_size?: FeedbackRewardSize | 'none' | null;
           created_at?: string;
         };
         Update: {
@@ -417,6 +422,8 @@ export type Database = {
           context?: string | null;
           user_agent?: string | null;
           status?: 'new' | 'seen' | 'done';
+          issue_number?: number | null;
+          reward_size?: FeedbackRewardSize | 'none' | null;
           created_at?: string;
         };
         Relationships: [];

@@ -107,6 +107,8 @@ ORDER BY f.created_at;
 SELECT grant_feedback_reward('<feedback id>', 'large', 'Gemeinsame Rezepte');
 ```
 
+Automatisch: Die tägliche Feedback-Triage (geplante Aufgabe in Claude Code, 5:47 Uhr) ordnet jedes Feedback einem GitHub-Issue zu und schätzt die Größe (`feedback.issue_number`, `feedback.reward_size`, Migration `018_feedback_triage_fields.sql`). Ist ein Feedback-Issue als erledigt geschlossen, schlägt sie die Belohnungen als Tabelle vor und vergibt sie erst, wenn du in der Sitzung zustimmst. `reward_size = 'none'` heißt: keine Belohnung. Ein Trigger setzt beim Einfügen `created_at` und leert die Triage-Felder, damit niemand „zuerst“ vortäuschen kann.
+
 Pro Konto gibt es höchstens 90 Tage in zwölf Monaten (die letzte Belohnung wird gekürzt), jedes Feedback nur einmal. Die Funktion setzt das Feedback auf `done` und gibt die vergebenen Tage zurück. Beim nächsten Öffnen der App bekommt die Person einmalig ein Dankeschön, im Profil steht ihr „Premium-Guthaben“. Premium selbst gibt es noch nicht; die Tage sind eine Gutschrift für den Start.
 
 ## Bewertungen und Export
