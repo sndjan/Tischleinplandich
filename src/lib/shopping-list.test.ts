@@ -31,6 +31,35 @@ describe("generateShoppingListFromPlannedMeals", () => {
   it("is empty without planned meals", () => {
     expect(generateShoppingListFromPlannedMeals([], [])).toEqual([]);
   });
+
+  it("leaves out excluded recipes", () => {
+    const list = generateShoppingListFromPlannedMeals(
+      [
+        { recipe_id: "a", serving_size: 1 },
+        { recipe_id: "b", serving_size: 1 },
+      ],
+      [
+        { id: "a", name: "A", ingredients: "1 Zwiebel", serving_size: 1 },
+        { id: "b", name: "B", ingredients: "200 g Reis", serving_size: 1 },
+      ],
+      { excludedRecipeIds: ["b"] },
+    );
+
+    expect(list).toEqual([expect.objectContaining({ ingredient: "zwiebel", sources: ["A"] })]);
+  });
+
+  it("adds ingredients put on the list without planning", () => {
+    const list = generateShoppingListFromPlannedMeals(
+      [{ recipe_id: "a", serving_size: 1 }],
+      [{ id: "a", name: "A", ingredients: "1 Zwiebel", serving_size: 1 }],
+      { extras: [{ id: "x", recipeName: "C", lines: ["1 Zwiebel", "100 g Feta"], multiplier: 2 }] },
+    );
+
+    expect(list).toEqual([
+      expect.objectContaining({ ingredient: "feta", quantity: 200, unit: "g", sources: ["C"] }),
+      expect.objectContaining({ ingredient: "zwiebel", quantity: 3, sources: ["C", "A"] }),
+    ]);
+  });
 });
 
 describe("isBasicIngredient", () => {

@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Eye, EyeOff, Plus, Share, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Eye, EyeOff, ListOrdered, Plus, Share, X } from "lucide-react";
 import toast from "react-hot-toast";
 import type { ShoppingListItem } from "@/types/database";
 import { isBasicIngredient } from "@/lib/shopping-list";
 import {
   formatShoppingAmount,
   getShoppingSection,
-  SHOPPING_SECTIONS,
+  orderShoppingSections,
   shoppingItemLabel,
   type ShoppingSectionId,
 } from "@/lib/shopping-sections";
+import type { ShoppingExtra } from "@/lib/shopping-list";
+import { formatWeekRange } from "@/lib/week";
 import { cn } from "@/lib/utils";
 import { useEntrance } from "@/hooks/use-entrance";
+import { useSelectedWeek } from "@/hooks/use-selected-week";
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
@@ -23,9 +26,15 @@ interface ShoppingListProps {
   // Keep the header card on large screens too, e.g. in the demo's phone frame.
   // By default it drops the card there, since the desktop side panel is already one.
   alwaysCard?: boolean;
+  // The week's planned recipes; tapping one leaves it off the list.
+  recipes?: { id: string; name: string; excluded: boolean }[];
+  onToggleRecipe?: (recipeId: string) => void;
+  // Ingredients put on the list from a recipe without planning it.
+  extras?: ShoppingExtra[];
+  onRemoveExtra?: (id: string) => void;
 }
 
-type CustomItem = { id: string; label: string };
+type CustomItem = { id: string; label: string; amount?: string };
 
 type Row = {
   key: string;
@@ -40,6 +49,7 @@ type Row = {
 const CHECKED_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:checked-items";
 const HIDE_BASICS_STORAGE_KEY = "weekly-meal-planner:shopping-list:hide-basics";
 const CUSTOM_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:custom-items";
+const SECTION_ORDER_STORAGE_KEY = "weekly-meal-planner:shopping-list:section-order";
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -61,54 +71,67 @@ function writeStorage(key: string, value: unknown) {
 const getItemKey = (item: ShoppingListItem) =>
   `${item.ingredient.trim().toLowerCase()}|${item.unit.trim().toLowerCase()}`;
 
-// Monday to Sunday of the current week, the days the planner shows.
-function formatWeekRange() {
-  const start = new Date();
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  const format = (date: Date) =>
-    date.toLocaleDateString("de-DE", { day: "numeric", month: "short" }).replace(/\.$/, "");
-  return `${format(start)} – ${format(end)}`;
-}
-
 /**
  * The list as plain text for messengers: only what is still missing, by section.
  */
-function buildShareText(sections: { label: string; emoji: string; rows: Row[] }[]) {
+function buildShareText(sections: { label: string; emoji: string; rows: Row[] }[], weekRange: string) {
   const blocks = sections.map(
     (section) =>
       `${section.emoji} ${section.label}\n${section.rows
         .map((row) => (row.amount ? `• ${row.label} – ${row.amount}` : `• ${row.label}`))
         .join("\n")}`,
   );
-  return [`🛒 Einkauf ${formatWeekRange()}`, ...blocks].join("\n\n");
+  return [`🛒 Einkauf ${weekRange}`, ...blocks].join("\n\n");
 }
 
-export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard = false }: ShoppingListProps) {
+export function ShoppingList({
+  items,
+  pantryStaples,
+  persist = true,
+  alwaysCard = false,
+  recipes = [],
+  onToggleRecipe,
+  extras = [],
+  onRemoveExtra,
+}: ShoppingListProps) {
+  const { weekKey, monday, label: weekLabel, isCurrentWeek } = useSelectedWeek();
+  const weekRange = formatWeekRange(monday);
+  // Checks belong to one week's list, so switching weeks doesn't clear them. The
+  // planner remounts the list for each week, so the key is fixed while mounted.
+  const checkedStorageKey = `${CHECKED_ITEMS_STORAGE_KEY}:${weekKey}`;
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
   const [customItems, setCustomItems] = useState<CustomItem[]>([]);
   const [hideBasics, setHideBasics] = useState(true);
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [ordering, setOrdering] = useState(false);
   const [newItem, setNewItem] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const addFormRef = useRef<HTMLFormElement>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!persist) return;
-    const storedChecked = readStorage<unknown>(CHECKED_ITEMS_STORAGE_KEY, []);
+    // Checks from before lists were kept per week belong to this week.
+    const storedChecked = readStorage<unknown>(
+      checkedStorageKey,
+      isCurrentWeek ? readStorage<unknown>(CHECKED_ITEMS_STORAGE_KEY, []) : [],
+    );
     setCheckedKeys(
       new Set(Array.isArray(storedChecked) ? storedChecked.filter((key) => typeof key === "string") : []),
     );
     const storedCustom = readStorage<unknown>(CUSTOM_ITEMS_STORAGE_KEY, []);
     setCustomItems(Array.isArray(storedCustom) ? (storedCustom as CustomItem[]) : []);
     setHideBasics(readStorage<unknown>(HIDE_BASICS_STORAGE_KEY, true) !== false);
+    const storedOrder = readStorage<unknown>(SECTION_ORDER_STORAGE_KEY, []);
+    setSectionOrder(Array.isArray(storedOrder) ? storedOrder.filter((id) => typeof id === "string") : []);
     setHydrated(true);
-  }, [persist]);
+  }, [persist, checkedStorageKey, isCurrentWeek]);
 
   useEffect(() => {
-    if (persist && hydrated) writeStorage(CHECKED_ITEMS_STORAGE_KEY, Array.from(checkedKeys));
-  }, [checkedKeys, hydrated, persist]);
+    if (persist && hydrated) writeStorage(checkedStorageKey, Array.from(checkedKeys));
+  }, [checkedKeys, hydrated, persist, checkedStorageKey]);
 
   useEffect(() => {
     if (persist && hydrated) writeStorage(CUSTOM_ITEMS_STORAGE_KEY, customItems);
@@ -131,7 +154,7 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
       ...customItems.map((item) => ({
         key: `custom|${item.id}`,
         label: item.label,
-        amount: "",
+        amount: item.amount ?? "",
         sources: [],
         section: getShoppingSection({ ingredient: item.label, unit: "" }),
         basic: false,
@@ -141,22 +164,24 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
     [items, customItems, pantryStaples],
   );
 
-  // Forget checks for items that left the list (e.g. a meal was removed).
+  // Forget checks for items that left the list (e.g. a meal was removed). An
+  // empty list is most likely a week still loading, so its checks are kept.
   useEffect(() => {
-    if (persist && !hydrated) return;
+    if ((persist && !hydrated) || items.length === 0) return;
     const validKeys = new Set(rows.map((row) => row.key));
     setCheckedKeys((prev) => {
       const next = new Set([...prev].filter((key) => validKeys.has(key)));
       return next.size === prev.size ? prev : next;
     });
-  }, [rows, hydrated, persist]);
+  }, [rows, items.length, hydrated, persist]);
 
   const hiddenBasics = hideBasics ? rows.filter((row) => row.basic) : [];
   const visibleRows = hideBasics ? rows.filter((row) => !row.basic) : rows;
   const openRows = visibleRows.filter((row) => !checkedKeys.has(row.key));
   const doneRows = visibleRows.filter((row) => checkedKeys.has(row.key));
 
-  const sections = SHOPPING_SECTIONS.map((section) => ({
+  const orderedSections = orderShoppingSections(sectionOrder);
+  const sections = orderedSections.map((section) => ({
     ...section,
     rows: openRows
       .filter((row) => row.section === section.id)
@@ -190,8 +215,31 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
       setAdding(false);
       return;
     }
-    setCustomItems((prev) => [...prev, { id: crypto.randomUUID(), label }]);
+    const amount = newAmount.trim();
+    setCustomItems((prev) => [...prev, { id: crypto.randomUUID(), label, ...(amount && { amount }) }]);
     setNewItem("");
+    setNewAmount("");
+    addInputRef.current?.focus();
+  };
+
+  // Closes the empty form once the focus leaves both of its fields.
+  const closeAddFormIfEmpty = (event: React.FocusEvent) => {
+    if (addFormRef.current?.contains(event.relatedTarget as Node | null)) return;
+    if (!newItem.trim() && !newAmount.trim()) setAdding(false);
+  };
+
+  const moveSection = (index: number, delta: number) => {
+    const ids = orderedSections.map((section) => section.id as string);
+    const target = index + delta;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    setSectionOrder(ids);
+    if (persist) writeStorage(SECTION_ORDER_STORAGE_KEY, ids);
+  };
+
+  const resetSectionOrder = () => {
+    setSectionOrder([]);
+    if (persist) writeStorage(SECTION_ORDER_STORAGE_KEY, []);
   };
 
   const removeCustomItem = (id: string) =>
@@ -203,7 +251,7 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
       return;
     }
 
-    const text = buildShareText(sections);
+    const text = buildShareText(sections, weekRange);
 
     if (navigator.share) {
       try {
@@ -232,10 +280,11 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[15px] font-bold text-brand-ink">Diese Woche</p>
+            <p className="text-[15px] font-bold text-brand-ink">{weekLabel}</p>
             <p className="text-[13px] text-brand-secondary">
-              {formatWeekRange()}
-              {recipeCount > 0 && ` · ${recipeCount} ${recipeCount === 1 ? "Rezept" : "Rezepte"}`}
+              {weekLabel !== weekRange && weekRange}
+              {recipeCount > 0 &&
+                `${weekLabel !== weekRange ? " · " : ""}${recipeCount} ${recipeCount === 1 ? "Rezept" : "Rezepte"}`}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -294,10 +343,61 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
             </div>
           </div>
         )}
+
+        {(recipes.length > 0 || extras.length > 0) && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-brand-secondary">
+              {onToggleRecipe && recipes.length > 0
+                ? "Tippe ein Rezept an, um es diesmal nicht einzukaufen."
+                : "Rezepte auf der Liste"}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {recipes.map((recipe) => (
+                <button
+                  key={recipe.id}
+                  type="button"
+                  onClick={() => onToggleRecipe?.(recipe.id)}
+                  disabled={!onToggleRecipe}
+                  aria-pressed={!recipe.excluded}
+                  className={cn(
+                    "flex h-8 max-w-full items-center gap-1 rounded-full px-3 text-[13px] font-semibold transition-all active:scale-95",
+                    recipe.excluded
+                      ? "bg-transparent text-brand-muted line-through ring-1 ring-brand-card-border"
+                      : "bg-brand-accent-bg text-brand-accent-dark",
+                  )}
+                >
+                  <span className="truncate">{recipe.name}</span>
+                </button>
+              ))}
+              {extras.map((extra) => (
+                <span
+                  key={extra.id}
+                  className="flex h-8 max-w-full items-center gap-0.5 rounded-full bg-brand-chip-neutral pl-3 pr-1 text-[13px] font-semibold text-brand-ink"
+                >
+                  <span className="truncate">
+                    {extra.recipeName}
+                    <span className="font-normal text-brand-secondary"> · {extra.lines.length} {extra.lines.length === 1 ? "Zutat" : "Zutaten"}</span>
+                  </span>
+                  {onRemoveExtra && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveExtra(extra.id)}
+                      aria-label={`${extra.recipeName} von der Liste nehmen`}
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full text-brand-tertiary active:bg-black/5"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {adding && (
         <form
+          ref={addFormRef}
           onSubmit={addCustomItem}
           className="flex animate-fade-up items-center gap-2 rounded-[18px] bg-white p-2 pl-4 ring-1 ring-brand-card-border"
         >
@@ -305,11 +405,21 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
             ref={addInputRef}
             value={newItem}
             onChange={(event) => setNewItem(event.target.value)}
-            onBlur={() => !newItem.trim() && setAdding(false)}
+            onBlur={closeAddFormIfEmpty}
             placeholder="z. B. Spülmittel"
             aria-label="Artikel"
-            enterKeyHint="done"
+            enterKeyHint="next"
             className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
+          />
+          <input
+            value={newAmount}
+            onChange={(event) => setNewAmount(event.target.value)}
+            onBlur={closeAddFormIfEmpty}
+            placeholder="Menge"
+            aria-label="Menge"
+            enterKeyHint="done"
+            maxLength={30}
+            className="h-10 w-20 shrink-0 rounded-xl bg-brand-chip-neutral px-2.5 text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
           />
           <button
             type="submit"
@@ -320,12 +430,65 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
         </form>
       )}
 
+      {ordering && (
+        <section
+          aria-label="Reihenfolge der Bereiche"
+          className="animate-fade-up rounded-[18px] bg-white py-1 pl-3.5 pr-1 ring-1 ring-brand-card-border"
+        >
+          <div className="flex items-center justify-between gap-2 py-2 pr-2">
+            <h3 className="text-[15px] font-bold text-brand-ink">Reihenfolge wie im Laden</h3>
+            <button
+              type="button"
+              onClick={() => setOrdering(false)}
+              className="h-8 rounded-full bg-brand-accent-dark px-3.5 text-[13px] font-bold text-white transition-transform active:scale-95"
+            >
+              Fertig
+            </button>
+          </div>
+          <ol>
+            {orderedSections.map((section, index) => (
+              <li key={section.id} className="flex min-h-11 items-center gap-2 border-b border-brand-divider last:border-b-0">
+                <span aria-hidden="true">{section.emoji}</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-brand-ink">{section.label}</span>
+                <button
+                  type="button"
+                  onClick={() => moveSection(index, -1)}
+                  disabled={index === 0}
+                  aria-label={`${section.label} nach oben`}
+                  className="flex size-9 items-center justify-center rounded-full text-brand-secondary active:bg-brand-chip-neutral disabled:opacity-30"
+                >
+                  <ArrowUp className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSection(index, 1)}
+                  disabled={index === orderedSections.length - 1}
+                  aria-label={`${section.label} nach unten`}
+                  className="flex size-9 items-center justify-center rounded-full text-brand-secondary active:bg-brand-chip-neutral disabled:opacity-30"
+                >
+                  <ArrowDown className="size-4" />
+                </button>
+              </li>
+            ))}
+          </ol>
+          {sectionOrder.length > 0 && (
+            <button
+              type="button"
+              onClick={resetSectionOrder}
+              className="my-1.5 h-8 rounded-full px-2 text-[13px] font-semibold text-brand-secondary active:bg-brand-chip-neutral"
+            >
+              Zurücksetzen
+            </button>
+          )}
+        </section>
+      )}
+
       {rows.length === 0 && !adding ? (
         <div className="rounded-[18px] bg-white px-6 py-10 text-center ring-1 ring-brand-card-border">
           <p className="text-3xl" aria-hidden="true">🧺</p>
           <p className="mt-2 font-heading text-lg font-extrabold text-brand-ink">Noch nichts zu kaufen</p>
           <p className="mt-1 text-sm text-brand-secondary">
-            Plane Mahlzeiten für diese Woche, dann steht hier alles, was du brauchst.
+            Plane Mahlzeiten für {isCurrentWeek ? "diese Woche" : "die Woche"}, dann steht hier alles, was du brauchst.
           </p>
         </div>
       ) : (
@@ -382,6 +545,17 @@ export function ShoppingList({ items, pantryStaples, persist = true, alwaysCard 
                 ))}
               </ul>
             </section>
+          )}
+
+          {!ordering && sections.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setOrdering(true)}
+              className="mx-auto flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-brand-secondary transition-transform active:scale-95 active:bg-brand-chip-neutral"
+            >
+              <ListOrdered className="size-4" />
+              Reihenfolge anpassen
+            </button>
           )}
         </>
       )}

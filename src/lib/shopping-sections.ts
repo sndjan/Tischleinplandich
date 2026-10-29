@@ -26,6 +26,17 @@ export const SHOPPING_SECTIONS: { id: ShoppingSectionId; label: string; emoji: s
   { id: "other", label: "Sonstiges", emoji: "🛒" },
 ];
 
+/**
+ * The sections in the user's own order (e.g. dry goods first, as the store is laid
+ * out). Unknown ids are dropped and sections missing from it keep their default
+ * place at the end, so a stored order survives new sections.
+ */
+export function orderShoppingSections(order: readonly string[] = []) {
+  const byId = new Map(SHOPPING_SECTIONS.map((section) => [section.id as string, section]));
+  const ordered = [...new Set(order)].flatMap((id) => byId.get(id) ?? []);
+  return [...ordered, ...SHOPPING_SECTIONS.filter((section) => !ordered.includes(section))];
+}
+
 // Keywords per section. The longest keyword found in the ingredient name wins, so
 // "Kokosmilch" lands in Konserven (not Kühlregal via "milch") and "Olivenöl" in
 // Gewürze & Öle (not Konserven via "oliven"). Keywords starting with "=" must

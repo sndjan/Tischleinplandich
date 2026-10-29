@@ -372,22 +372,43 @@ export function generateShoppingListFromRecipes(
 }
 
 /**
+ * Ingredients put on the shopping list straight from a recipe, without planning
+ * it: the whole dish or only some lines.
+ */
+export type ShoppingExtra = {
+  id: string;
+  recipeName: string;
+  // Ingredient lines as written in the recipe, already chosen by the user.
+  lines: string[];
+  // Planned portions divided by the recipe's own serving size.
+  multiplier: number;
+};
+
+export type ShoppingListOptions = {
+  // Recipes left off the list, e.g. because they are bought next week.
+  excludedRecipeIds?: Iterable<string>;
+  extras?: ShoppingExtra[];
+};
+
+/**
  * Generate shopping list from current planned meals and recipes
  */
 export function generateShoppingListFromPlannedMeals(
   plannedMeals: Array<Pick<PlannedMeal, "recipe_id" | "serving_size">>,
   recipes: Array<Pick<Recipe, "id" | "name" | "ingredients" | "serving_size">>,
+  { excludedRecipeIds = [], extras = [] }: ShoppingListOptions = {},
 ): ShoppingListItem[] {
-  if (plannedMeals.length === 0 || recipes.length === 0) {
-    return [];
-  }
-
   const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  const excluded = new Set(excludedRecipeIds);
   const items: ShoppingListItem[] = [];
+
+  for (const extra of extras) {
+    items.push(...parseIngredientLines(extra.lines.join("\n"), extra.multiplier, extra.recipeName));
+  }
 
   for (const plannedMeal of plannedMeals) {
     const recipe = recipesById.get(plannedMeal.recipe_id);
-    if (!recipe) {
+    if (!recipe || excluded.has(recipe.id)) {
       continue;
     }
 

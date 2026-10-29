@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteRecipe } from "@/lib/recipes";
 import { showUndoToast } from "@/lib/undo-toast";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
+import { useSelectedWeek } from "./use-selected-week";
 import {
-  getCurrentWeekStartDateString,
   isPendingId,
   mealsAwaitingRemoval,
   PENDING_ID_PREFIX,
@@ -50,13 +50,13 @@ async function getOrCreateMealPlanId(userId: string, weekStart: string): Promise
 }
 
 /**
- * Adds a meal to this week's plan. It appears immediately; the day totals and
+ * Adds a meal to the selected week's plan. It appears immediately; the day totals and
  * shopping list update with it while the server write runs in the background.
  */
 export function useAddMeal() {
   const queryClient = useQueryClient();
   const userId = useUserId();
-  const weekStart = getCurrentWeekStartDateString();
+  const { weekKey: weekStart } = useSelectedWeek();
   const weekKey = queryKeys.week(userId ?? "", weekStart);
 
   const mutation = useMutation({
@@ -149,7 +149,8 @@ export function useAddMeal() {
 export function useRemoveMeal(recipesById: Map<string, Recipe>) {
   const queryClient = useQueryClient();
   const userId = useUserId();
-  const weekKey = queryKeys.week(userId ?? "", getCurrentWeekStartDateString());
+  const { weekKey: weekStart } = useSelectedWeek();
+  const weekKey = queryKeys.week(userId ?? "", weekStart);
 
   const deleteMutation = useMutation({
     mutationFn: async (mealId: string) => {
@@ -203,7 +204,8 @@ export function useDeleteRecipe() {
   const queryClient = useQueryClient();
   const userId = useUserId();
   const recipesKey = queryKeys.recipes(userId ?? "");
-  const weekKey = queryKeys.week(userId ?? "", getCurrentWeekStartDateString());
+  // Every cached week: the recipe can be planned in any of them.
+  const weeksKey = queryKeys.allWeeks(userId ?? "");
 
   const deleteMutation = useMutation({
     mutationFn: (recipe: Recipe) => deleteRecipe(recipe),
@@ -214,14 +216,14 @@ export function useDeleteRecipe() {
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: recipesKey }),
-        queryClient.invalidateQueries({ queryKey: weekKey }),
+        queryClient.invalidateQueries({ queryKey: weeksKey }),
       ]),
   });
 
   return useCallback(
     (recipe: Recipe) => {
       const previousRecipes = queryClient.getQueryData<RecipesData>(recipesKey);
-      const previousWeek = queryClient.getQueryData<WeekData>(weekKey);
+      const previousWeeks = queryClient.getQueriesData<WeekData>({ queryKey: weeksKey });
 
       queryClient.setQueryData<RecipesData>(recipesKey, (current) =>
         current
@@ -229,7 +231,7 @@ export function useDeleteRecipe() {
           : current,
       );
       // Planned meals of a deleted recipe are deleted with it in the database.
-      queryClient.setQueryData<WeekData>(weekKey, (current) =>
+      queryClient.setQueriesData<WeekData>({ queryKey: weeksKey }, (current) =>
         current
           ? { ...current, meals: current.meals.filter((meal) => meal.recipe_id !== recipe.id) }
           : current,
@@ -239,11 +241,11 @@ export function useDeleteRecipe() {
         message: `„${recipe.name}“ gelöscht`,
         onUndo: () => {
           queryClient.setQueryData(recipesKey, previousRecipes);
-          queryClient.setQueryData(weekKey, previousWeek);
+          for (const [key, week] of previousWeeks) queryClient.setQueryData(key, week);
         },
         onCommit: () => deleteMutation.mutate(recipe),
       });
     },
-    [queryClient, recipesKey, weekKey, deleteMutation],
+    [queryClient, recipesKey, weeksKey, deleteMutation],
   );
 }
