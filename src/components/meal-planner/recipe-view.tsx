@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, ChefHat, ChevronLeft, Pencil, Share2, Trash2 } from "lucide-react";
+import { CalendarPlus, ChefHat, ChevronLeft, Pencil, Share2, ShoppingCart, Trash2 } from "lucide-react";
 import type { Recipe } from "@/types/database";
 import { useRecipesQuery } from "@/hooks/use-planner-data";
 import { HeroButton, RecipeBody } from "./recipe-body";
 import { PlanRecipeSheet } from "./plan-recipe-sheet";
+import { AddToListSheet } from "./add-to-list-sheet";
 import { ShareRecipeSheet } from "./share-recipe-sheet";
 import { StarRating, useRateRecipe } from "./star-rating";
 import { useShowNutrition } from "./nutrition-target-settings";
@@ -27,7 +28,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
   const recipe = data?.recipes.find((candidate) => candidate.id === initialRecipe.id) ?? initialRecipe;
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const [servings, setServings] = useState(initialServings ?? baseServings);
-  const [sheet, setSheet] = useState<"plan" | "share" | null>(null);
+  const [sheet, setSheet] = useState<"plan" | "share" | "list" | null>(null);
   const rateRecipe = useRateRecipe();
   const showNutrition = useShowNutrition();
 
@@ -47,6 +48,9 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
                 <ChevronLeft className="size-6" />
               </HeroButton>
               <div className="flex gap-2">
+                <HeroButton label="Auf die Einkaufsliste" onClick={() => setSheet("list")}>
+                  <ShoppingCart className="size-[18px]" />
+                </HeroButton>
                 <HeroButton label="Teilen" onClick={() => setSheet("share")}>
                   <Share2 className="size-[18px]" />
                 </HeroButton>
@@ -87,6 +91,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
         <PlanRecipeSheet recipe={recipe} servings={servings} onClose={() => setSheet(null)} />
       )}
       {sheet === "share" && <ShareRecipeSheet recipe={recipe} onClose={() => setSheet(null)} />}
+      {sheet === "list" && <AddToListSheet recipe={recipe} servings={servings} onClose={() => setSheet(null)} />}
     </div>
   );
 }

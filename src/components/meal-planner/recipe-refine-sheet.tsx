@@ -40,7 +40,7 @@ export function RecipeRefineSheet({
   const lastActiveId = [...exchanges].reverse().find((exchange) => !exchange.undone)?.id;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div data-overlay className="fixed inset-0 z-50 flex items-end justify-center">
       <button
         type="button"
         aria-label="Schließen"

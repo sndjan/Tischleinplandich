@@ -7,18 +7,23 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteRecipe } from "@/lib/recipes";
 import { showUndoToast } from "@/lib/undo-toast";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
+import { useSelectedWeek } from "./use-selected-week";
 import {
-  getCurrentWeekStartDateString,
   isPendingId,
+  mealsAwaitingRemoval,
   PENDING_ID_PREFIX,
   queryKeys,
   useUserId,
   type RecipesData,
   type WeekData,
 } from "./use-planner-data";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 export type AddMealInput = {
-  recipeId: string;
+  // Null for a meal without a recipe, which then needs a label (migration 020).
+  recipeId: string | null;
+  label?: string;
+  calories?: number | null;
   dayIndex: number;
   mealType: MealType;
   servingSize: number;
@@ -49,13 +54,13 @@ async function getOrCreateMealPlanId(userId: string, weekStart: string): Promise
 }
 
 /**
- * Adds a meal to this week's plan. It appears immediately; the day totals and
+ * Adds a meal to the selected week's plan. It appears immediately; the day totals and
  * shopping list update with it while the server write runs in the background.
  */
 export function useAddMeal() {
   const queryClient = useQueryClient();
   const userId = useUserId();
-  const weekStart = getCurrentWeekStartDateString();
+  const { weekKey: weekStart } = useSelectedWeek();
   const weekKey = queryKeys.week(userId ?? "", weekStart);
 
   const mutation = useMutation({
@@ -83,6 +88,8 @@ export function useAddMeal() {
           day_of_week: input.dayIndex,
           meal_type: input.mealType,
           serving_size: input.servingSize,
+          // Only sent when used, so recipes still plan before migration 020 has run.
+          ...(input.recipeId === null && { label: input.label, calories: input.calories ?? null }),
         })
         .select("*")
         .single<PlannedMeal>();
@@ -102,6 +109,8 @@ export function useAddMeal() {
         day_of_week: input.dayIndex,
         meal_type: input.mealType,
         serving_size: input.servingSize,
+        label: input.label ?? null,
+        calories: input.calories ?? null,
         created_at: now,
         updated_at: now,
       } as PlannedMeal;
@@ -124,10 +133,16 @@ export function useAddMeal() {
         ),
       }));
     },
-    onError: (error, _input, context) => {
+    onError: (error, input, context) => {
       console.error(error);
       if (context?.previous) {
         queryClient.setQueryData(weekKey, context.previous);
+      }
+      // Missing column (42703) or recipe_id still required (23502).
+      const code = (error as { code?: string } | null)?.code;
+      if (input.recipeId === null && (code === "42703" || code === "23502")) {
+        toast("Auswärts essen braucht noch ein kleines Datenbank-Update (Migration 020).");
+        return;
       }
       toast.error("Hinzufügen fehlgeschlagen");
     },
@@ -148,7 +163,8 @@ export function useAddMeal() {
 export function useRemoveMeal(recipesById: Map<string, Recipe>) {
   const queryClient = useQueryClient();
   const userId = useUserId();
-  const weekKey = queryKeys.week(userId ?? "", getCurrentWeekStartDateString());
+  const { weekKey: weekStart } = useSelectedWeek();
+  const weekKey = queryKeys.week(userId ?? "", weekStart);
 
   const deleteMutation = useMutation({
     mutationFn: async (mealId: string) => {
@@ -159,7 +175,10 @@ export function useRemoveMeal(recipesById: Map<string, Recipe>) {
       console.error(error);
       toast.error("Entfernen fehlgeschlagen");
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: weekKey }),
+    onSettled: (_data, _error, mealId) => {
+      mealsAwaitingRemoval.delete(mealId);
+      return queryClient.invalidateQueries({ queryKey: weekKey });
+    },
   });
 
   return useCallback(
@@ -172,16 +191,19 @@ export function useRemoveMeal(recipesById: Map<string, Recipe>) {
         meals: (current?.meals ?? []).filter((entry) => entry.id !== meal.id),
       });
 
+      mealsAwaitingRemoval.add(meal.id);
       queryClient.setQueryData<WeekData>(weekKey, hide);
-      const recipeName = recipesById.get(meal.recipe_id)?.name;
+      const recipeName = getMealRecipe(meal, recipesById)?.recipe.name;
 
       showUndoToast({
         message: recipeName ? `„${recipeName}“ entfernt` : "Mahlzeit entfernt",
-        onUndo: () =>
+        onUndo: () => {
+          mealsAwaitingRemoval.delete(meal.id);
           queryClient.setQueryData<WeekData>(weekKey, (current) => ({
             mealPlanId: current?.mealPlanId ?? null,
             meals: [...(current?.meals ?? []), meal],
-          })),
+          }));
+        },
         onCommit: () => deleteMutation.mutate(meal.id),
       });
     },
@@ -196,7 +218,8 @@ export function useDeleteRecipe() {
   const queryClient = useQueryClient();
   const userId = useUserId();
   const recipesKey = queryKeys.recipes(userId ?? "");
-  const weekKey = queryKeys.week(userId ?? "", getCurrentWeekStartDateString());
+  // Every cached week: the recipe can be planned in any of them.
+  const weeksKey = queryKeys.allWeeks(userId ?? "");
 
   const deleteMutation = useMutation({
     mutationFn: (recipe: Recipe) => deleteRecipe(recipe),
@@ -207,14 +230,14 @@ export function useDeleteRecipe() {
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: recipesKey }),
-        queryClient.invalidateQueries({ queryKey: weekKey }),
+        queryClient.invalidateQueries({ queryKey: weeksKey }),
       ]),
   });
 
   return useCallback(
     (recipe: Recipe) => {
       const previousRecipes = queryClient.getQueryData<RecipesData>(recipesKey);
-      const previousWeek = queryClient.getQueryData<WeekData>(weekKey);
+      const previousWeeks = queryClient.getQueriesData<WeekData>({ queryKey: weeksKey });
 
       queryClient.setQueryData<RecipesData>(recipesKey, (current) =>
         current
@@ -222,7 +245,7 @@ export function useDeleteRecipe() {
           : current,
       );
       // Planned meals of a deleted recipe are deleted with it in the database.
-      queryClient.setQueryData<WeekData>(weekKey, (current) =>
+      queryClient.setQueriesData<WeekData>({ queryKey: weeksKey }, (current) =>
         current
           ? { ...current, meals: current.meals.filter((meal) => meal.recipe_id !== recipe.id) }
           : current,
@@ -232,11 +255,11 @@ export function useDeleteRecipe() {
         message: `„${recipe.name}“ gelöscht`,
         onUndo: () => {
           queryClient.setQueryData(recipesKey, previousRecipes);
-          queryClient.setQueryData(weekKey, previousWeek);
+          for (const [key, week] of previousWeeks) queryClient.setQueryData(key, week);
         },
         onCommit: () => deleteMutation.mutate(recipe),
       });
     },
-    [queryClient, recipesKey, weekKey, deleteMutation],
+    [queryClient, recipesKey, weeksKey, deleteMutation],
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MessageSquarePlus, Plus, WifiOff } from "lucide-react";
-import { MealWeekView, useViewMode, ViewModeToggle } from "./meal-week-view";
+import { MealWeekView, useViewMode, ViewModeToggle, WeekSwitcher } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
 import { DesktopNavRail, type DesktopPanelTab } from "./desktop-nav-rail";
 import { SidePanel } from "./side-panel";
@@ -38,6 +38,8 @@ import { QueryProvider } from "@/lib/query-provider";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
+import { SelectedWeekProvider, useSelectedWeek } from "@/hooks/use-selected-week";
+import { useShoppingWeek } from "@/hooks/use-shopping-week";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
 import { sumMealNutrition } from "./day-summary";
 import { useEntrance } from "@/hooks/use-entrance";
@@ -46,9 +48,11 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 export function MealPlannerMain() {
   return (
     <QueryProvider>
-      <ScreenStackProvider>
-        <MealPlanner />
-      </ScreenStackProvider>
+      <SelectedWeekProvider>
+        <ScreenStackProvider>
+          <MealPlanner />
+        </ScreenStackProvider>
+      </SelectedWeekProvider>
     </QueryProvider>
   );
 }
@@ -90,16 +94,31 @@ function MealPlanner() {
   const [feedbackContext, setFeedbackContext] = useState<string | null>(null);
 
   const mealPlanData = useMealPlanData();
+  const selectedWeek = useSelectedWeek();
   const deleteRecipe = useDeleteRecipe();
+
+  const shoppingWeek = useShoppingWeek();
 
   const shoppingListItems = useMemo(
     () =>
-      generateShoppingListFromPlannedMeals(
-        mealPlanData.plannedMeals,
-        mealPlanData.recipes,
-      ),
-    [mealPlanData.plannedMeals, mealPlanData.recipes],
+      generateShoppingListFromPlannedMeals(mealPlanData.plannedMeals, mealPlanData.recipes, {
+        excludedRecipeIds: shoppingWeek.excludedRecipeIds,
+        extras: shoppingWeek.extras,
+      }),
+    [mealPlanData.plannedMeals, mealPlanData.recipes, shoppingWeek.excludedRecipeIds, shoppingWeek.extras],
   );
+
+  // Each planned recipe once, in plan order, for leaving it off the list.
+  const shoppingRecipes = useMemo(() => {
+    const recipesById = new Map(mealPlanData.recipes.map((recipe) => [recipe.id, recipe]));
+    const ids = [...new Set(mealPlanData.plannedMeals.flatMap((meal) => meal.recipe_id ?? []))];
+    return ids.flatMap((id) => {
+      const recipe = recipesById.get(id);
+      return recipe
+        ? [{ id, name: recipe.name, excluded: shoppingWeek.excludedRecipeIds.includes(id) }]
+        : [];
+    });
+  }, [mealPlanData.plannedMeals, mealPlanData.recipes, shoppingWeek.excludedRecipeIds]);
 
   const ingredientSuggestions = useMemo(
     () => collectIngredientNames(mealPlanData.recipes),
@@ -116,7 +135,8 @@ function MealPlanner() {
 
   // What is left of today's targets, so "Aus Idee" can fit a recipe into the day.
   const targetHint = useMemo(() => {
-    if (!nutritionTargets.show_nutrition) return null;
+    // Only today's meals count, and they are only loaded while this week is shown.
+    if (!nutritionTargets.show_nutrition || !selectedWeek.isCurrentWeek) return null;
     const recipesById = new Map(mealPlanData.recipes.map((recipe) => [recipe.id, recipe]));
     const todayMeals = mealPlanData.plannedMeals.filter(
       (meal) => meal.day_of_week === getTodayDayIndex(),
@@ -136,7 +156,7 @@ function MealPlanner() {
     }
 
     return parts.length > 0 ? parts.join(" · ") : null;
-  }, [mealPlanData.recipes, mealPlanData.plannedMeals, nutritionTargets]);
+  }, [mealPlanData.recipes, mealPlanData.plannedMeals, nutritionTargets, selectedWeek.isCurrentWeek]);
 
   // Content shared into the app from another app (see public/sw.js).
   useEffect(() => {
@@ -279,7 +299,10 @@ function MealPlanner() {
       subtitle: recipeCount === null ? "Zum Planen auf einen Tag ziehen" : `${recipeCount} · zum Planen auf einen Tag ziehen`,
     },
     discover: { title: "Entdecken", subtitle: "Rezepte, die andere geteilt haben" },
-    shopping: { title: "Einkaufsliste", subtitle: "Aus den Mahlzeiten dieser Woche" },
+    shopping: {
+      title: "Einkaufsliste",
+      subtitle: selectedWeek.isCurrentWeek ? "Aus den Mahlzeiten dieser Woche" : selectedWeek.label,
+    },
   }[desktopRightPanelTab];
 
   return (
@@ -380,7 +403,15 @@ function MealPlanner() {
                 </div>
                 <div className="-mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
                   {desktopRightPanelTab === "shopping" ? (
-                    <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
+                    <ShoppingList
+                      key={selectedWeek.weekKey}
+                      items={shoppingListItems}
+                      pantryStaples={pantryStaples}
+                      recipes={shoppingRecipes}
+                      onToggleRecipe={shoppingWeek.toggleRecipe}
+                      extras={shoppingWeek.extras}
+                      onRemoveExtra={shoppingWeek.removeExtra}
+                    />
                   ) : (
                     <RecipeLibrary tab={desktopRightPanelTab} />
                   )}
@@ -401,7 +432,18 @@ function MealPlanner() {
                 />
               )}
               {mobileTab === "shopping" && (
-                <ShoppingList items={shoppingListItems} pantryStaples={pantryStaples} />
+                <>
+                  <WeekSwitcher />
+                  <ShoppingList
+                    key={selectedWeek.weekKey}
+                    items={shoppingListItems}
+                    pantryStaples={pantryStaples}
+                    recipes={shoppingRecipes}
+                    onToggleRecipe={shoppingWeek.toggleRecipe}
+                    extras={shoppingWeek.extras}
+                    onRemoveExtra={shoppingWeek.removeExtra}
+                  />
+                </>
               )}
               {mobileTab === "recipes" && <RecipeLibrary />}
             </Entrance>

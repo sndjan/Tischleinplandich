@@ -42,6 +42,7 @@ export function MobileTabBar({ activeTab, onTabChange, feedbackOpen, onFeedback 
   return (
     <nav
       aria-label="Bereiche"
+      data-tab-bar
       className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-center gap-2 px-4 pointer-events-none lg:hidden"
     >
       <div

@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Baked into the client and /api/version alike, so an open app can tell a
+  // newer deploy apart from the one it is running.
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || String(Date.now()),
+  },
   images: {
     remotePatterns: [
       {

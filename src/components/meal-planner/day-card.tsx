@@ -8,6 +8,7 @@ import { MealSlotCard } from "./meal-slot-card";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { isPendingId } from "@/hooks/use-planner-data";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 const FIXED_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -141,7 +142,8 @@ export function DayCard({
 
       {FIXED_MEAL_TYPES.map((mealType) => {
         const meal = plannedMealsForDay.find((m) => m.meal_type === mealType);
-        const recipe = meal ? recipesById.get(meal.recipe_id) : undefined;
+        const shown = meal ? getMealRecipe(meal, recipesById) : undefined;
+        const recipe = shown?.recipe;
 
         return (
           <div key={mealType}>
@@ -156,6 +158,7 @@ export function DayCard({
                   pending={isPendingId(meal.id)}
                   onRemove={() => onRemoveMeal(meal)}
                   compact={compact}
+                  openable={shown?.isRecipe}
                 />
               ) : (
                 <AddMealButton dayOfWeek={dayIndex} mealType={mealType} compact={compact} />
@@ -169,8 +172,9 @@ export function DayCard({
         "extra",
         <div className={compact ? "space-y-2" : "space-y-2.5"}>
           {extraMeals.map((meal) => {
-            const recipe = recipesById.get(meal.recipe_id);
-            if (!recipe) return null;
+            const shown = getMealRecipe(meal, recipesById);
+            if (!shown) return null;
+            const { recipe } = shown;
 
             return (
               <MealSlotCard
@@ -182,6 +186,7 @@ export function DayCard({
                 pending={isPendingId(meal.id)}
                 onRemove={() => onRemoveMeal(meal)}
                 compact={compact}
+                openable={shown.isRecipe}
               />
             );
           })}

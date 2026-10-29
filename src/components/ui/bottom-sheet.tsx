@@ -24,7 +24,7 @@ export function BottomSheet({ title, description, onClose, children }: BottomShe
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div data-overlay className="fixed inset-0 z-50 flex items-end justify-center">
       <button
         type="button"
         aria-label="Schließen"

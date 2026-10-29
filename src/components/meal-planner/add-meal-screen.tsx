@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { Check, Search, UtensilsCrossed } from "lucide-react";
+import { Check, ChevronRight, Search, Store } from "lucide-react";
 import type { MealType, Recipe } from "@/types/database";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import { useMealPlanData } from "@/hooks/use-planner-data";
@@ -10,10 +10,12 @@ import { useAddMeal } from "@/hooks/use-planner-mutations";
 import { Button } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/controls";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { cn } from "@/lib/utils";
 import { SubPage } from "./sub-page";
 import { sumMealNutrition } from "./day-summary";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
+import { RecipePlaceholder } from "./recipe-placeholder";
 
 export const WEEK_DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
@@ -76,6 +78,7 @@ export function AddMealScreen({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [recent] = useState(readRecent);
+  const [eatingOut, setEatingOut] = useState(false);
 
   const recipesById = useMemo(() => new Map(recipes.map((recipe) => [recipe.id, recipe])), [recipes]);
 
@@ -113,8 +116,7 @@ export function AddMealScreen({
         const aMeal = mealTags.includes(a.toLowerCase()) ? 1 : 0;
         const bMeal = mealTags.includes(b.toLowerCase()) ? 1 : 0;
         return bMeal - aMeal || count(b) - count(a) || a.localeCompare(b, "de");
-      })
-      .slice(0, 8);
+      });
   }, [tagsById, mealTags]);
 
   const visibleRecipes = useMemo(() => {
@@ -151,6 +153,12 @@ export function AddMealScreen({
     rememberPlannedRecipe(selectedId);
     // The meal shows up in the plan right away; saving continues in the background.
     addMeal({ recipeId: selectedId, dayIndex: dayOfWeek, mealType, servingSize: servings });
+    onMealAdded();
+  };
+
+  const addEatingOut = (label: string, calories: number | null) => {
+    if (navigator.vibrate) navigator.vibrate(10);
+    addMeal({ recipeId: null, label, calories, dayIndex: dayOfWeek, mealType, servingSize: 1 });
     onMealAdded();
   };
 
@@ -222,6 +230,29 @@ export function AddMealScreen({
         </div>
       }
     >
+      <button
+        type="button"
+        onClick={() => setEatingOut(true)}
+        className="-mt-2 mb-2 flex w-full touch-manipulation items-center gap-3 border-b border-brand-divider py-2.5 text-left transition-transform active:scale-[0.98]"
+      >
+        <span className="flex size-[60px] shrink-0 items-center justify-center rounded-xl bg-[#fdf0d5] text-[#7a4f0e]">
+          <Store className="size-6" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[15px] font-bold text-brand-ink">Auswärts essen</span>
+          <span className="text-[13px] text-brand-secondary">Ohne Rezept, Kalorien schätzt du selbst</span>
+        </span>
+        <ChevronRight className="size-5 shrink-0 text-brand-muted" />
+      </button>
+
+      {eatingOut && (
+        <EatingOutSheet
+          showCalories={nutritionTargets.show_nutrition}
+          onAdd={addEatingOut}
+          onClose={() => setEatingOut(false)}
+        />
+      )}
+
       {loading ? (
         <div className="space-y-3" aria-busy="true" aria-label="Lädt">
           {[0, 1, 2, 3, 4].map((index) => (
@@ -265,7 +296,7 @@ export function AddMealScreen({
                     {recipe.image_url ? (
                       <Image src={recipe.image_url} alt="" width={120} height={120} className="h-full w-full object-cover" unoptimized />
                     ) : (
-                      <UtensilsCrossed className="size-6 text-brand-muted" />
+                      <RecipePlaceholder name={recipe.name} className="text-3xl" />
                     )}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -292,5 +323,60 @@ export function AddMealScreen({
         </ul>
       )}
     </SubPage>
+  );
+}
+
+function EatingOutSheet({
+  showCalories,
+  onAdd,
+  onClose,
+}: {
+  showCalories: boolean;
+  onAdd: (label: string, calories: number | null) => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [calories, setCalories] = useState("");
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const kcal = Number(calories.replace(",", "."));
+    onAdd(
+      label.trim() || "Auswärts",
+      calories.trim() && Number.isFinite(kcal) ? Math.min(10000, Math.max(0, Math.round(kcal))) : null,
+    );
+  };
+
+  return (
+    <BottomSheet title="Auswärts essen" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <label className="block space-y-1">
+          <span className="text-[13px] font-semibold text-brand-secondary">Was gibt es?</span>
+          <input
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+            placeholder="z. B. Pizza beim Italiener"
+            maxLength={80}
+            autoFocus
+            className="h-11 w-full rounded-xl bg-brand-chip-neutral px-3 text-[15px] text-brand-ink outline-none placeholder:text-brand-muted focus:ring-2 focus:ring-brand-accent-bg"
+          />
+        </label>
+        {showCalories && (
+          <label className="block space-y-1">
+            <span className="text-[13px] font-semibold text-brand-secondary">Kalorien (geschätzt, optional)</span>
+            <input
+              value={calories}
+              onChange={(event) => setCalories(event.target.value)}
+              inputMode="numeric"
+              placeholder="z. B. 900"
+              className="h-11 w-full rounded-xl bg-brand-chip-neutral px-3 text-[15px] text-brand-ink outline-none placeholder:text-brand-muted focus:ring-2 focus:ring-brand-accent-bg"
+            />
+          </label>
+        )}
+        <Button type="submit" className="h-[52px] w-full rounded-[14px] text-base font-bold">
+          Eintragen
+        </Button>
+      </form>
+    </BottomSheet>
   );
 }

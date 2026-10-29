@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import { DayCard } from "./day-card";
 import { WeekAgenda, WeekSummary } from "./week-overview";
@@ -9,6 +10,8 @@ import { useAddMeal, useRemoveMeal } from "@/hooks/use-planner-mutations";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { DEFAULT_NUTRITION_TARGETS } from "./nutrition-target-settings";
+import { useSelectedWeek } from "@/hooks/use-selected-week";
+import { formatWeekRange, getDayIndex, getWeekDates } from "@/lib/week";
 
 const DAYS = [
   "Montag",
@@ -92,32 +95,51 @@ export function ViewModeToggle({
   );
 }
 
-function getTodayDayIndex(): number {
-  // JS getDay() is Sunday=0..Saturday=6; day_of_week in this app is Monday=0..Sunday=6.
-  return (new Date().getDay() + 6) % 7;
-}
-
-// Dates of this week's Monday..Sunday, for the day strip.
-function getWeekDates() {
-  const monday = new Date();
-  monday.setDate(monday.getDate() - getTodayDayIndex());
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + index);
-    return date.getDate();
-  });
-}
-
 const SHORT_DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
-function getWeekRange() {
-  const monday = new Date();
-  monday.setDate(monday.getDate() - getTodayDayIndex());
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const format = (date: Date) =>
-    date.toLocaleDateString("de-DE", { day: "numeric", month: "short" }).replace(/\.$/, "");
-  return `${format(monday)} – ${format(sunday)}`;
+/** Steps between weeks; the label says which one the plan shows. */
+export function WeekSwitcher({ className }: { className?: string }) {
+  const { offset, setOffset, monday, label } = useSelectedWeek();
+  const range = formatWeekRange(monday);
+
+  const step = (delta: number) => {
+    if (navigator.vibrate) navigator.vibrate(5);
+    setOffset(offset + delta);
+  };
+
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <button
+        type="button"
+        onClick={() => step(-1)}
+        aria-label="Vorherige Woche"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full text-brand-secondary transition-transform active:scale-90 active:bg-black/5"
+      >
+        <ChevronLeft className="size-5" />
+      </button>
+      <div className="min-w-0 flex-1 text-center" aria-live="polite">
+        <p className="truncate font-heading text-[15px] font-extrabold leading-tight text-brand-ink">{label}</p>
+        {label !== range && <p className="truncate text-xs text-brand-secondary">{range}</p>}
+      </div>
+      {offset !== 0 && (
+        <button
+          type="button"
+          onClick={() => setOffset(0)}
+          className="h-8 shrink-0 rounded-full bg-brand-chip-neutral px-3 text-[13px] font-bold text-brand-ink transition-transform active:scale-95"
+        >
+          Heute
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => step(1)}
+        aria-label="Nächste Woche"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full text-brand-secondary transition-transform active:scale-90 active:bg-black/5"
+      >
+        <ChevronRight className="size-5" />
+      </button>
+    </div>
+  );
 }
 
 interface MealWeekViewProps {
@@ -137,11 +159,18 @@ export function MealWeekView({
   viewMode,
   onViewModeChange,
 }: MealWeekViewProps) {
-  const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayDayIndex);
+  const { offset, monday } = useSelectedWeek();
+  // Past weeks count as fully past, later weeks as not started yet.
+  const todayIndex = offset === 0 ? getDayIndex(new Date()) : offset < 0 ? 7 : -1;
+  const [selectedDayIndex, setSelectedDayIndex] = useState(() => Math.max(0, Math.min(6, todayIndex)));
   const addMeal = useAddMeal();
-  const todayIndex = getTodayDayIndex();
-  const weekDates = useMemo(getWeekDates, []);
-  const weekRange = useMemo(getWeekRange, []);
+  const weekDates = useMemo(() => getWeekDates(monday), [monday]);
+  const weekRange = useMemo(() => formatWeekRange(monday), [monday]);
+
+  // Another week opens on today if it is this week, else on Monday.
+  useEffect(() => {
+    setSelectedDayIndex(offset === 0 ? getDayIndex(new Date()) : 0);
+  }, [offset]);
 
   // Drilling into a day keeps the saved preference, so the planner opens in
   // the week view again next time.
@@ -209,6 +238,7 @@ export function MealWeekView({
   if (loading) {
     return (
       <div className="mx-auto max-w-xl space-y-2.5" aria-busy="true" aria-label="Lädt">
+        <WeekSwitcher />
         <div className="grid grid-cols-7 gap-1">
           {SHORT_DAYS.map((day) => (
             <Skeleton key={day} className="h-[62px] rounded-[14px]" />
@@ -224,6 +254,7 @@ export function MealWeekView({
 
   return (
     <div className="space-y-3">
+      <WeekSwitcher className={cn(viewMode === "day" && "mx-auto max-w-xl")} />
       {viewMode === "day" ? (
         <div className="mx-auto max-w-xl space-y-2.5">
           <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">

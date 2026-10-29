@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import type { PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
+import { getMealRecipe } from "@/lib/planned-meal";
 
 export type NutritionTotals = { calories: number; protein: number; carbs: number; fats: number };
 
@@ -15,7 +16,7 @@ export function sumMealNutrition(
 ): NutritionTotals {
   return meals.reduce(
     (acc, meal) => {
-      const recipe = recipesById.get(meal.recipe_id);
+      const recipe = getMealRecipe(meal, recipesById)?.recipe;
       if (!recipe) return acc;
 
       const multiplier = meal.serving_size || 1;

@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { UtensilsCrossed, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { MealType, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import { cn } from "@/lib/utils";
 import { useScreenStack } from "./screen-stack";
+import { RecipePlaceholder } from "./recipe-placeholder";
 
 interface MealSlotCardProps {
   recipe: Recipe;
@@ -18,6 +19,8 @@ interface MealSlotCardProps {
   onRemove: () => void;
   // Narrow desktop week column: photo on top, name below, calories only.
   compact?: boolean;
+  // False for meals without a recipe (eating out): nothing to open.
+  openable?: boolean;
 }
 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
@@ -30,10 +33,13 @@ export function MealSlotCard({
   pending = false,
   onRemove,
   compact = false,
+  openable = true,
 }: MealSlotCardProps) {
   const { openScreen } = useScreenStack();
 
-  const openRecipe = () => openScreen({ kind: "recipe-preview", recipe, servings: servingSize });
+  const openRecipe = () => {
+    if (openable) openScreen({ kind: "recipe-preview", recipe, servings: servingSize });
+  };
 
   const facts = [
     nutritionTargets.show_nutrition && recipe.calories != null && nutritionTargets.calories_target_enabled &&
@@ -63,7 +69,7 @@ export function MealSlotCard({
                 unoptimized
               />
             ) : (
-              <UtensilsCrossed className="size-5 text-brand-muted" />
+              <RecipePlaceholder name={recipe.name} className="text-2xl" />
             )}
           </span>
           <span className="block space-y-0.5 px-2 pb-2 pt-1.5">
@@ -129,7 +135,7 @@ export function MealSlotCard({
             unoptimized
           />
         ) : (
-          <UtensilsCrossed className="size-6 text-brand-muted" />
+          <RecipePlaceholder name={recipe.name} className="text-3xl" />
         )}
       </div>
       <div className="min-w-0 flex-1">

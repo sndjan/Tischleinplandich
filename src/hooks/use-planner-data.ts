@@ -6,14 +6,7 @@ import { useAuth } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/client";
 import type { PlannedMeal, Recipe } from "@/types/database";
 import { withSafeLinks } from "@/lib/safe-links";
-
-export function getCurrentWeekStartDateString(): string {
-  const today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  weekStart.setHours(0, 0, 0, 0);
-  return weekStart.toISOString().split("T")[0];
-}
+import { useSelectedWeek } from "./use-selected-week";
 
 // Meals added optimistically carry this id prefix until the server row arrives.
 export const PENDING_ID_PREFIX = "pending-";
@@ -23,6 +16,7 @@ export const isPendingId = (id: string) => id.startsWith(PENDING_ID_PREFIX);
 export const queryKeys = {
   recipes: (userId: string) => ["recipes", userId] as const,
   week: (userId: string, weekStart: string) => ["week", userId, weekStart] as const,
+  allWeeks: (userId: string) => ["week", userId] as const,
   nutritionTargets: (userId: string) => ["nutrition-targets", userId] as const,
   pantryStaples: (userId: string) => ["pantry-staples", userId] as const,
   profile: (userId: string) => ["profile", userId] as const,
@@ -85,6 +79,11 @@ export async function fetchRecipes(userId: string): Promise<RecipesData> {
   return { recipes, tagsById };
 }
 
+// Meals removed in the app whose delete waits for the undo window to pass. A
+// refetch in the meantime (e.g. after another removal is committed) still
+// returns them, so they are left out here.
+export const mealsAwaitingRemoval = new Set<string>();
+
 export async function fetchWeek(userId: string, weekStart: string): Promise<WeekData> {
   const { data, error } = await createClient()
     .from("meal_plans")
@@ -97,7 +96,10 @@ export async function fetchWeek(userId: string, weekStart: string): Promise<Week
 
   const plan = data as { id: string; planned_meals: PlannedMeal[] | null } | null;
 
-  return { mealPlanId: plan?.id ?? null, meals: plan?.planned_meals ?? [] };
+  return {
+    mealPlanId: plan?.id ?? null,
+    meals: (plan?.planned_meals ?? []).filter((meal) => !mealsAwaitingRemoval.has(meal.id)),
+  };
 }
 
 /**
@@ -120,7 +122,7 @@ export function useRecipesQuery() {
 
 export function useWeekQuery() {
   const userId = useUserId();
-  const weekStart = getCurrentWeekStartDateString();
+  const { weekKey: weekStart } = useSelectedWeek();
 
   return useQuery({
     queryKey: queryKeys.week(userId ?? "", weekStart),

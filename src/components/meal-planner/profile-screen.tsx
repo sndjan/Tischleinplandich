@@ -11,6 +11,7 @@ import { isStandalone, promptInstall } from "@/lib/install-prompt";
 import { queryKeys, useProfileQuery, useRecipesQuery, useUserId } from "@/hooks/use-planner-data";
 import { DAILY_AI_LIMIT } from "@/lib/recipe-draft";
 import { exportRecipesAsZip } from "@/lib/recipe-export";
+import { recipesToPrintHtml } from "@/lib/recipe-print";
 import { cn } from "@/lib/utils";
 import { CACHE_STORAGE_KEY } from "@/lib/query-provider";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -122,7 +123,30 @@ function useExportRecipes() {
     }
   };
 
-  return { exporting, run, count: data?.recipes.length ?? 0 };
+  // Prints from a hidden frame, so the app stays as it is; "Als PDF sichern" in
+  // the print dialog makes the file.
+  const print = () => {
+    const recipes = data?.recipes ?? [];
+    if (recipes.length === 0) {
+      toast("Noch keine Rezepte zum Exportieren");
+      return;
+    }
+
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:fixed;width:0;height:0;border:0;opacity:0";
+    frame.srcdoc = recipesToPrintHtml(recipes, data?.tagsById ?? {});
+    // Fires once the photos have loaded too.
+    frame.onload = () => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      window.setTimeout(() => frame.remove(), 60_000);
+    };
+    document.body.appendChild(frame);
+    toast("Im Druckdialog „Als PDF sichern“ wählen");
+  };
+
+  return { exporting, run, print, count: data?.recipes.length ?? 0 };
 }
 
 interface ProfileScreenProps {
@@ -146,6 +170,7 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
   const exportRecipes = useExportRecipes();
   const hasUnseenChanges = useHasUnseenChanges();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [choosingExport, setChoosingExport] = useState(false);
 
   useEffect(() => setCanInstall(!isStandalone()), []);
 
@@ -206,9 +231,9 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
       emoji: "📦",
       tint: "bg-[#efe9fb]",
       title: exportRecipes.exporting ? "Wird exportiert …" : "Rezepte exportieren",
-      subtitle: `${exportRecipes.count} ${exportRecipes.count === 1 ? "Rezept" : "Rezepte"} als Markdown (ZIP)`,
+      subtitle: `${exportRecipes.count} ${exportRecipes.count === 1 ? "Rezept" : "Rezepte"} als PDF oder Markdown`,
       onClick: () => {
-        if (!exportRecipes.exporting) void exportRecipes.run();
+        if (!exportRecipes.exporting) setChoosingExport(true);
       },
     },
     ...(canInstall
@@ -312,6 +337,40 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
           Konto löschen
         </button>
       </footer>
+
+      {choosingExport && (
+        <BottomSheet title="Rezepte exportieren" onClose={() => setChoosingExport(false)}>
+          <div className="space-y-2.5">
+            {[
+              {
+                key: "pdf",
+                title: "PDF",
+                subtitle: "Zum Ausdrucken oder Aufheben, ein Rezept pro Seite",
+                onClick: exportRecipes.print,
+              },
+              {
+                key: "zip",
+                title: "Markdown (ZIP)",
+                subtitle: "Für Notiz-Apps wie Obsidian oder Notion, mit Fotos",
+                onClick: () => void exportRecipes.run(),
+              },
+            ].map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => {
+                  setChoosingExport(false);
+                  option.onClick();
+                }}
+                className="flex w-full flex-col items-start rounded-[14px] bg-brand-chip-neutral px-4 py-3 text-left transition-transform active:scale-[0.98]"
+              >
+                <span className="text-[15px] font-bold text-brand-ink">{option.title}</span>
+                <span className="text-[13px] text-brand-secondary">{option.subtitle}</span>
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
+      )}
 
       {confirmingDelete && (
         <DeleteAccountSheet
