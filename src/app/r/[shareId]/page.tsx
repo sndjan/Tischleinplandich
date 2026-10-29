@@ -62,7 +62,7 @@ export default async function SharedRecipePage({ params }: PageProps) {
         <h1 className="font-heading text-2xl font-extrabold text-brand-ink">Dieser Link funktioniert nicht mehr</h1>
         <p className="text-[15px] text-brand-secondary">Vielleicht wurde das Teilen beendet. Frag nach einem neuen Link.</p>
         <Link href="/" className="mt-3 font-bold text-brand-accent-dark">
-          Zum Wochen-Essensplaner
+          Zu Tischleinplandich
         </Link>
       </div>
     );

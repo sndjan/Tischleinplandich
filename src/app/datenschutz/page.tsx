@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 };
 
 // Draft that matches what the app does today (hosting on Vercel, Supabase,
-// Claude for AI features, Resend for waitlist mails, Cloudflare Turnstile).
+// Claude for AI features, Resend for login and waitlist mails, Cloudflare for
+// DNS, mail forwarding and Turnstile).
 // Update it whenever a new service is added, and have it checked before selling.
 export default function DatenschutzPage() {
   return (
@@ -36,6 +37,13 @@ export default function DatenschutzPage() {
         Auftragsverarbeitungsvertrag; die Übermittlung in die USA stützt sich auf das EU-US Data Privacy
         Framework und Standardvertragsklauseln.
       </p>
+      <p>
+        Die Namensauflösung (DNS) der Domain läuft über Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107,
+        USA). Schreibst du uns an {OPERATOR.email}, leitet Cloudflare die Mail an unser Postfach weiter, ohne sie zu
+        speichern. Rechtsgrundlage ist unser berechtigtes Interesse an einem zuverlässigen Betrieb bzw. an der
+        Bearbeitung deiner Anfrage (Art. 6 Abs. 1 lit. f DSGVO). Mit Cloudflare besteht ein
+        Auftragsverarbeitungsvertrag; die Übermittlung in die USA stützt sich auf das EU-US Data Privacy Framework.
+      </p>
 
       <h2>3. Schutz vor Missbrauch (Cloudflare Turnstile)</h2>
       <p>
@@ -51,8 +59,10 @@ export default function DatenschutzPage() {
       <p>
         Für ein Konto brauchst du nur deine E-Mail-Adresse. Wir schicken dir einen Anmeldelink bzw. Code. Konto,
         Anmeldung und alle App-Daten speichert Supabase Inc. für uns in der Region {SUPABASE_REGION}.
-        Rechtsgrundlage ist die Erfüllung des Nutzungsvertrags (Art. 6 Abs. 1 lit. b DSGVO). Mit Supabase besteht
-        ein Auftragsverarbeitungsvertrag.
+        Die Mail mit Link und Code versenden wir über Resend (Plus Five Five, Inc., USA). Rechtsgrundlage ist die
+        Erfüllung des Nutzungsvertrags (Art. 6 Abs. 1 lit. b DSGVO). Mit Supabase und Resend bestehen
+        Auftragsverarbeitungsverträge; für Resend stützt sich die Übermittlung in die USA auf
+        Standardvertragsklauseln.
       </p>
 
       <h2>5. Daten in der App</h2>

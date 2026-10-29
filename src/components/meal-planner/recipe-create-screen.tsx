@@ -514,7 +514,7 @@ export function RecipeCreateScreen({
             </div>
             <p className="text-[13px] leading-snug text-brand-secondary">
               Schneller: In Instagram, Chrome oder Fotos auf{" "}
-              <strong className="text-brand-ink">Teilen › Essensplaner</strong> tippen (Android,
+              <strong className="text-brand-ink">Teilen › Tischlein</strong> tippen (Android,
               App installiert).
             </p>
           </div>

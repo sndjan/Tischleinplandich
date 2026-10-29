@@ -384,12 +384,12 @@ function DemoDevice({ data, layout, framed = false }: { data: DemoData; layout: 
                     {isDesktop ? (
                       <>
                         <span aria-hidden="true" className="text-[26px]">🥗</span>
-                        Wochen-Essensplaner
+                        Tischleinplandich
                       </>
                     ) : mobileTab === "plan" ? (
                       <>
                         <span aria-hidden="true" className="text-[26px]">🥗</span>
-                        WMP
+                        Tischlein
                       </>
                     ) : (
                       <span>{mobileTab === "shopping" ? "Einkauf" : "Rezepte"}</span>

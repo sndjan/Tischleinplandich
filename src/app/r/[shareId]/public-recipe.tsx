@@ -42,7 +42,7 @@ export function PublicRecipe({
     <div className="flex min-h-dvh flex-col bg-white">
       <div className="sticky top-0 z-40 flex h-11 items-center justify-between border-b border-brand-card-border bg-white/90 px-3.5 pt-[env(safe-area-inset-top)] backdrop-blur">
         <Link href="/" className="flex items-center gap-1.5 font-heading text-base font-extrabold text-brand-ink">
-          <span aria-hidden="true">🥗</span> WMP
+          <span aria-hidden="true">🥗</span> Tischleinplandich
         </Link>
         {signedIn ? (
           <Link href="/meal-planner" className="text-[13px] font-bold text-brand-accent-dark">

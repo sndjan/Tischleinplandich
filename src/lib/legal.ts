@@ -7,7 +7,7 @@ export const OPERATOR = {
   street: "[PLATZHALTER: Straße und Hausnummer]",
   city: "[PLATZHALTER: PLZ und Ort]",
   country: "Deutschland",
-  email: "[PLATZHALTER: kontakt@deine-domain.de]",
+  email: "hallo@tischleinplandich.de",
   // Only once you have one; leave null until then.
   vatId: null as string | null,
 };

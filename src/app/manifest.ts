@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Wochen-Essensplaner",
-    short_name: "Essensplaner",
+    name: "Tischleinplandich",
+    short_name: "Tischlein",
     description:
       "Plane deine wöchentlichen Mahlzeiten und erstelle automatisch Einkaufslisten",
     lang: "de",

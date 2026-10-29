@@ -228,7 +228,7 @@ export async function fetchRecipePage(rawUrl: string): Promise<RecipePage> {
   try {
     const { response, body } = await safeFetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; WeeklyMealPlanner/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; Tischleinplandich/1.0)",
         Accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(10_000),
@@ -339,7 +339,7 @@ export async function fetchCoverImage(
 ): Promise<{ mediaType: string; data: string } | null> {
   try {
     const { response, body: bytes } = await safeFetch(imageUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; WeeklyMealPlanner/1.0)", Accept: "image/*" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Tischleinplandich/1.0)", Accept: "image/*" },
       signal: AbortSignal.timeout(8_000),
       maxBytes: MAX_COVER_BYTES,
     });
