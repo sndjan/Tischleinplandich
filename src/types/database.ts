@@ -477,6 +477,41 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Premium days for implemented feedback; written only by grant_feedback_reward,
+      // users can read their own rows. Migration 017.
+      feedback_rewards: {
+        Row: {
+          id: string;
+          user_id: string;
+          feedback_id: string | null;
+          category: FeedbackCategory;
+          size: FeedbackRewardSize;
+          days: number;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          feedback_id?: string | null;
+          category: FeedbackCategory;
+          size: FeedbackRewardSize;
+          days: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          feedback_id?: string | null;
+          category?: FeedbackCategory;
+          size?: FeedbackRewardSize;
+          days?: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       // Written only by consume_ai_quota; users can read their own rows. Migration 010.
       ai_usage: {
         Row: {
@@ -504,6 +539,10 @@ export type Database = {
       consume_ai_quota: {
         Args: { daily_limit: number };
         Returns: boolean;
+      };
+      grant_feedback_reward: {
+        Args: { p_feedback_id: string; p_size: FeedbackRewardSize; p_note?: string | null };
+        Returns: number;
       };
       get_shared_recipe: {
         Args: { p_share_id: string };
@@ -535,10 +574,12 @@ export type RecipeIngredient = Database['public']['Tables']['recipe_ingredients'
 export type HealthTargets = Database['public']['Tables']['health_targets']['Row'];
 export type PantryStaple = Database['public']['Tables']['pantry_staples']['Row'];
 export type Feedback = Database['public']['Tables']['feedback']['Row'];
+export type FeedbackReward = Database['public']['Tables']['feedback_rewards']['Row'];
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'extra';
 export type FoodColor = 'red' | 'yellow' | 'green' | 'purple' | 'brown';
 export type FeedbackCategory = 'bug' | 'idea' | 'other';
+export type FeedbackRewardSize = 'small' | 'medium' | 'large';
 
 export type NutritionValues = {
   calories: number;
