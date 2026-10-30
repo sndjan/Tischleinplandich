@@ -62,16 +62,19 @@ function SignIn() {
   const sendLink = () =>
     sendStatus.run(async () => {
       setError(null);
-      if (!captcha.ready) {
-        setError(captcha.message);
-        throw new Error('Captcha not ready');
+      let captchaToken: string | undefined;
+      try {
+        captchaToken = await captcha.getToken();
+      } catch (captchaError) {
+        setError((captchaError as Error).message);
+        throw captchaError;
       }
       const callback = new URL('/auth/callback', window.location.origin);
       if (next !== '/meal-planner') callback.searchParams.set('next', next);
 
       const { error: sendError } = await createClient().auth.signInWithOtp({
         email: email.trim(),
-        options: { shouldCreateUser: true, emailRedirectTo: callback.toString(), captchaToken: captcha.take() },
+        options: { shouldCreateUser: true, emailRedirectTo: callback.toString(), captchaToken },
       });
 
       if (sendError) {
@@ -235,7 +238,7 @@ function SignIn() {
           <div className="mt-auto flex justify-center pt-8">
             <button
               type="button"
-              disabled={resendIn > 0 || sendStatus.status === 'pending' || !captcha.ready}
+              disabled={resendIn > 0 || sendStatus.status === 'pending'}
               onClick={() => void sendLink()}
               className="h-11 px-3 text-sm font-semibold text-brand-accent-dark transition-transform active:scale-95 disabled:text-brand-muted"
             >
