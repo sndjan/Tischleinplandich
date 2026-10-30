@@ -138,6 +138,8 @@ function SignIn() {
                 Wir haben einen Link an
                 <br />
                 <b className="text-brand-ink">{email.trim()}</b> geschickt.
+                {/* Some providers (GMX, web.de) file the mail as spam. */}
+                <span className="mt-1.5 block text-[13px]">Nichts da? Schau auch im Spam-Ordner nach.</span>
               </>
             ) : (
               <>

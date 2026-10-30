@@ -20,6 +20,8 @@ interface DayCardProps {
   summaryTitle?: string;
   dayIndex: number;
   isToday?: boolean;
+  // Greyed out in the desktop week so today and the days ahead stand out.
+  isPast?: boolean;
   // Fill the available width without the desktop column's own card.
   fullWidth?: boolean;
   // Narrow desktop week column: stacked meal cards and a single calorie line
@@ -41,6 +43,7 @@ export function DayCard({
   summaryTitle,
   dayIndex,
   isToday = false,
+  isPast = false,
   fullWidth = false,
   compact = false,
   recipesById,
@@ -86,7 +89,8 @@ export function DayCard({
       className={cn(
         "w-full shrink-0",
         compact ? "space-y-2" : "space-y-2.5",
-        !fullWidth && "rounded-[22px] bg-brand-app-bg ring-1 ring-brand-card-border",
+        !fullWidth && "rounded-[22px] ring-1 ring-brand-card-border",
+        !fullWidth && (isPast ? "bg-brand-chip-neutral" : "bg-brand-app-bg"),
         !fullWidth && (compact ? "p-2" : "p-2.5"),
         !fullWidth && isToday && "ring-2 ring-brand-accent",
       )}

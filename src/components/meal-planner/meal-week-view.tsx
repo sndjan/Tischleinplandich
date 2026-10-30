@@ -275,7 +275,10 @@ export function MealWeekView({
                     "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
                     selected
                       ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
-                      : "bg-white text-brand-ink ring-1 ring-brand-card-border",
+                      : cn(
+                          "text-brand-ink ring-1 ring-brand-card-border",
+                          index < todayIndex ? "bg-brand-chip-neutral" : "bg-white",
+                        ),
                     !selected && index === todayIndex && "ring-2 ring-brand-accent",
                   )}
                 >
@@ -347,6 +350,7 @@ export function MealWeekView({
                 compact
                 dayIndex={index}
                 isToday={index === todayIndex}
+                isPast={index < todayIndex}
                 recipesById={recipesById}
                 plannedMealsForDay={plannedMealsByDay.get(index) ?? []}
                 nutritionTargets={nutritionTargets}

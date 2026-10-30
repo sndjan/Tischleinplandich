@@ -17,6 +17,9 @@ import { sumMealNutrition } from "./day-summary";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
 import { RecipePlaceholder } from "./recipe-placeholder";
 
+// Chips shown before "+N" in the filter row; the rest wrap in on demand.
+const COLLAPSED_CHIP_COUNT = 6;
+
 export const WEEK_DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
 const RECENT_STORAGE_KEY = "weekly-meal-planner:add-meal:recent";
@@ -79,6 +82,7 @@ export function AddMealScreen({
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [recent] = useState(readRecent);
   const [eatingOut, setEatingOut] = useState(false);
+  const [showAllChips, setShowAllChips] = useState(false);
 
   const recipesById = useMemo(() => new Map(recipes.map((recipe) => [recipe.id, recipe])), [recipes]);
 
@@ -169,6 +173,11 @@ export function AddMealScreen({
     ...tagChips.map((tag) => ({ key: `tag-${tag}`, label: tag, filter: { kind: "tag", tag } as Filter })),
   ];
   const filterKey = filter.kind === "tag" ? `tag-${filter.tag}` : filter.kind;
+  // The row wraps instead of scrolling sideways, where tags past the edge went
+  // unnoticed; long tag lists fold away behind "+N", keeping the active chip visible.
+  const collapsedChips = chips.filter((chip, index) => index < COLLAPSED_CHIP_COUNT || chip.key === filterKey);
+  const hiddenChipCount = chips.length - collapsedChips.length;
+  const shownChips = showAllChips ? chips : collapsedChips;
 
   const subtitle =
     remaining.calories !== null
@@ -197,8 +206,8 @@ export function AddMealScreen({
               className="min-w-0 flex-1 bg-transparent text-[15px] text-brand-ink outline-none placeholder:text-brand-muted"
             />
           </label>
-          <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]">
-            {chips.map((chip) => (
+          <div className="flex flex-wrap gap-1.5">
+            {shownChips.map((chip) => (
               <button
                 key={chip.key}
                 type="button"
@@ -214,6 +223,16 @@ export function AddMealScreen({
                 {chip.label}
               </button>
             ))}
+            {hiddenChipCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAllChips((shown) => !shown)}
+                aria-expanded={showAllChips}
+                className="h-8 shrink-0 rounded-full px-3 text-[13px] font-bold text-brand-accent-dark transition-all active:scale-95"
+              >
+                {showAllChips ? "Weniger" : `+${hiddenChipCount} weitere`}
+              </button>
+            )}
           </div>
         </div>
       }
