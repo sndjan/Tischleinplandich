@@ -1,6 +1,8 @@
 // A recipe produced by the AI (import, idea or a chat change), used to prefill the
 // recipe editor. Shared between the API routes and the client components.
 
+import type { RecipeBalance } from "@/lib/balance";
+
 export type RecipeDraft = {
   name: string;
   // One ingredient per line ("200 g Feta").
@@ -15,6 +17,8 @@ export type RecipeDraft = {
   carbs: number | null;
   fats: number | null;
   serving_size: number;
+  // Facts for the "Ausgewogenheit" score, estimated along with the recipe.
+  balance: RecipeBalance | null;
 };
 
 export type RecipeStreamStage = "reading" | "ingredients" | "steps" | "nutrition";
@@ -38,7 +42,7 @@ export type RecipeRefineResult = {
   changes: Array<{ before: string | null; after: string }>;
 };
 
-// AI requests (import, "Aus Idee", chat changes) per user and day.
+// AI requests (import, "Aus Idee", chat changes, "Ausgewogenheit berechnen") per user and day.
 export const DAILY_AI_LIMIT = 30;
 
 export const RECIPE_EXTRACT_MAX_IMAGES = 5;

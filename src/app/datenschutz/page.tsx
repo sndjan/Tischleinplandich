@@ -88,6 +88,13 @@ export default function DatenschutzPage() {
         Abs. 1 lit. b DSGVO; die Übermittlung in die USA stützt sich auf Standardvertragsklauseln. Um Missbrauch zu
         verhindern, zählen wir die KI-Anfragen pro Tag.
       </p>
+      <p>
+        Für die Ausgewogenheit schätzt die KI beim Import (oder wenn du „Ausgewogenheit berechnen“ antippst) aus den
+        Zutaten des Rezepts Nährstoffe und Lebensmittelgruppen. Dafür werden nur Name, Zutaten, Portionen und
+        Zubereitung des Rezepts gesendet. Die Schätzung speichern wir beim Rezept; den Wert für Rezepte und Wochen
+        berechnet die App daraus in deinem Browser. Angaben über deine Gesundheit erfragen oder speichern wir dabei
+        nicht.
+      </p>
 
       <h2>8. Feedback</h2>
       <p>

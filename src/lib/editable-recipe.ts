@@ -3,6 +3,7 @@
 
 import type { Recipe } from "@/types/database";
 import type { RecipeDraft } from "@/lib/recipe-draft";
+import { parseRecipeBalance, type RecipeBalance } from "@/lib/balance";
 
 export type IngredientRow = {
   id: string;
@@ -24,6 +25,8 @@ export type EditableRecipe = {
   tags: string[];
   source_url: string;
   is_public: boolean;
+  // Kept as is; edits to ingredients or portions make it stale (getBalanceState).
+  balance: RecipeBalance | null;
 };
 
 export const INGREDIENT_UNITS = [
@@ -151,6 +154,7 @@ export function editableFromDraft(draft: RecipeDraft): EditableRecipe {
     tags: draft.tags,
     source_url: draft.source_url,
     is_public: true,
+    balance: draft.balance,
   };
 }
 
@@ -168,6 +172,7 @@ export function editableFromRecipe(recipe: Recipe, tags: string[]): EditableReci
     tags,
     source_url: recipe.source_url ?? "",
     is_public: recipe.is_public,
+    balance: parseRecipeBalance(recipe.balance),
   };
 }
 
@@ -184,6 +189,7 @@ export const emptyEditableRecipe = (): EditableRecipe => ({
   tags: [],
   source_url: "",
   is_public: true,
+  balance: null,
 });
 
 const fieldToNumber = (value: string) => {
@@ -210,6 +216,7 @@ export function draftFromEditable(recipe: EditableRecipe): RecipeDraft {
     carbs: fieldToNumber(recipe.carbs),
     fats: fieldToNumber(recipe.fats),
     serving_size: recipe.serving_size,
+    balance: recipe.balance,
   };
 }
 

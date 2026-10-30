@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import { DayCard } from "./day-card";
 import { WeekAgenda, WeekSummary } from "./week-overview";
+import { WeekBalanceCard } from "./balance-display";
 import { cn } from "@/lib/utils";
 import { useAddMeal, useRemoveMeal } from "@/hooks/use-planner-mutations";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -317,6 +318,10 @@ export function MealWeekView({
               weekRange={weekRange}
               onSelectDay={openDay}
             />
+          )}
+
+          {nutritionTargets.show_balance && (
+            <WeekBalanceCard plannedMeals={plannedMeals} recipesById={recipesById} />
           )}
 
           {/* Mobile: agenda; the date or "Planen" opens the day to add meals */}

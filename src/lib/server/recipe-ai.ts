@@ -3,6 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod/v4";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAILY_AI_LIMIT, type RecipeDraft } from "@/lib/recipe-draft";
+import {
+  BALANCE_GROUPS,
+  BALANCE_VERSION,
+  balanceFingerprint,
+  parseRecipeBalance,
+  type RecipeBalance,
+} from "@/lib/balance";
 import { safeFetch } from "@/lib/server/safe-fetch";
 
 // Haiku is plenty for reading and adapting recipes and keeps each request at a
@@ -30,6 +37,26 @@ const IngredientSchema = z.object({
   unit: z.string().nullable(),
 });
 
+// Facts for the "Ausgewogenheit" score. The app calculates the score from them
+// (src/lib/balance.ts); the model never rates a recipe itself.
+export const BalanceFactsSchema = z.object({
+  energy_kcal: z.number(),
+  fiber_g: z.number(),
+  added_sugar_g: z.number(),
+  saturated_fat_g: z.number(),
+  salt_g: z.number(),
+  ingredients: z.array(
+    z.object({
+      name: z.string(),
+      grams: z.number(),
+      group: z.enum(BALANCE_GROUPS),
+      nova: z.number(),
+      whole_grain: z.boolean(),
+      plant: z.string().nullable(),
+    }),
+  ),
+});
+
 // Field order matters: the result streams in this order, which drives the
 // progress steps shown while it is written.
 const RecipeFields = {
@@ -42,6 +69,7 @@ const RecipeFields = {
   protein: z.number().nullable(),
   carbs: z.number().nullable(),
   fats: z.number().nullable(),
+  balance: BalanceFactsSchema,
   tags: z.array(z.string()),
   source_url: z.string().nullable(),
 };
@@ -61,12 +89,21 @@ export const RefinedRecipeSchema = z.object({
 
 export type ExtractedRecipe = z.infer<typeof ExtractedRecipeSchema>;
 
+const BALANCE_RULES = `- balance: sachliche Schätzung PRO PORTION für eine Ernährungsauswertung (du bewertest nichts selbst):
+  - energy_kcal (wie calories), fiber_g (Ballaststoffe), added_sugar_g (nur zugesetzter Zucker inkl. Honig und Sirup, nicht der natürliche Zucker in Obst oder Milch), saturated_fat_g, salt_g (Salz inkl. Salz in Brühe, Sojasoße, Käse, Wurst).
+  - ingredients: jede Zutat mit grams (geschätztes Gewicht pro Portion), group, nova, whole_grain, plant.
+  - group: vegetables (Gemüse, Pilze, Kräuter), fruit, legumes (Hülsenfrüchte inkl. Tofu, Tempeh), potatoes, grains (Getreide, Mehl, Nudeln, Reis, Brot), nuts_seeds, dairy (Milchprodukte, Käse), eggs, fish (Fisch, Meeresfrüchte), poultry, red_meat (Rind, Schwein, Lamm, Hack), processed_meat (Wurst, Schinken, Speck, Salami), fats_oils, sugar_sweets, condiments (Soßen, Brühe, Gewürze, Senf), beverages, other.
+  - nova: 1 unverarbeitet oder minimal verarbeitet (frisches Gemüse, Obst, Fleisch, Eier, Milch, Mehl, Reis, Nudeln, getrocknete Hülsenfrüchte), 2 Küchenzutat (Öl, Butter, Zucker, Salz, Essig), 3 verarbeitet (Käse, Brot, Dosengemüse, geräucherter Fisch, Speck), 4 hochverarbeitet (Fertigsoßen, Instantbrühe, Wurst mit Zusatzstoffen, Fleischersatz-Fertigprodukte, Süßigkeiten, Toastbrot).
+  - whole_grain: true nur bei Vollkorn (Vollkornmehl, -nudeln, Naturreis, Haferflocken).
+  - plant: die Pflanze in einem Wort im Singular ("Tomate", "Kichererbse", "Weizen"), null bei tierischen Zutaten, Salz, Wasser und Zucker.`;
+
 const SHARED_RULES = `Regeln:
 - Schreibe Name, Zutaten, Zubereitungsschritte und Tags auf Deutsch.
 - Mengen metrisch (g, kg, ml, l). Übliche Küchenmaße wie EL, TL, Prise, Stück, Bund, Dose bleiben erhalten. Ohne Mengenangabe ist quantity null.
 - preparation_steps: ein Schritt pro Eintrag, ohne Nummerierung.
 - serving_size: Anzahl der Portionen, die das Rezept ergibt (Standard 1).
 - Nährwerte (calories in kcal, protein/carbs/fats in g) gelten PRO PORTION. Stehen sie in der Quelle, übernimm sie (ggf. auf eine Portion umgerechnet). Fehlen sie, schätze sie realistisch anhand der Zutaten und Mengen.
+${BALANCE_RULES}
 - prep_time als kurzer Text, z. B. "30 Min." oder null.
 - tags: 1–4 kurze Tags (z. B. Mahlzeit, Küche, Eigenschaften). Verwende bevorzugt die vorhandenen Tags des Nutzers, wenn sie passen.`;
 
@@ -92,6 +129,12 @@ Gib das vollständige angepasste Rezept zurück und ändere nur, was die Anweisu
 
 ${SHARED_RULES}`;
 
+export const ANALYZE_SYSTEM_PROMPT = `Du schätzt für ein bestehendes Rezept einer Wochen-Essensplaner-App die Fakten für eine Ernährungsauswertung. Ändere das Rezept nicht und bewerte es nicht; liefere nur die Schätzung.
+
+Regeln:
+${BALANCE_RULES}
+- Die Portionenzahl steht im Rezept; alle Werte gelten für eine Portion. Fehlen Mengen, schätze übliche Mengen.`;
+
 const roundOrNull = (value: number | null | undefined) =>
   value === null || value === undefined || !Number.isFinite(value) ? null : Math.round(value);
 
@@ -102,24 +145,46 @@ const formatQuantity = (quantity: number | null | undefined) =>
 
 type RecipeLike = Partial<z.infer<z.ZodObject<typeof RecipeFields>>>;
 
+const formatIngredients = (ingredients: RecipeLike["ingredients"]) =>
+  (Array.isArray(ingredients) ? ingredients : [])
+    .filter((ingredient) => ingredient && typeof ingredient.name === "string")
+    .map((ingredient) =>
+      [formatQuantity(ingredient.quantity), ingredient.unit?.trim() ?? "", ingredient.name.trim()]
+        .filter(Boolean)
+        .join(" "),
+    )
+    .filter(Boolean)
+    .join("\n");
+
+/**
+ * The model's facts, stamped with the ingredients they were estimated for, so the
+ * app notices when the recipe is edited afterwards. Null while still streaming.
+ */
+export function toRecipeBalance(
+  facts: unknown,
+  ingredients: string,
+  servingSize: number,
+): RecipeBalance | null {
+  if (!facts || typeof facts !== "object") return null;
+  return parseRecipeBalance({
+    ...facts,
+    version: BALANCE_VERSION,
+    fingerprint: balanceFingerprint(ingredients, servingSize),
+  });
+}
+
 /**
  * Turns the (possibly still incomplete) model output into a draft for the client.
  */
 export function toRecipeDraft(recipe: RecipeLike, requestUrl = ""): RecipeDraft {
-  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
   const steps = Array.isArray(recipe.preparation_steps) ? recipe.preparation_steps : [];
+  const servingSize =
+    typeof recipe.serving_size === "number" && recipe.serving_size > 0 ? recipe.serving_size : 1;
+  const ingredients = formatIngredients(recipe.ingredients);
 
   return {
     name: typeof recipe.name === "string" ? recipe.name.trim() : "",
-    ingredients: ingredients
-      .filter((ingredient) => ingredient && typeof ingredient.name === "string")
-      .map((ingredient) =>
-        [formatQuantity(ingredient.quantity), ingredient.unit?.trim() ?? "", ingredient.name.trim()]
-          .filter(Boolean)
-          .join(" "),
-      )
-      .filter(Boolean)
-      .join("\n"),
+    ingredients,
     preparation_steps: steps
       .filter((step): step is string => typeof step === "string")
       .map((step) => step.trim())
@@ -135,8 +200,8 @@ export function toRecipeDraft(recipe: RecipeLike, requestUrl = ""): RecipeDraft 
     protein: roundOrNull(recipe.protein),
     carbs: roundOrNull(recipe.carbs),
     fats: roundOrNull(recipe.fats),
-    serving_size:
-      typeof recipe.serving_size === "number" && recipe.serving_size > 0 ? recipe.serving_size : 1,
+    serving_size: servingSize,
+    balance: toRecipeBalance(recipe.balance, ingredients, servingSize),
   };
 }
 

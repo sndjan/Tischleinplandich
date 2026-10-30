@@ -71,7 +71,7 @@ Automatisch: Eine geplante Claude-Code-Aufgabe (täglich, 5:47 Uhr) liest alle E
 
 ## KI-Nutzung und Kosten
 
-Rezept-Import, „Aus Idee“ und „Mit KI ändern“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
+Rezept-Import, „Aus Idee“, „Mit KI ändern“ und „Ausgewogenheit berechnen“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
 
 Im Profil steht unter „KI-Anfragen heute“, wie viele davon schon verbraucht sind (nur sichtbar, wenn die Migration läuft).
 
@@ -121,6 +121,12 @@ Pro Konto gibt es höchstens 90 Tage in zwölf Monaten (die letzte Belohnung wir
 ## Nährwerte ausblenden
 
 Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros in der ganzen App aus (Planer, Wochenübersicht, Rezeptkarten und -ansicht). Gespeichert wird das in `user_preferences.show_nutrition` (Migration `014_add_show_nutrition.sql`, im SQL Editor ausführen). Ohne die Migration bleiben Nährwerte sichtbar und der Schalter zeigt einen Hinweis.
+
+## Ausgewogenheit
+
+Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Für alte, selbst getippte oder geänderte Rezepte gibt es in der Rezeptansicht „Ausgewogenheit berechnen“ (eine KI-Anfrage, `/api/recipes/analyze`).
+
+Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), „Berechnen“ und der Schalter zeigen einen Hinweis.
 
 ## Warteliste (Double-Opt-in)
 
