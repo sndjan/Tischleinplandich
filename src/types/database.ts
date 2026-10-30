@@ -55,6 +55,9 @@ export type Database = {
           share_id: string | null;
           // Own 1–5 star rating, null when not rated. Migration 012.
           rating: number | null;
+          // AI-estimated facts for the "Ausgewogenheit" score (src/lib/balance.ts);
+          // validate with parseRecipeBalance before use. Migration 022.
+          balance?: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -75,6 +78,7 @@ export type Database = {
           is_public?: boolean;
           share_id?: string | null;
           rating?: number | null;
+          balance?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -95,6 +99,7 @@ export type Database = {
           is_public?: boolean;
           share_id?: string | null;
           rating?: number | null;
+          balance?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -218,6 +223,8 @@ export type Database = {
           carbs_target_enabled: boolean;
           fats_target_enabled: boolean;
           show_nutrition: boolean;
+          // Shows the "Ausgewogenheit" score. Migration 022.
+          show_balance?: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -233,6 +240,7 @@ export type Database = {
           carbs_target_enabled?: boolean;
           fats_target_enabled?: boolean;
           show_nutrition?: boolean;
+          show_balance?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -248,6 +256,7 @@ export type Database = {
           carbs_target_enabled?: boolean;
           fats_target_enabled?: boolean;
           show_nutrition?: boolean;
+          show_balance?: boolean;
           created_at?: string;
           updated_at?: string;
         };

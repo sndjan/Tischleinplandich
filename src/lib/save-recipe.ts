@@ -8,6 +8,7 @@ import { draftFromEditable, type EditableRecipe } from "@/lib/editable-recipe";
 import type { Recipe } from "@/types/database";
 import { toSourceUrl } from "@/lib/safe-links";
 import { toUploadableImage } from "@/lib/image-utils";
+import { isMissingColumnError } from "@/hooks/use-planner-data";
 
 export class SaveRecipeError extends Error {}
 
@@ -146,26 +147,39 @@ export async function saveRecipe(
     serving_size: draft.serving_size || 1,
     image_url: imageUrl,
     is_public: recipe.is_public,
+    balance: draft.balance,
+  };
+
+  // Until migration 022 runs there is no balance column; the recipe saves without it.
+  // PostgREST reports unknown columns in writes as PGRST204.
+  const missingBalance = (error: { code?: string } | null) =>
+    isMissingColumnError(error) || error?.code === "PGRST204";
+  const withoutBalance = () => {
+    const rest: Partial<typeof payload> = { ...payload };
+    delete rest.balance;
+    return rest;
   };
 
   let recipeId: string;
 
   try {
     if (existing) {
-      const { error } = await supabase
-        .from("recipes")
-        .update(payload)
-        .eq("id", existing.id)
-        .eq("user_id", user.id);
+      const update = (values: Partial<typeof payload>) =>
+        supabase.from("recipes").update(values).eq("id", existing.id).eq("user_id", user.id);
+      let { error } = await update(payload);
+      if (missingBalance(error)) ({ error } = await update(withoutBalance()));
 
       if (error) throw new SaveRecipeError(recipeSaveErrorMessage(error));
       recipeId = existing.id;
     } else {
-      const { data, error } = await supabase
-        .from("recipes")
-        .insert({ user_id: user.id, ...payload })
-        .select("id")
-        .single<{ id: string }>();
+      const insert = (values: Partial<typeof payload>) =>
+        supabase
+          .from("recipes")
+          .insert({ user_id: user.id, ...(values as typeof payload) })
+          .select("id")
+          .single<{ id: string }>();
+      let { data, error } = await insert(payload);
+      if (missingBalance(error)) ({ data, error } = await insert(withoutBalance()));
 
       if (error || !data) throw new SaveRecipeError(error ? recipeSaveErrorMessage(error) : "Speichern fehlgeschlagen");
       recipeId = data.id;

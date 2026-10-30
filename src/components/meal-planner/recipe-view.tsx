@@ -10,6 +10,7 @@ import { AddToListSheet } from "./add-to-list-sheet";
 import { ShareRecipeSheet } from "./share-recipe-sheet";
 import { StarRating, useRateRecipe } from "./star-rating";
 import { useShowNutrition } from "./nutrition-target-settings";
+import { RecipeBalanceSection, useShowBalance } from "./balance-display";
 
 interface RecipeViewProps {
   recipe: Recipe;
@@ -31,6 +32,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
   const [sheet, setSheet] = useState<"plan" | "share" | "list" | null>(null);
   const rateRecipe = useRateRecipe();
   const showNutrition = useShowNutrition();
+  const showBalance = useShowBalance();
 
   return (
     <div className="flex min-h-dvh flex-col bg-white">
@@ -41,6 +43,7 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
           servings={servings}
           onServingsChange={setServings}
           showNutrition={showNutrition}
+          balance={showBalance && <RecipeBalanceSection recipe={recipe} />}
           rating={<StarRating value={recipe.rating ?? null} onChange={(value) => void rateRecipe(recipe, value)} />}
           heroActions={
             <>

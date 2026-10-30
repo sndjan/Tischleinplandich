@@ -17,6 +17,7 @@ export const DEMO_TARGETS: NutritionTargetSettings = {
   carbs_target_enabled: true,
   fats_target_enabled: true,
   show_nutrition: true,
+  show_balance: true,
 };
 
 export const DEMO_PANTRY_STAPLES = ["salz", "olivenöl", "currypulver"];
@@ -161,6 +162,7 @@ export function importedDraft(ingredientCount: number, stepCount: number, withNu
     carbs: withNutrition ? IMPORTED_INPUT.carbs : null,
     fats: withNutrition ? IMPORTED_INPUT.fats : null,
     serving_size: 1,
+    balance: null,
   };
 }
 

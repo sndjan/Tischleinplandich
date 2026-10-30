@@ -35,6 +35,7 @@ export function RecipeBody({
   heroActions,
   attribution,
   rating,
+  balance,
   showNutrition = true,
 }: {
   recipe: Pick<
@@ -48,6 +49,8 @@ export function RecipeBody({
   attribution?: React.ReactNode;
   // Own rating stars; only shown for the reader's own recipes.
   rating?: React.ReactNode;
+  // "Ausgewogenheit" section, shown below the nutrition values.
+  balance?: React.ReactNode;
   showNutrition?: boolean;
 }) {
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
@@ -126,6 +129,8 @@ export function RecipeBody({
             <p className="text-xs text-brand-secondary">Pro Portion</p>
           </section>
         )}
+
+        {balance}
 
         <section className="space-y-1">
           <div className="mb-1.5 flex items-center justify-between gap-3">

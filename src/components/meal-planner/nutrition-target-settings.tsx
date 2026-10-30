@@ -22,6 +22,8 @@ export type NutritionTargetSettings = {
   fats_target_enabled: boolean;
   // Off hides calories and macros everywhere in the app.
   show_nutrition: boolean;
+  // Off hides the "Ausgewogenheit" score of recipes and the week.
+  show_balance: boolean;
 };
 
 export const DEFAULT_NUTRITION_TARGETS: NutritionTargetSettings = {
@@ -34,6 +36,7 @@ export const DEFAULT_NUTRITION_TARGETS: NutritionTargetSettings = {
   carbs_target_enabled: true,
   fats_target_enabled: true,
   show_nutrition: true,
+  show_balance: true,
 };
 
 const toNutritionTargets = (
@@ -70,6 +73,10 @@ const toNutritionTargets = (
   // Missing until migration 014 runs.
   show_nutrition: Boolean(
     preferences?.show_nutrition ?? DEFAULT_NUTRITION_TARGETS.show_nutrition,
+  ),
+  // Missing until migration 022 runs.
+  show_balance: Boolean(
+    preferences?.show_balance ?? DEFAULT_NUTRITION_TARGETS.show_balance,
   ),
 });
 
@@ -151,9 +158,10 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
       const user = await getSessionUser();
       if (!user) throw new Error("Nicht angemeldet");
 
-      // show_nutrition is saved on its own, so targets still save without migration 014.
+      // The switches are saved on their own, so targets still save without migrations 014 and 022.
       const targets: Partial<NutritionTargetSettings> = { ...next };
       delete targets.show_nutrition;
+      delete targets.show_balance;
       const { error } = await createClient()
         .from("user_preferences")
         .upsert({ user_id: user.id, ...targets }, { onConflict: "user_id" });
@@ -176,8 +184,8 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
     [save],
   );
 
-  const toggleShowNutrition = async (show: boolean) => {
-    const next = { ...settings, show_nutrition: show };
+  const toggleSwitch = async (key: "show_nutrition" | "show_balance", show: boolean) => {
+    const next = { ...settings, [key]: show };
     setSettings(next);
     onChange(next);
 
@@ -185,14 +193,17 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
     if (!user) return;
     const { error } = await createClient()
       .from("user_preferences")
-      .upsert({ user_id: user.id, show_nutrition: show }, { onConflict: "user_id" });
+      .upsert(
+        key === "show_balance" ? { user_id: user.id, show_balance: show } : { user_id: user.id, show_nutrition: show },
+        { onConflict: "user_id" },
+      );
 
     if (error) {
       console.error(error);
-      const reverted = { ...next, show_nutrition: !show };
+      const reverted = { ...next, [key]: !show };
       setSettings(reverted);
       onChange(reverted);
-      toast.error("Gibt es erst nach dem Datenbank-Update (Migration 014).");
+      toast.error(`Gibt es erst nach dem Datenbank-Update (Migration ${key === "show_balance" ? "022" : "014"}).`);
     }
   };
 
@@ -241,8 +252,22 @@ export function NutritionTargetsScreen({ targets, onBack, onChange }: NutritionT
           </span>
           <Switch
             checked={settings.show_nutrition}
-            onChange={(checked) => void toggleShowNutrition(checked)}
+            onChange={(checked) => void toggleSwitch("show_nutrition", checked)}
             label="Nährwerte anzeigen"
+          />
+        </section>
+
+        <section className="flex items-center justify-between gap-3 rounded-[18px] bg-white p-3.5 ring-1 ring-brand-card-border">
+          <span className="min-w-0">
+            <span className="block text-[15px] font-bold text-brand-ink">Ausgewogenheit anzeigen</span>
+            <span className="block text-[13px] text-brand-secondary">
+              Wert von 0 bis 100 für Rezepte und die Woche
+            </span>
+          </span>
+          <Switch
+            checked={settings.show_balance}
+            onChange={(checked) => void toggleSwitch("show_balance", checked)}
+            label="Ausgewogenheit anzeigen"
           />
         </section>
 

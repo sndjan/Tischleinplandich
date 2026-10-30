@@ -122,6 +122,12 @@ Pro Konto gibt es höchstens 90 Tage in zwölf Monaten (die letzte Belohnung wir
 
 Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros in der ganzen App aus (Planer, Wochenübersicht, Rezeptkarten und -ansicht). Gespeichert wird das in `user_preferences.show_nutrition` (Migration `014_add_show_nutrition.sql`, im SQL Editor ausführen). Ohne die Migration bleiben Nährwerte sichtbar und der Schalter zeigt einen Hinweis.
 
+## Ausgewogenheit
+
+Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Alte, selbst getippte oder von Hand geänderte Rezepte haben (noch) keinen aktuellen Wert; die Fakten lassen sich später gesammelt nachtragen (Format: `RecipeBalance` in `src/lib/balance.ts`, `fingerprint` per `balanceFingerprint`).
+
+Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), der Schalter zeigt einen Hinweis.
+
 ## Warteliste (Double-Opt-in)
 
 Die Landingpage sammelt E-Mails für den Start (Migration `015_create_waitlist.sql`, im SQL Editor ausführen). Ablauf: Eintragen → Bestätigungsmail über Resend → Klick auf `/warteliste?token=…` und dort auf „Anmeldung bestätigen“ (ein Knopf statt direktem Link, damit Mail-Scanner nicht automatisch bestätigen). Jede Mail enthält einen Abmeldelink, der den Eintrag löscht. Unbestätigte Einträge werden nach 30 Tagen gelöscht.
