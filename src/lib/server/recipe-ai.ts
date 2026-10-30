@@ -129,12 +129,6 @@ Gib das vollständige angepasste Rezept zurück und ändere nur, was die Anweisu
 
 ${SHARED_RULES}`;
 
-export const ANALYZE_SYSTEM_PROMPT = `Du schätzt für ein bestehendes Rezept einer Wochen-Essensplaner-App die Fakten für eine Ernährungsauswertung. Ändere das Rezept nicht und bewerte es nicht; liefere nur die Schätzung.
-
-Regeln:
-${BALANCE_RULES}
-- Die Portionenzahl steht im Rezept; alle Werte gelten für eine Portion. Fehlen Mengen, schätze übliche Mengen.`;
-
 const roundOrNull = (value: number | null | undefined) =>
   value === null || value === undefined || !Number.isFinite(value) ? null : Math.round(value);
 

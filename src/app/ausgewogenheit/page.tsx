@@ -24,15 +24,15 @@ export default function AusgewogenheitPage() {
 
       <h2>Wie der Wert entsteht</h2>
       <p>
-        Beim Import eines Rezepts (oder auf Knopfdruck) schätzt eine KI nur Fakten: welche Zutaten in einer
-        Portion stecken und wie viel davon, wie stark sie verarbeitet sind, und wie viel Ballaststoffe,
+        Beim Import eines Rezepts, beim Erstellen aus einer Idee und beim Ändern mit KI schätzt eine KI nur
+        Fakten: welche Zutaten in einer Portion stecken und wie viel davon, wie stark sie verarbeitet sind, und wie viel Ballaststoffe,
         zugesetzter Zucker, gesättigte Fette und Salz eine Portion hat. Die Punkte vergibt die KI nicht. Sie
         entstehen aus den festen Regeln unten, damit dasselbe Rezept immer denselben Wert bekommt und jeder
         Punkt nachvollziehbar ist.
       </p>
       <p>
         Die Fakten sind Schätzungen. Sie können danebenliegen, besonders bei ungenauen Mengenangaben. Ändert
-        sich ein Rezept, wird der Wert als veraltet markiert und kann neu berechnet werden.
+        sich ein Rezept von Hand, wird der Wert als veraltet markiert und zählt nicht mehr für die Woche.
       </p>
       <p>
         Mengen vergleichen wir pro 1.000 kcal statt pro Portion. So werden ein kleiner Salat und ein großer

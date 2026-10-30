@@ -71,7 +71,7 @@ Automatisch: Eine geplante Claude-Code-Aufgabe (täglich, 5:47 Uhr) liest alle E
 
 ## KI-Nutzung und Kosten
 
-Rezept-Import, „Aus Idee“, „Mit KI ändern“ und „Ausgewogenheit berechnen“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
+Rezept-Import, „Aus Idee“ und „Mit KI ändern“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
 
 Im Profil steht unter „KI-Anfragen heute“, wie viele davon schon verbraucht sind (nur sichtbar, wenn die Migration läuft).
 
@@ -124,9 +124,9 @@ Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros 
 
 ## Ausgewogenheit
 
-Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Für alte, selbst getippte oder geänderte Rezepte gibt es in der Rezeptansicht „Ausgewogenheit berechnen“ (eine KI-Anfrage, `/api/recipes/analyze`).
+Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Alte, selbst getippte oder von Hand geänderte Rezepte haben (noch) keinen aktuellen Wert; die Fakten lassen sich später gesammelt nachtragen (Format: `RecipeBalance` in `src/lib/balance.ts`, `fingerprint` per `balanceFingerprint`).
 
-Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), „Berechnen“ und der Schalter zeigen einen Hinweis.
+Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), der Schalter zeigt einen Hinweis.
 
 ## Warteliste (Double-Opt-in)
 

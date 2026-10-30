@@ -42,7 +42,7 @@ export type RecipeRefineResult = {
   changes: Array<{ before: string | null; after: string }>;
 };
 
-// AI requests (import, "Aus Idee", chat changes, "Ausgewogenheit berechnen") per user and day.
+// AI requests (import, "Aus Idee", chat changes) per user and day.
 export const DAILY_AI_LIMIT = 30;
 
 export const RECIPE_EXTRACT_MAX_IMAGES = 5;

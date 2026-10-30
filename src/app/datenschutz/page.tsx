@@ -89,9 +89,8 @@ export default function DatenschutzPage() {
         verhindern, zählen wir die KI-Anfragen pro Tag.
       </p>
       <p>
-        Für die Ausgewogenheit schätzt die KI beim Import (oder wenn du „Ausgewogenheit berechnen“ antippst) aus den
-        Zutaten des Rezepts Nährstoffe und Lebensmittelgruppen. Dafür werden nur Name, Zutaten, Portionen und
-        Zubereitung des Rezepts gesendet. Die Schätzung speichern wir beim Rezept; den Wert für Rezepte und Wochen
+        Für die Ausgewogenheit schätzt die KI bei diesen Anfragen zusätzlich aus den Zutaten des Rezepts Nährstoffe
+        und Lebensmittelgruppen; dafür werden keine weiteren Daten gesendet. Die Schätzung speichern wir beim Rezept; den Wert für Rezepte und Wochen
         berechnet die App daraus in deinem Browser. Angaben über deine Gesundheit erfragen oder speichern wir dabei
         nicht.
       </p>

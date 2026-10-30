@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, Loader2, RefreshCw, Scale } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { ChevronDown, Scale } from "lucide-react";
 import {
   balanceTone,
   getBalanceState,
@@ -11,10 +9,8 @@ import {
   scoreWeek,
   type BalanceCategory,
   type BalanceTone,
-  type RecipeBalance,
   type WeekBalanceMeal,
 } from "@/lib/balance";
-import { queryKeys, useUserId, type RecipesData } from "@/hooks/use-planner-data";
 import type { PlannedMeal, Recipe } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { useNutritionTargets } from "./nutrition-target-settings";
@@ -36,52 +32,6 @@ const TONE_TEXT: Record<BalanceTone, string> = {
 /** Whether the "Ausgewogenheit" score is shown at all. */
 export function useShowBalance() {
   return useNutritionTargets()[0].show_balance;
-}
-
-/**
- * Estimates and stores the facts for a saved recipe (one AI request) and puts
- * them into the cached recipe list.
- */
-export function useAnalyzeRecipe() {
-  const queryClient = useQueryClient();
-  const userId = useUserId();
-  const [pendingId, setPendingId] = useState<string | null>(null);
-
-  const analyze = async (recipe: Recipe) => {
-    if (!userId || pendingId) return;
-    setPendingId(recipe.id);
-
-    try {
-      const response = await fetch("/api/recipes/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipeId: recipe.id }),
-      });
-      const body = (await response.json().catch(() => null)) as { balance?: RecipeBalance; error?: string } | null;
-
-      if (!response.ok || !body?.balance) {
-        toast.error(body?.error ?? "Das hat nicht geklappt, bitte erneut versuchen");
-        return;
-      }
-
-      const balance = body.balance;
-      queryClient.setQueryData<RecipesData>(queryKeys.recipes(userId), (data) =>
-        data
-          ? {
-              ...data,
-              recipes: data.recipes.map((entry) => (entry.id === recipe.id ? { ...entry, balance } : entry)),
-            }
-          : data,
-      );
-    } catch (error) {
-      console.error(error);
-      toast.error("Keine Verbindung, bitte erneut versuchen");
-    } finally {
-      setPendingId(null);
-    }
-  };
-
-  return { analyze, pendingId };
 }
 
 export function BalanceRing({ score, size = 52 }: { score: number; size?: number }) {
@@ -196,70 +146,31 @@ const METHOD_LINK = (
 );
 
 /**
- * The recipe's score with its reasons. `onAnalyze` (own recipes only) offers to
- * estimate the facts when they are missing or no longer match the ingredients.
+ * The recipe's score with its reasons. Recipes without facts show nothing; facts
+ * that no longer match the ingredients show greyed out until they are re-estimated.
  */
-export function RecipeBalanceSection({
-  recipe,
-  onAnalyze,
-  analyzing = false,
-}: {
-  recipe: Pick<Recipe, "ingredients" | "serving_size" | "balance">;
-  onAnalyze?: () => void;
-  analyzing?: boolean;
-}) {
+export function RecipeBalanceSection({ recipe }: { recipe: Pick<Recipe, "ingredients" | "serving_size" | "balance"> }) {
   const [open, setOpen] = useState(false);
   const state = getBalanceState(recipe);
-  const result = state.kind === "missing" ? null : scoreRecipe(state.balance);
-
-  if (state.kind === "missing" && !onAnalyze) return null;
-
-  const analyzeButton = onAnalyze && (
-    <button
-      type="button"
-      onClick={onAnalyze}
-      disabled={analyzing}
-      className="flex h-9 items-center gap-1.5 rounded-full bg-brand-accent-bg px-3.5 text-[13px] font-bold text-brand-accent-dark transition-transform active:scale-95 disabled:opacity-60"
-    >
-      {analyzing ? (
-        <Loader2 className="size-3.5 animate-spin" />
-      ) : state.kind === "missing" ? (
-        <Scale className="size-3.5" />
-      ) : (
-        <RefreshCw className="size-3.5" />
-      )}
-      {analyzing ? "Wird berechnet …" : state.kind === "missing" ? "Ausgewogenheit berechnen" : "Neu berechnen"}
-    </button>
-  );
+  if (state.kind === "missing") return null;
+  const result = scoreRecipe(state.balance);
 
   return (
     <section aria-label="Ausgewogenheit" className="space-y-3 rounded-[18px] bg-brand-stat-bg p-3.5">
-      {result ? (
-        <ScoreHeader
-          score={result.score}
-          label={`Ausgewogenheit · ${result.label}`}
-          note={state.kind === "stale" ? "Zutaten geändert – Wert ist veraltet" : "Pro Portion, Werte von der KI geschätzt"}
-          open={open}
-          onToggle={() => setOpen((value) => !value)}
-          muted={state.kind === "stale"}
-        />
-      ) : (
-        <div className="space-y-1">
-          <p className="text-[15px] font-bold text-brand-ink">Ausgewogenheit</p>
-          <p className="text-xs text-brand-secondary">
-            Wie gut passt das Rezept zu einer ausgewogenen Ernährung? Kostet eine KI-Anfrage.
-          </p>
-        </div>
-      )}
-
-      {result && open && (
+      <ScoreHeader
+        score={result.score}
+        label={`Ausgewogenheit · ${result.label}`}
+        note={state.kind === "stale" ? "Zutaten geändert – Wert ist veraltet" : "Pro Portion, Werte von der KI geschätzt"}
+        open={open}
+        onToggle={() => setOpen((value) => !value)}
+        muted={state.kind === "stale"}
+      />
+      {open && (
         <div className="space-y-3 border-t border-brand-divider pt-3">
           <CategoryList categories={result.categories} />
           {METHOD_LINK}
         </div>
       )}
-
-      {(state.kind !== "ready" || (open && onAnalyze)) && analyzeButton}
     </section>
   );
 }
@@ -311,7 +222,7 @@ export function WeekBalanceCard({
             <span className="block text-[15px] font-bold text-brand-ink">Ausgewogenheit der Woche</span>
             <span className="block text-xs text-brand-secondary">
               Ab 3 bewerteten Rezepten gibt es hier einen Wert.
-              {unscoredNote ? ` ${unscoredNote} – öffne ein Rezept, um es zu berechnen.` : ""}
+              {unscoredNote ? ` ${unscoredNote}.` : ""}
             </span>
           </span>
         </div>
