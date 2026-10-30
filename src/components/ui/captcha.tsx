@@ -14,15 +14,25 @@ const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 export function useCaptcha() {
   const ref = useRef<TurnstileInstance>(null);
   const [token, setToken] = useState<string | null>(null);
+  // Set when Cloudflare refuses the widget, e.g. 110200 for a hostname missing
+  // from the widget's list. Then no token ever arrives, so "still running" would be wrong.
+  const [failure, setFailure] = useState<string | null>(null);
   const enabled = Boolean(TURNSTILE_SITE_KEY);
 
   const widget = enabled ? (
     <Turnstile
       ref={ref}
       siteKey={TURNSTILE_SITE_KEY}
-      onSuccess={setToken}
+      onSuccess={(value) => {
+        setToken(value);
+        setFailure(null);
+      }}
       onExpire={() => setToken(null)}
-      onError={() => setToken(null)}
+      onError={(code) => {
+        setToken(null);
+        setFailure(code || "unknown");
+      }}
+      onUnsupported={() => setFailure("unsupported")}
       options={{ appearance: "interaction-only", language: "de", size: "flexible", theme: "light" }}
     />
   ) : null;
@@ -34,7 +44,12 @@ export function useCaptcha() {
     return current;
   };
 
-  return { enabled, ready: !enabled || token !== null, widget, take };
+  const message =
+    failure === null
+      ? CAPTCHA_PENDING_MESSAGE
+      : `Die Sicherheitsprüfung konnte nicht geladen werden (Fehler ${failure}). Lade die Seite neu oder versuch es in einem anderen Browser.`;
+
+  return { enabled, ready: !enabled || token !== null, widget, take, message };
 }
 
 export const CAPTCHA_PENDING_MESSAGE = "Sicherheitsprüfung läuft noch – bitte gleich nochmal versuchen.";
