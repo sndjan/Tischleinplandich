@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { WAITLIST_CONSENT_TEXT } from "@/lib/waitlist";
-import { CAPTCHA_PENDING_MESSAGE, useCaptcha } from "@/components/ui/captcha";
+import { useCaptcha } from "@/components/ui/captcha";
 
 /**
  * Email field for launch news. The address only counts after the link in the
@@ -18,7 +18,7 @@ export function WaitlistForm() {
 
   const submit = async () => {
     if (!captcha.ready) {
-      setError(CAPTCHA_PENDING_MESSAGE);
+      setError(captcha.message);
       setState("error");
       return;
     }

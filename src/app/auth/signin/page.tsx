@@ -8,7 +8,7 @@ import type { AuthError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { safeNextPath } from '@/lib/auth/next-path';
 import { StatusButton, useActionStatus } from '@/components/ui/status-button';
-import { CAPTCHA_PENDING_MESSAGE, useCaptcha } from '@/components/ui/captcha';
+import { useCaptcha } from '@/components/ui/captcha';
 import { cn } from '@/lib/utils';
 
 const RESEND_SECONDS = 30;
@@ -63,7 +63,7 @@ function SignIn() {
     sendStatus.run(async () => {
       setError(null);
       if (!captcha.ready) {
-        setError(CAPTCHA_PENDING_MESSAGE);
+        setError(captcha.message);
         throw new Error('Captcha not ready');
       }
       const callback = new URL('/auth/callback', window.location.origin);
