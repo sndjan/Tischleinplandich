@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import { DayCard } from "./day-card";
@@ -143,6 +143,122 @@ export function WeekSwitcher({ className }: { className?: string }) {
   );
 }
 
+// Past weeks count as fully past, later weeks as not started yet.
+const getTodayIndex = (weekOffset: number) =>
+  weekOffset === 0 ? getDayIndex(new Date()) : weekOffset < 0 ? 7 : -1;
+
+/**
+ * Mo–So above the day view. It scrolls sideways a week at a time: last and
+ * next week sit just off screen, and once a swipe settles on one, that week
+ * becomes the selected one and the strip recentres.
+ */
+function DayStrip({
+  selectedDayIndex,
+  onSelectDay,
+  plannedMealsByDay,
+}: {
+  selectedDayIndex: number;
+  onSelectDay: (dayIndex: number) => void;
+  plannedMealsByDay: Map<number, PlannedMeal[]>;
+}) {
+  const { offset, setOffset, monday } = useSelectedWeek();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const settleTimeoutRef = useRef<number>();
+
+  const pages = useMemo(
+    () =>
+      [-1, 0, 1].map((delta) => {
+        const weekMonday = new Date(monday);
+        weekMonday.setDate(monday.getDate() + delta * 7);
+        return { delta, dates: getWeekDates(weekMonday), todayIndex: getTodayIndex(offset + delta) };
+      }),
+    [monday, offset],
+  );
+
+  // Before paint, so the new week appears in place instead of sliding back.
+  useLayoutEffect(() => {
+    const strip = scrollRef.current;
+    if (strip) strip.scrollLeft = strip.clientWidth;
+  }, [offset]);
+
+  useEffect(() => () => window.clearTimeout(settleTimeoutRef.current), []);
+
+  // Scroll snapping keeps firing scroll events until it rests on a page, so a
+  // short quiet spell means the swipe is done.
+  const handleScroll = () => {
+    window.clearTimeout(settleTimeoutRef.current);
+    settleTimeoutRef.current = window.setTimeout(() => {
+      const strip = scrollRef.current;
+      if (!strip || strip.clientWidth === 0) return;
+      const page = Math.round(strip.scrollLeft / strip.clientWidth);
+      if (page === 1) return;
+      if (navigator.vibrate) navigator.vibrate(5);
+      setOffset(offset + page - 1);
+    }, 120);
+  };
+
+  return (
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      // Room above and below, so the today ring and the selected shadow aren't clipped.
+      className="-mb-3 -mt-1 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {pages.map(({ delta, dates, todayIndex }) => {
+        const current = delta === 0;
+
+        return (
+          <div
+            key={delta}
+            role={current ? "tablist" : undefined}
+            aria-label={current ? "Tag" : undefined}
+            aria-hidden={current ? undefined : true}
+            className="grid w-full shrink-0 snap-center snap-always grid-cols-7 gap-1 px-0.5"
+          >
+            {SHORT_DAYS.map((day, index) => {
+              const selected = current && index === selectedDayIndex;
+              const hasMeals = current && (plannedMealsByDay.get(index)?.length ?? 0) > 0;
+
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  role={current ? "tab" : undefined}
+                  aria-selected={current ? selected : undefined}
+                  aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
+                  tabIndex={current ? undefined : -1}
+                  onClick={() => current && onSelectDay(index)}
+                  className={cn(
+                    "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
+                    selected
+                      ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
+                      : cn(
+                          "text-brand-ink ring-1 ring-brand-card-border",
+                          index < todayIndex ? "bg-brand-chip-neutral" : "bg-white",
+                        ),
+                    !selected && index === todayIndex && "ring-2 ring-brand-accent",
+                  )}
+                >
+                  <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>
+                    {day}
+                  </span>
+                  <span className="font-heading text-[17px] font-extrabold leading-none">{dates[index]}</span>
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent",
+                    )}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface MealWeekViewProps {
   recipes: Recipe[];
   plannedMeals: PlannedMeal[];
@@ -161,8 +277,7 @@ export function MealWeekView({
   onViewModeChange,
 }: MealWeekViewProps) {
   const { offset, monday } = useSelectedWeek();
-  // Past weeks count as fully past, later weeks as not started yet.
-  const todayIndex = offset === 0 ? getDayIndex(new Date()) : offset < 0 ? 7 : -1;
+  const todayIndex = getTodayIndex(offset);
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => Math.max(0, Math.min(6, todayIndex)));
   const addMeal = useAddMeal();
   const weekDates = useMemo(() => getWeekDates(monday), [monday]);
@@ -258,44 +373,11 @@ export function MealWeekView({
       <WeekSwitcher className={cn(viewMode === "day" && "mx-auto max-w-xl")} />
       {viewMode === "day" ? (
         <div className="mx-auto max-w-xl space-y-2.5">
-          <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">
-            {SHORT_DAYS.map((day, index) => {
-              const selected = index === selectedDayIndex;
-              const hasMeals = (plannedMealsByDay.get(index)?.length ?? 0) > 0;
-
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
-                  onClick={() => setSelectedDayIndex(index)}
-                  className={cn(
-                    "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
-                    selected
-                      ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
-                      : cn(
-                          "text-brand-ink ring-1 ring-brand-card-border",
-                          index < todayIndex ? "bg-brand-chip-neutral" : "bg-white",
-                        ),
-                    !selected && index === todayIndex && "ring-2 ring-brand-accent",
-                  )}
-                >
-                  <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>
-                    {day}
-                  </span>
-                  <span className="font-heading text-[17px] font-extrabold leading-none">{weekDates[index]}</span>
-                  <span
-                    className={cn(
-                      "size-1.5 rounded-full",
-                      hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent",
-                    )}
-                  />
-                </button>
-              );
-            })}
-          </div>
+          <DayStrip
+            selectedDayIndex={selectedDayIndex}
+            onSelectDay={setSelectedDayIndex}
+            plannedMealsByDay={plannedMealsByDay}
+          />
 
           <DayCard
             key={selectedDayIndex}
