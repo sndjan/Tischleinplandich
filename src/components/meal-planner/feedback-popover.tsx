@@ -56,9 +56,16 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const cardRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messageRef = useRef(message);
   messageRef.current = message;
   const keyboardInset = useKeyboardInset();
+
+  // autoFocus would scroll the page behind the card to bring the field into
+  // view (it jumped to the top on phones); the card is fixed, so it never needs that.
+  useEffect(() => {
+    textareaRef.current?.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -155,6 +162,7 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
       </div>
 
       <textarea
+        ref={textareaRef}
         value={message}
         onChange={(event) => setMessage(event.target.value)}
         onKeyDown={(event) => {
@@ -162,7 +170,6 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
         }}
         maxLength={MAX_MESSAGE_LENGTH}
         rows={3}
-        autoFocus
         disabled={sending}
         aria-label="Nachricht"
         placeholder={

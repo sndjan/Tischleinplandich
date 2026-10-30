@@ -29,8 +29,8 @@ interface WeekSummaryProps {
 }
 
 /**
- * "Diese Woche": calories per day against the daily goal as small bars, and
- * per-day averages over the days that have something planned.
+ * "Diese Woche": calories per day against the daily goal as small bars,
+ * per-day averages over the days that have something planned, and the week's total.
  */
 export function WeekSummary({
   plannedMeals,
@@ -58,8 +58,11 @@ export function WeekSummary({
     ? nutritionTargets.calories_target
     : Math.max(...dayTotals.map((totals) => totals.calories), 1);
 
+  const weekCalories = dayTotals.reduce((sum, totals) => sum + totals.calories, 0);
+
   const stats = [
     { value: formatNumber(average("calories")), label: "Ø kcal / Tag" },
+    { value: formatNumber(weekCalories), label: "kcal / Woche" },
     ...(nutritionTargets.protein_target_enabled
       ? [{ value: `${formatNumber(average("protein"))} g`, label: "Ø Protein / Tag", accent: true }]
       : []),
@@ -123,7 +126,8 @@ export function WeekSummary({
         })}
       </div>
 
-      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}>
+      {/* Four tiles don't fit side by side on a phone, so they go two by two. */}
+      <div className={cn("grid gap-2", stats.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-xl bg-brand-stat-bg px-2.5 py-2">
             <b className={cn("block text-base", stat.accent ? "text-brand-accent-dark" : "text-brand-ink")}>
@@ -198,7 +202,13 @@ export function WeekAgenda({
               </span>
             </button>
 
-            <div className="min-w-0 flex-1 rounded-2xl bg-white px-3 py-1.5 ring-1 ring-brand-card-border">
+            <div
+              className={cn(
+                "min-w-0 flex-1 rounded-2xl px-3 py-1.5 ring-1 ring-brand-card-border",
+                // Past days recede so today and the days ahead stand out.
+                isPast ? "bg-brand-chip-neutral" : "bg-white",
+              )}
+            >
               {meals.length === 0 ? (
                 <div className="flex items-center justify-between gap-2 py-1.5">
                   <span className="text-[13px] text-brand-tertiary">Nichts geplant</span>
