@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, ListOrdered, Plus, Share, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Eye, EyeOff, ListOrdered, Plus, RotateCcw, Share, X } from "lucide-react";
 import toast from "react-hot-toast";
 import type { ShoppingListItem } from "@/types/database";
 import { isBasicIngredient } from "@/lib/shopping-list";
@@ -15,6 +15,7 @@ import {
 import type { ShoppingExtra } from "@/lib/shopping-list";
 import { formatWeekRange } from "@/lib/week";
 import { cn } from "@/lib/utils";
+import { showUndoToast } from "@/lib/undo-toast";
 import { useEntrance } from "@/hooks/use-entrance";
 import { useSelectedWeek } from "@/hooks/use-selected-week";
 
@@ -50,6 +51,7 @@ const CHECKED_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:checked-ite
 const HIDE_BASICS_STORAGE_KEY = "weekly-meal-planner:shopping-list:hide-basics";
 const CUSTOM_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:custom-items";
 const SECTION_ORDER_STORAGE_KEY = "weekly-meal-planner:shopping-list:section-order";
+const REMOVED_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:removed-items";
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -99,7 +101,12 @@ export function ShoppingList({
   // Checks belong to one week's list, so switching weeks doesn't clear them. The
   // planner remounts the list for each week, so the key is fixed while mounted.
   const checkedStorageKey = `${CHECKED_ITEMS_STORAGE_KEY}:${weekKey}`;
+  // Items from planned recipes the user already has at home. Kept per week by
+  // ingredient and unit, so they stay off the list when the plan changes.
+  const removedStorageKey = `${REMOVED_ITEMS_STORAGE_KEY}:${weekKey}`;
   const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
+  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
+  const [showRemoved, setShowRemoved] = useState(false);
   const [customItems, setCustomItems] = useState<CustomItem[]>([]);
   const [hideBasics, setHideBasics] = useState(true);
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
@@ -121,17 +128,25 @@ export function ShoppingList({
     setCheckedKeys(
       new Set(Array.isArray(storedChecked) ? storedChecked.filter((key) => typeof key === "string") : []),
     );
+    const storedRemoved = readStorage<unknown>(removedStorageKey, []);
+    setRemovedKeys(
+      new Set(Array.isArray(storedRemoved) ? storedRemoved.filter((key) => typeof key === "string") : []),
+    );
     const storedCustom = readStorage<unknown>(CUSTOM_ITEMS_STORAGE_KEY, []);
     setCustomItems(Array.isArray(storedCustom) ? (storedCustom as CustomItem[]) : []);
     setHideBasics(readStorage<unknown>(HIDE_BASICS_STORAGE_KEY, true) !== false);
     const storedOrder = readStorage<unknown>(SECTION_ORDER_STORAGE_KEY, []);
     setSectionOrder(Array.isArray(storedOrder) ? storedOrder.filter((id) => typeof id === "string") : []);
     setHydrated(true);
-  }, [persist, checkedStorageKey, isCurrentWeek]);
+  }, [persist, checkedStorageKey, removedStorageKey, isCurrentWeek]);
 
   useEffect(() => {
     if (persist && hydrated) writeStorage(checkedStorageKey, Array.from(checkedKeys));
   }, [checkedKeys, hydrated, persist, checkedStorageKey]);
+
+  useEffect(() => {
+    if (persist && hydrated) writeStorage(removedStorageKey, Array.from(removedKeys));
+  }, [removedKeys, hydrated, persist, removedStorageKey]);
 
   useEffect(() => {
     if (persist && hydrated) writeStorage(CUSTOM_ITEMS_STORAGE_KEY, customItems);
@@ -175,8 +190,10 @@ export function ShoppingList({
     });
   }, [rows, items.length, hydrated, persist]);
 
-  const hiddenBasics = hideBasics ? rows.filter((row) => row.basic) : [];
-  const visibleRows = hideBasics ? rows.filter((row) => !row.basic) : rows;
+  const removedRows = rows.filter((row) => removedKeys.has(row.key));
+  const listedRows = rows.filter((row) => !removedKeys.has(row.key));
+  const hiddenBasics = hideBasics ? listedRows.filter((row) => row.basic) : [];
+  const visibleRows = hideBasics ? listedRows.filter((row) => !row.basic) : listedRows;
   const openRows = visibleRows.filter((row) => !checkedKeys.has(row.key));
   const doneRows = visibleRows.filter((row) => checkedKeys.has(row.key));
 
@@ -244,6 +261,30 @@ export function ShoppingList({
 
   const removeCustomItem = (id: string) =>
     setCustomItems((prev) => prev.filter((item) => item.id !== id));
+
+  const setRemoved = (key: string, removed: boolean) =>
+    setRemovedKeys((prev) => {
+      if (prev.has(key) === removed) return prev;
+      const next = new Set(prev);
+      if (removed) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+  // Removing applies right away; the toast only offers to bring the item back,
+  // since the row's own button sits close to the checkbox.
+  const removeRow = (row: Row) => {
+    if (row.customId) {
+      removeCustomItem(row.customId);
+      return;
+    }
+    setRemoved(row.key, true);
+    showUndoToast({
+      message: `${row.label} entfernt`,
+      onUndo: () => setRemoved(row.key, false),
+      onCommit: () => {},
+    });
+  };
 
   const share = async () => {
     if (sections.length === 0) {
@@ -511,7 +552,7 @@ export function ShoppingList({
                     row={row}
                     checked={false}
                     onToggle={() => toggle(row.key)}
-                    onRemove={row.customId ? () => removeCustomItem(row.customId!) : undefined}
+                    onRemove={() => removeRow(row)}
                   />
                 ))}
               </ul>
@@ -540,10 +581,51 @@ export function ShoppingList({
                     row={row}
                     checked
                     onToggle={() => toggle(row.key)}
-                    onRemove={row.customId ? () => removeCustomItem(row.customId!) : undefined}
+                    onRemove={() => removeRow(row)}
                   />
                 ))}
               </ul>
+            </section>
+          )}
+
+          {removedRows.length > 0 && (
+            <section
+              aria-label="Entfernt"
+              className="rounded-[18px] bg-white py-1 pl-3.5 pr-1 ring-1 ring-brand-card-border"
+            >
+              <button
+                type="button"
+                onClick={() => setShowRemoved((prev) => !prev)}
+                aria-expanded={showRemoved}
+                className="flex w-full items-center gap-1.5 pb-2.5 pr-3 pt-2.5 text-left text-xs font-bold uppercase tracking-[0.06em] text-brand-muted"
+              >
+                <X className="size-3.5" strokeWidth={3} />
+                <span className="flex-1">Hast du schon · {removedRows.length}</span>
+                <ChevronDown className={cn("size-4 transition-transform", showRemoved && "rotate-180")} />
+              </button>
+              {showRemoved && (
+                <ul>
+                  {removedRows.map((row) => (
+                    <li
+                      key={row.key}
+                      className="flex min-h-11 items-center gap-3 border-t border-brand-divider"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[15px] text-brand-muted">{row.label}</span>
+                      {row.amount && (
+                        <span className="shrink-0 whitespace-nowrap text-[15px] text-brand-muted">{row.amount}</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setRemoved(row.key, false)}
+                        aria-label={`${row.label} wieder auf die Liste`}
+                        className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-brand-secondary transition-colors active:bg-brand-chip-neutral"
+                      >
+                        <RotateCcw className="size-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           )}
 
@@ -572,7 +654,7 @@ function ShoppingRow({
   row: Row;
   checked: boolean;
   onToggle: () => void;
-  onRemove?: () => void;
+  onRemove: () => void;
 }) {
   // Rows rise in when they move between the open list and "Im Wagen".
   const { entering, onAnimationEnd } = useEntrance();
@@ -624,16 +706,14 @@ function ShoppingRow({
           </span>
         )}
       </button>
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`${row.label} entfernen`}
-          className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-brand-tertiary transition-colors active:bg-brand-chip-neutral"
-        >
-          <X className="size-4" />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`${row.label} entfernen`}
+        className="mr-1 flex size-9 shrink-0 items-center justify-center rounded-full text-brand-tertiary transition-colors active:bg-brand-chip-neutral"
+      >
+        <X className="size-4" />
+      </button>
     </li>
   );
 }
