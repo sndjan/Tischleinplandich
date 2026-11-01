@@ -63,3 +63,21 @@ export async function refineRecipe(
 
   return (await response.json()) as RecipeRefineResult;
 }
+
+/**
+ * Recomputes nutrition, "Ausgewogenheit" and details for the recipe as edited;
+ * the text comes back unchanged.
+ */
+export async function recalculateRecipe(draft: RecipeDraft): Promise<RecipeDraft> {
+  const response = await fetch("/api/recipes/recalculate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ draft }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  return ((await response.json()) as { draft: RecipeDraft }).draft;
+}

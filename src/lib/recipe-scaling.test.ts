@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { findStepTimer, formatTimer, scaleQuantity } from "@/lib/recipe-scaling";
+import {
+  findStepTimer,
+  formatTimer,
+  groupIngredients,
+  scaleIngredients,
+  scaleQuantity,
+  stepIngredientAmounts,
+} from "@/lib/recipe-scaling";
 
 describe("scaleQuantity", () => {
   it("scales numbers, fractions and ranges", () => {
@@ -25,5 +32,33 @@ describe("formatTimer", () => {
   it("shows hours only when needed", () => {
     expect(formatTimer(90)).toBe("01:30");
     expect(formatTimer(3725)).toBe("1:02:05");
+  });
+});
+
+describe("scaleIngredients", () => {
+  it("leaves group headers out and keeps each line's group", () => {
+    const rows = scaleIngredients("# Teig\n200 g Mehl\n# Soße\n2 Zwiebeln", 2);
+    expect(rows.map((row) => [row.amount, row.name, row.group])).toEqual([
+      ["400 g", "Mehl", "Teig"],
+      ["4", "Zwiebeln", "Soße"],
+    ]);
+    expect(groupIngredients(rows).map((group) => group.group)).toEqual(["Teig", "Soße"]);
+  });
+});
+
+describe("stepIngredientAmounts", () => {
+  const ingredients = "# Soße\n2 Zwiebeln\n1 Prise Salz\nPfeffer";
+
+  it("uses the step's share of an ingredient", () => {
+    const rows = stepIngredientAmounts({ uses: [{ i: 0, fraction: 0.5 }, { i: 2, fraction: null }] }, ingredients, 1);
+    expect(rows.map((row) => [row.amount, row.name])).toEqual([
+      ["1", "Zwiebeln"],
+      ["", "Pfeffer"],
+    ]);
+  });
+
+  it("scales with the portions and skips unknown lines", () => {
+    const rows = stepIngredientAmounts({ uses: [{ i: 0, fraction: 0.5 }, { i: 9, fraction: null }] }, ingredients, 2);
+    expect(rows.map((row) => row.amount)).toEqual(["2"]);
   });
 });

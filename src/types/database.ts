@@ -58,6 +58,9 @@ export type Database = {
           // AI-estimated facts for the "Ausgewogenheit" score (src/lib/balance.ts);
           // validate with parseRecipeBalance before use. Migration 022.
           balance?: Json | null;
+          // AI extras: equipment, tips, times, allergens, per-line data (src/lib/recipe-details.ts);
+          // validate with parseRecipeDetails before use. Migration 028.
+          details?: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -79,6 +82,7 @@ export type Database = {
           share_id?: string | null;
           rating?: number | null;
           balance?: Json | null;
+          details?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -100,8 +104,31 @@ export type Database = {
           share_id?: string | null;
           rating?: number | null;
           balance?: Json | null;
+          details?: Json | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      // Text an import was read from, private to the owner. Migration 028.
+      recipe_sources: {
+        Row: {
+          recipe_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          recipe_id: string;
+          user_id: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          recipe_id?: string;
+          user_id?: string;
+          content?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -569,7 +596,7 @@ export type Database = {
         Args: { p_feedback_id: string; p_size: FeedbackRewardSize; p_note?: string | null };
         Returns: number;
       };
-      // Both return the recipe's balance facts too since migration 025.
+      // Both return the recipe's balance facts too since migration 025, and its details since 028.
       get_shared_recipe: {
         Args: { p_share_id: string };
         Returns: Json;

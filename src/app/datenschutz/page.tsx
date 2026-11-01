@@ -81,7 +81,7 @@ export default function DatenschutzPage() {
 
       <h2>7. KI-Funktionen</h2>
       <p>
-        Wenn du ein Rezept per KI importierst, aus einer Idee erstellen oder mit KI ändern lässt, senden wir die
+        Wenn du ein Rezept per KI importierst, aus einer Idee erstellen, mit KI ändern oder seine Nährwerte und Details neu berechnen lässt, senden wir die
         dafür nötigen Inhalte (Text, Link-Inhalt, Fotos oder PDFs und ggf. das Rezept) an Anthropic PBC (548 Market
         St, San Francisco, CA 94104, USA), um das Rezept zu erzeugen. Deine E-Mail-Adresse wird dabei nicht
         übermittelt. Anthropic nutzt diese Daten nach eigenen Angaben nicht zum Training. Rechtsgrundlage ist Art. 6
@@ -93,6 +93,14 @@ export default function DatenschutzPage() {
         und Lebensmittelgruppen; dafür werden keine weiteren Daten gesendet. Die Schätzung speichern wir beim Rezept; den Wert für Rezepte und Wochen
         berechnet die App daraus in deinem Browser. Angaben über deine Gesundheit erfragen oder speichern wir dabei
         nicht.
+      </p>
+      <p>
+        Außerdem ergänzt die KI beim Rezept Angaben wie Zeiten, Küchengeräte, Tipps, mögliche Allergene,
+        Haltbarkeit und Suchbegriffe; auch die speichern wir beim Rezept. Beim Import von Text oder einem Link
+        speichern wir zusätzlich den gelesenen Text der Quelle, nur für dich sichtbar und nie mit dem Rezept
+        geteilt, damit wir das Rezept später mit einer verbesserten KI erneut aufbereiten können. Fotos und PDFs
+        aus dem Import speichern wir nicht (außer dem Titelbild, wenn du es übernimmst). Der Quelltext wird mit dem
+        Rezept gelöscht.
       </p>
 
       <h2>8. Feedback</h2>

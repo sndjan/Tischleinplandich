@@ -69,3 +69,13 @@ describe("isBasicIngredient", () => {
     expect(isBasicIngredient("Oregano-Pesto", ["oregano"])).toBe(false);
   });
 });
+
+describe("ingredient groups", () => {
+  it("leaves group headers off the shopping list", () => {
+    const items = generateShoppingListFromPlannedMeals(
+      [{ recipe_id: "r1", serving_size: 1 }],
+      [{ id: "r1", name: "Pizza", ingredients: "# Teig\n200 g Mehl\n# Belag\n100 g Käse", serving_size: 1 }],
+    );
+    expect(items.map((item) => item.ingredient).sort()).toEqual(["käse", "mehl"]);
+  });
+});

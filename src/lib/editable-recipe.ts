@@ -4,12 +4,16 @@
 import type { Recipe } from "@/types/database";
 import type { RecipeDraft } from "@/lib/recipe-draft";
 import { parseRecipeBalance, rebaseBalance, type RecipeBalance } from "@/lib/balance";
+import { parseRecipeDetails, type RecipeDetails } from "@/lib/recipe-details";
+import { formatIngredientHeader, ingredientHeaderName, isIngredientHeader } from "@/lib/ingredient-lines";
 
 export type IngredientRow = {
   id: string;
   quantity: string;
   unit: string;
   name: string;
+  // A group heading ("Für die Soße") instead of an ingredient; name holds the title.
+  header?: boolean;
 };
 
 export type EditableRecipe = {
@@ -27,6 +31,10 @@ export type EditableRecipe = {
   is_public: boolean;
   // Kept as is; edits to ingredients or portions make it stale (getBalanceState).
   balance: RecipeBalance | null;
+  // AI extras (equipment, tips, times, …). Per-line parts go stale on edits (detailsMatch).
+  details: RecipeDetails | null;
+  // What an import was read from, saved privately with a new recipe. Null otherwise.
+  source_text: string | null;
 };
 
 export const INGREDIENT_UNITS = [
@@ -95,6 +103,10 @@ const QUANTITY_PATTERN =
 export const newRowId = () => crypto.randomUUID();
 
 export function parseIngredientLine(line: string): IngredientRow {
+  if (isIngredientHeader(line)) {
+    return { id: newRowId(), quantity: "", unit: "", name: ingredientHeaderName(line), header: true };
+  }
+
   let rest = line
     .trim()
     .replace(/^[-•*]\s*/, "")
@@ -122,10 +134,14 @@ export function parseIngredientLine(line: string): IngredientRow {
 }
 
 export const formatIngredientRow = (row: IngredientRow) =>
-  [row.quantity.trim(), row.unit.trim(), row.name.trim()].filter(Boolean).join(" ");
+  row.header
+    ? row.name.trim()
+      ? formatIngredientHeader(row.name)
+      : ""
+    : [row.quantity.trim(), row.unit.trim(), row.name.trim()].filter(Boolean).join(" ");
 
 export const formatIngredientAmount = (row: IngredientRow) =>
-  [row.quantity.trim(), row.unit.trim()].filter(Boolean).join(" ");
+  row.header ? "" : [row.quantity.trim(), row.unit.trim()].filter(Boolean).join(" ");
 
 const splitLines = (text: string | null | undefined) =>
   (text ?? "")
@@ -165,6 +181,8 @@ export function editableFromDraft(draft: RecipeDraft): EditableRecipe {
       ingredients.map(formatIngredientRow).filter(Boolean).join("\n"),
       servingSize,
     ),
+    details: draft.details,
+    source_text: draft.source_text,
   };
 }
 
@@ -183,6 +201,8 @@ export function editableFromRecipe(recipe: Recipe, tags: string[]): EditableReci
     source_url: recipe.source_url ?? "",
     is_public: recipe.is_public,
     balance: parseRecipeBalance(recipe.balance),
+    details: parseRecipeDetails(recipe.details),
+    source_text: null,
   };
 }
 
@@ -200,6 +220,8 @@ export const emptyEditableRecipe = (): EditableRecipe => ({
   source_url: "",
   is_public: true,
   balance: null,
+  details: null,
+  source_text: null,
 });
 
 const fieldToNumber = (value: string) => {
@@ -227,6 +249,8 @@ export function draftFromEditable(recipe: EditableRecipe): RecipeDraft {
     fats: fieldToNumber(recipe.fats),
     serving_size: recipe.serving_size,
     balance: recipe.balance,
+    details: recipe.details,
+    source_text: recipe.source_text,
   };
 }
 
@@ -238,6 +262,7 @@ export function collectIngredientNames(recipes: Recipe[]): string[] {
 
   for (const recipe of recipes) {
     for (const line of splitLines(recipe.ingredients)) {
+      if (isIngredientHeader(line)) continue;
       const name = parseIngredientLine(line).name;
       if (name && name.length <= 40 && !names.has(name.toLowerCase())) {
         names.set(name.toLowerCase(), name);

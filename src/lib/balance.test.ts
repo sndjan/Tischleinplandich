@@ -198,6 +198,8 @@ describe("rebaseBalance", () => {
       fats: null,
       serving_size: 2,
       balance: fresh,
+      details: null,
+      source_text: null,
     };
     const saved = draftFromEditable(editableFromDraft(draft));
     expect(saved.ingredients).not.toBe(aiText);

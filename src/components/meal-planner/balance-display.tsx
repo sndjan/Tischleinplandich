@@ -203,7 +203,7 @@ export function RecipeBalanceSection({
       <ScoreHeader
         score={result.score}
         label={`Ausgewogenheit · ${result.label}`}
-        note={state.kind === "stale" ? "Zutaten geändert – Wert ist veraltet" : "Pro Portion, Werte von der KI geschätzt"}
+        note={state.kind === "stale" ? "Zutaten geändert – beim Bearbeiten neu berechnen" : "Pro Portion, Werte von der KI geschätzt"}
         open={open}
         onToggle={() => setOpen((value) => !value)}
         muted={state.kind === "stale"}
