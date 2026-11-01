@@ -163,6 +163,8 @@ export function importedDraft(ingredientCount: number, stepCount: number, withNu
     fats: withNutrition ? IMPORTED_INPUT.fats : null,
     serving_size: 1,
     balance: null,
+    details: null,
+    source_text: null,
   };
 }
 

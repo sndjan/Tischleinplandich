@@ -1,4 +1,5 @@
 import type { PlannedMeal, Recipe, ShoppingListItem } from "@/types/database";
+import { isIngredientHeader } from "@/lib/ingredient-lines";
 
 type Conversion = {
   group: "weight" | "volume";
@@ -229,7 +230,8 @@ function parseIngredientLines(
   return ingredients
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0)
+    // Group headers ("# Für die Soße") are not things to buy.
+    .filter((line) => line.length > 0 && !isIngredientHeader(line))
     .map((line) => parseIngredient(line))
     .filter((item) => item.ingredient.length > 0)
     .map((item) => ({

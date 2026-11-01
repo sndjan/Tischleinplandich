@@ -9,6 +9,7 @@ import type { Recipe } from "@/types/database";
 import { toSourceUrl } from "@/lib/safe-links";
 import { toUploadableImage } from "@/lib/image-utils";
 import { isMissingColumnError } from "@/hooks/use-planner-data";
+import { parseRecipeDetails } from "@/lib/recipe-details";
 
 export class SaveRecipeError extends Error {}
 
@@ -148,38 +149,47 @@ export async function saveRecipe(
     image_url: imageUrl,
     is_public: recipe.is_public,
     balance: draft.balance,
+    // Normalized on the way in, which also drops empty tips from the editor.
+    details: parseRecipeDetails(draft.details),
   };
 
-  // Until migration 022 runs there is no balance column; the recipe saves without it.
-  // PostgREST reports unknown columns in writes as PGRST204.
-  const missingBalance = (error: { code?: string } | null) =>
+  // Until migrations 022 (balance) and 025 (details) run, those columns don't
+  // exist; the recipe saves without them. PostgREST reports unknown columns in
+  // writes as PGRST204. Newest first, so an older database keeps what it has.
+  const missingColumn = (error: { code?: string } | null) =>
     isMissingColumnError(error) || error?.code === "PGRST204";
-  const withoutBalance = () => {
-    const rest: Partial<typeof payload> = { ...payload };
-    delete rest.balance;
-    return rest;
+  const optionalColumns = ["details", "balance"] as const;
+  const withSave = async <T extends { error: { code?: string; message: string } | null }>(
+    write: (values: Partial<typeof payload>) => PromiseLike<T>,
+  ): Promise<T> => {
+    const values: Partial<typeof payload> = { ...payload };
+    let result = await write(values);
+    for (const column of optionalColumns) {
+      if (!missingColumn(result.error)) break;
+      delete values[column];
+      result = await write(values);
+    }
+    return result;
   };
 
   let recipeId: string;
 
   try {
     if (existing) {
-      const update = (values: Partial<typeof payload>) =>
-        supabase.from("recipes").update(values).eq("id", existing.id).eq("user_id", user.id);
-      let { error } = await update(payload);
-      if (missingBalance(error)) ({ error } = await update(withoutBalance()));
+      const { error } = await withSave((values) =>
+        supabase.from("recipes").update(values).eq("id", existing.id).eq("user_id", user.id),
+      );
 
       if (error) throw new SaveRecipeError(recipeSaveErrorMessage(error));
       recipeId = existing.id;
     } else {
-      const insert = (values: Partial<typeof payload>) =>
+      const { data, error } = await withSave((values) =>
         supabase
           .from("recipes")
           .insert({ user_id: user.id, ...(values as typeof payload) })
           .select("id")
-          .single<{ id: string }>();
-      let { data, error } = await insert(payload);
-      if (missingBalance(error)) ({ data, error } = await insert(withoutBalance()));
+          .single<{ id: string }>(),
+      );
 
       if (error || !data) throw new SaveRecipeError(error ? recipeSaveErrorMessage(error) : "Speichern fehlgeschlagen");
       recipeId = data.id;
@@ -193,6 +203,15 @@ export async function saveRecipe(
 
   if (previousImagePath && previousImagePath !== uploadedImagePath) {
     await supabase.storage.from(RECIPE_IMAGE_BUCKET).remove([previousImagePath]);
+  }
+
+  // What a new import was read from, kept privately. Optional: it fails quietly
+  // until migration 025 runs.
+  if (!existing && recipe.source_text) {
+    const { error } = await supabase
+      .from("recipe_sources")
+      .insert({ recipe_id: recipeId, user_id: user.id, content: recipe.source_text.slice(0, 20_000) });
+    if (error) console.warn("Recipe source not saved", error.message);
   }
 
   try {

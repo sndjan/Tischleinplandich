@@ -75,6 +75,10 @@ Rezept-Import, „Aus Idee“ und „Mit KI ändern“ laufen über Claude Haiku
 
 Im Profil steht unter „KI-Anfragen heute“, wie viele davon schon verbraucht sind (nur sichtbar, wenn die Migration läuft).
 
+### Rezept-Details
+
+Die KI schreibt die Zubereitung in eigenen Worten neu (zusammengehörige Handgriffe in einem Schritt), ordnet Zutaten in Gruppen und schätzt Nährwerte Zutat für Zutat; die App summiert sie pro Portion und markiert unplausible Werte. Gruppen stehen als Zeilen `# Für die Soße` im Zutatentext. Zeiten, Küchengeräte, Tipps, Allergene, Haltbarkeit, Suchwörter und pro Zutat bzw. Schritt Einkaufsabteilung, Nährwerte und Mengenanteile landen in `recipes.details` (geprüft mit `parseRecipeDetails` in `src/lib/recipe-details.ts`, Version in `DETAILS_VERSION`). Der gelesene Quelltext von Text- und Link-Importen wird privat in `recipe_sources` gespeichert, um Rezepte später neu aufbereiten zu können. Beides kommt mit Migration `025_recipe_details.sql` (im SQL Editor ausführen); ohne sie speichern Rezepte weiter, nur ohne Details und Quelltext.
+
 Verbrauch pro Tag:
 
 ```sql

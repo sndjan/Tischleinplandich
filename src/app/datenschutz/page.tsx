@@ -94,6 +94,14 @@ export default function DatenschutzPage() {
         berechnet die App daraus in deinem Browser. Angaben über deine Gesundheit erfragen oder speichern wir dabei
         nicht.
       </p>
+      <p>
+        Außerdem ergänzt die KI beim Rezept Angaben wie Zeiten, Küchengeräte, Tipps, mögliche Allergene,
+        Haltbarkeit und Suchbegriffe; auch die speichern wir beim Rezept. Beim Import von Text oder einem Link
+        speichern wir zusätzlich den gelesenen Text der Quelle, nur für dich sichtbar und nie mit dem Rezept
+        geteilt, damit wir das Rezept später mit einer verbesserten KI erneut aufbereiten können. Fotos und PDFs
+        aus dem Import speichern wir nicht (außer dem Titelbild, wenn du es übernimmst). Der Quelltext wird mit dem
+        Rezept gelöscht.
+      </p>
 
       <h2>8. Feedback</h2>
       <p>

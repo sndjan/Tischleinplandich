@@ -5,6 +5,7 @@
 // must be updated together with these rules.
 
 import { z } from "zod/v4";
+import { isIngredientHeader } from "@/lib/ingredient-lines";
 
 // Bump when the stored facts change shape; scoring changes need no bump because
 // the score is never stored.
@@ -107,8 +108,10 @@ export function parseRecipeBalance(value: unknown): RecipeBalance | null {
  * Spacing, case and order don't count, so "200g Feta" and "200 g feta" match.
  */
 export function balanceFingerprint(ingredients: string, servingSize: number): string {
+  // Group headers don't change what is in the dish.
   const lines = ingredients
     .split(/\r?\n/)
+    .filter((line) => !isIngredientHeader(line))
     .map((line) => line.toLowerCase().replace(/\s+/g, ""))
     .filter(Boolean)
     .sort();

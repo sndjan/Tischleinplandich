@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import type { RecipeDraft, RecipeStreamStage } from "@/lib/recipe-draft";
 import { formatIngredientAmount, parseIngredientLine } from "@/lib/editable-recipe";
+import { isIngredientHeader } from "@/lib/ingredient-lines";
 
 export type ProgressStep = { label: string; status: "active" | "done" | "waiting" };
 
@@ -54,10 +55,10 @@ export function RecipeAiProgress({
     },
     { label: "Zutaten", status: statusFor("ingredients") },
     { label: "Zubereitung", status: statusFor("steps") },
-    { label: "Nährwerte schätzen", status: statusFor("nutrition") },
+    { label: "Nährwerte und Details", status: statusFor("nutrition") },
   ];
 
-  const ingredientLines = (draft?.ingredients ?? "").split("\n").filter(Boolean);
+  const ingredientLines = (draft?.ingredients ?? "").split("\n").filter((line) => line && !isIngredientHeader(line));
   const stepLines = (draft?.preparation_steps ?? "").split("\n").filter(Boolean);
 
   return (

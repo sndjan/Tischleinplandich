@@ -1,5 +1,7 @@
 import { formatCount, formatMeasure } from "@/lib/shopping-sections";
 import { parseIngredientLine, type IngredientRow } from "@/lib/editable-recipe";
+import { ingredientLines } from "@/lib/ingredient-lines";
+import { formatFraction, type StepInfo } from "@/lib/recipe-details";
 
 const GLYPHS: Record<string, number> = { "½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3, "⅛": 0.125 };
 
@@ -34,18 +36,65 @@ export function scaleQuantity(quantity: string, unit: string, factor: number): s
   return end !== null ? `${scaledStart}–${formatScaled(end * factor, unit)}` : scaledStart;
 }
 
-export type ScaledIngredient = IngredientRow & { amount: string };
+export type ScaledIngredient = IngredientRow & {
+  amount: string;
+  // Group header above the line ("Für die Soße"), null without groups.
+  group: string | null;
+};
 
+/**
+ * The recipe's ingredients (group headers left out, each line knowing its group),
+ * with amounts scaled by the factor.
+ */
 export function scaleIngredients(ingredients: string | null, factor: number): ScaledIngredient[] {
-  return (ingredients ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const row = parseIngredientLine(line);
-      const quantity = scaleQuantity(row.quantity, row.unit, factor);
-      return { ...row, quantity, amount: [quantity, row.unit].filter(Boolean).join(" ") };
-    });
+  return ingredientLines(ingredients).map(({ line, group }) => {
+    const row = parseIngredientLine(line);
+    const quantity = scaleQuantity(row.quantity, row.unit, factor);
+    return { ...row, quantity, amount: [quantity, row.unit].filter(Boolean).join(" "), group };
+  });
+}
+
+/**
+ * Splits ingredients into runs of the same group, for lists with group headings.
+ */
+export function groupIngredients<T extends { group: string | null }>(ingredients: T[]): Array<{ group: string | null; items: T[] }> {
+  const groups: Array<{ group: string | null; items: T[] }> = [];
+  for (const ingredient of ingredients) {
+    const last = groups[groups.length - 1];
+    if (last && last.group === ingredient.group) last.items.push(ingredient);
+    else groups.push({ group: ingredient.group, items: [ingredient] });
+  }
+  return groups;
+}
+
+/**
+ * The ingredients a step uses with the amount for that step, from the AI's step
+ * details: "½" of 2 onions becomes "1". Amounts that can't be split ("1 Prise")
+ * get the share in front ("½ · 1 Prise").
+ */
+export function stepIngredientAmounts(
+  step: StepInfo,
+  ingredients: string | null,
+  factor: number,
+): ScaledIngredient[] {
+  const lines = ingredientLines(ingredients);
+
+  return step.uses.flatMap(({ i, fraction }) => {
+    const entry = lines[i];
+    if (!entry) return [];
+
+    const row = parseIngredientLine(entry.line);
+    const share = fraction === null || fraction >= 0.99 ? 1 : fraction;
+    const quantity = scaleQuantity(row.quantity, row.unit, factor * share);
+    // "1 Prise" or "etwas" can't be split, so the share goes in front.
+    const scalable = scaleQuantity(row.quantity, row.unit, 2) !== row.quantity;
+    const amount =
+      share === 1 || scalable || !row.quantity
+        ? [quantity, row.unit].filter(Boolean).join(" ")
+        : `${formatFraction(share)} · ${[scaleQuantity(row.quantity, row.unit, factor), row.unit].filter(Boolean).join(" ")}`;
+
+    return [{ ...row, id: `${row.id}-${i}`, quantity, amount, group: entry.group }];
+  });
 }
 
 // The word a step would mention an ingredient by: usually the last word of its

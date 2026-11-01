@@ -31,6 +31,9 @@ import {
 
 type ImageMediaType = (typeof RECIPE_EXTRACT_IMAGE_TYPES)[number];
 
+// Matches the limit of public.recipe_sources (migration 025).
+const MAX_SOURCE_TEXT = 20_000;
+
 // Partial results are sent at most this often while the recipe is written.
 const PARTIAL_INTERVAL_MS = 150;
 
@@ -88,6 +91,13 @@ export async function POST(request: Request) {
           }
         }
 
+        // What the recipe was read from, kept privately with it so it can be
+        // processed again later. Photos and PDFs aren't kept.
+        const sourceText =
+          input.mode === 'import'
+            ? [pageContent, input.text].filter(Boolean).join('\n\n').slice(0, MAX_SOURCE_TEXT) || null
+            : null;
+
         const tagNames = await getUserTagNames(supabase, user.id);
         const messages = buildMessages(input, pageContent, tagNames);
 
@@ -119,7 +129,7 @@ export async function POST(request: Request) {
             send({
               type: 'partial',
               stage: getStage(partial),
-              draft: toRecipeDraft(partial, input.url),
+              draft: toRecipeDraft(partial, input.url, sourceText),
             });
           }
         });
@@ -150,7 +160,7 @@ export async function POST(request: Request) {
 
         send({
           type: 'done',
-          draft: toRecipeDraft(extracted, input.url),
+          draft: toRecipeDraft(extracted, input.url, sourceText),
           coverImageIndex,
           coverImage,
         });
@@ -317,9 +327,9 @@ function safePartialParse(json: string): Partial<ExtractedRecipe> | null {
 }
 
 function getStage(partial: Partial<ExtractedRecipe>) {
-  if ('calories' in partial) return 'nutrition' as const;
-  if ('preparation_steps' in partial) return 'steps' as const;
-  if ('ingredients' in partial) return 'ingredients' as const;
+  if ('nutrition_from_source' in partial) return 'nutrition' as const;
+  if ('steps' in partial) return 'steps' as const;
+  if ('ingredient_groups' in partial) return 'ingredients' as const;
   return 'reading' as const;
 }
 

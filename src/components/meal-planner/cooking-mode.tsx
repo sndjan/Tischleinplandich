@@ -5,7 +5,15 @@ import { Check, Lightbulb, Timer, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import type { Recipe } from "@/types/database";
-import { findStepTimer, formatTimer, ingredientsForStep, scaleIngredients } from "@/lib/recipe-scaling";
+import {
+  findStepTimer,
+  formatTimer,
+  groupIngredients,
+  ingredientsForStep,
+  scaleIngredients,
+  stepIngredientAmounts,
+} from "@/lib/recipe-scaling";
+import { detailsMatch, parseRecipeDetails } from "@/lib/recipe-details";
 
 /**
  * Keeps the screen on while mounted. The browser drops the wake lock whenever the
@@ -136,6 +144,9 @@ export function CookingMode({ recipe, servings, onBack }: CookingModeProps) {
   const factor = (servings ?? baseServings) / baseServings;
   const ingredients = useMemo(() => scaleIngredients(recipe.ingredients, factor), [recipe.ingredients, factor]);
   const steps = useMemo(() => getSteps(recipe.preparation_steps), [recipe.preparation_steps]);
+  const details = useMemo(() => parseRecipeDetails(recipe.details), [recipe.details]);
+  // The AI's per-step amounts only fit while ingredients and steps are unedited.
+  const stepDetails = detailsMatch(details, recipe) && details.steps.length === steps.length ? details.steps : null;
 
   // Step 0 is the ingredient checklist, followed by one step per preparation line.
   const totalSteps = steps.length + 1;
@@ -146,7 +157,12 @@ export function CookingMode({ recipe, servings, onBack }: CookingModeProps) {
   const isLastStep = stepIndex === totalSteps - 1;
   const step = isChecklist ? "" : steps[stepIndex - 1] ?? "";
   const stepTimer = isChecklist ? null : findStepTimer(step);
-  const stepIngredients = isChecklist ? [] : ingredientsForStep(step, ingredients);
+  const stepInfo = stepDetails?.[stepIndex - 1];
+  const stepIngredients = isChecklist
+    ? []
+    : stepInfo
+      ? stepIngredientAmounts(stepInfo, recipe.ingredients, factor)
+      : ingredientsForStep(step, ingredients);
   const timerLabel = `Schritt ${stepIndex}`;
   const stepTimerRunning = timers.some((timer) => timer.label === timerLabel && !timer.done);
 
@@ -211,38 +227,53 @@ export function CookingMode({ recipe, servings, onBack }: CookingModeProps) {
 
         {isChecklist ? (
           ingredients.length > 0 ? (
-            <ul className="space-y-2">
-              {ingredients.map((ingredient) => {
-                const isChecked = checked.has(ingredient.id);
-                return (
-                  <li key={ingredient.id}>
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={isChecked}
-                      onClick={() => toggleIngredient(ingredient.id)}
-                      className={cn(
-                        "flex min-h-14 w-full touch-manipulation items-center gap-3 rounded-2xl px-3.5 text-left ring-1 transition-all active:scale-[0.98]",
-                        isChecked ? "bg-brand-app-bg ring-transparent" : "bg-white ring-brand-card-border",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
-                          isChecked ? "bg-brand-accent text-white" : "border-2 border-brand-disabled",
-                        )}
-                      >
-                        {isChecked && <Check className="size-4 animate-pop-in" strokeWidth={3} />}
-                      </span>
-                      <span className={cn("text-[17px]", isChecked ? "text-brand-muted line-through" : "text-brand-ink")}>
-                        {ingredient.amount && <b className="mr-1.5">{ingredient.amount}</b>}
-                        {ingredient.name}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="space-y-4">
+              {details && details.equipment.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.06em] text-brand-secondary">Das brauchst du</h2>
+                  <p className="text-[17px] leading-snug text-brand-ink">{details.equipment.join(" · ")}</p>
+                </section>
+              )}
+              {groupIngredients(ingredients).map((group, groupIndex) => (
+                <section key={groupIndex} className="space-y-2">
+                  {group.group && (
+                    <h2 className="text-xs font-bold uppercase tracking-[0.06em] text-brand-accent-dark">{group.group}</h2>
+                  )}
+                  <ul className="space-y-2">
+                    {group.items.map((ingredient) => {
+                      const isChecked = checked.has(ingredient.id);
+                      return (
+                        <li key={ingredient.id}>
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={isChecked}
+                            onClick={() => toggleIngredient(ingredient.id)}
+                            className={cn(
+                              "flex min-h-14 w-full touch-manipulation items-center gap-3 rounded-2xl px-3.5 text-left ring-1 transition-all active:scale-[0.98]",
+                              isChecked ? "bg-brand-app-bg ring-transparent" : "bg-white ring-brand-card-border",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
+                                isChecked ? "bg-brand-accent text-white" : "border-2 border-brand-disabled",
+                              )}
+                            >
+                              {isChecked && <Check className="size-4 animate-pop-in" strokeWidth={3} />}
+                            </span>
+                            <span className={cn("text-[17px]", isChecked ? "text-brand-muted line-through" : "text-brand-ink")}>
+                              {ingredient.amount && <b className="mr-1.5">{ingredient.amount}</b>}
+                              {ingredient.name}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
           ) : (
             <p className="text-sm text-brand-tertiary">Keine Zutaten</p>
           )
