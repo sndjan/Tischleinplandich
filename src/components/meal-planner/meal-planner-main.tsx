@@ -383,7 +383,10 @@ function MealPlanner() {
                   : "lg:grid-cols-[400px_minmax(0,1fr)] xl:grid-cols-[440px_minmax(0,1fr)]",
               )}
             >
-              <div className="min-w-0 space-y-4 overflow-y-auto overscroll-contain pb-6">
+              {/* Both columns are positioned so absolute children (sr-only labels,
+                  remove buttons) stay inside them; otherwise one further down
+                  stretches the page and it scrolls into blank space on tablets. */}
+              <div className="relative min-w-0 space-y-4 overflow-y-auto overscroll-contain pb-6">
                 <MealWeekView
                   recipes={mealPlanData.recipes}
                   plannedMeals={mealPlanData.plannedMeals}
@@ -401,7 +404,7 @@ function MealPlanner() {
                   <h2 className="shrink-0 whitespace-nowrap font-heading text-xl font-extrabold text-brand-ink">{panelHeading.title}</h2>
                   <p className="min-w-0 truncate text-[13px] text-brand-secondary">{panelHeading.subtitle}</p>
                 </div>
-                <div className="-mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
+                <div className="relative -mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
                   {desktopRightPanelTab === "shopping" ? (
                     <ShoppingList
                       key={selectedWeek.weekKey}
