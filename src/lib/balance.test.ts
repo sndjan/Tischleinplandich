@@ -4,11 +4,14 @@ import {
   balanceFingerprint,
   getBalanceState,
   parseRecipeBalance,
+  rebaseBalance,
   scoreRecipe,
   scoreWeek,
   type BalanceFacts,
   type BalanceIngredient,
 } from "@/lib/balance";
+import { draftFromEditable, editableFromDraft } from "@/lib/editable-recipe";
+import type { RecipeDraft } from "@/lib/recipe-draft";
 
 const ingredient = (patch: Partial<BalanceIngredient>): BalanceIngredient => ({
   name: "Zutat",
@@ -163,5 +166,41 @@ describe("parseRecipeBalance / getBalanceState", () => {
     expect(parseRecipeBalance({ ...stored, version: 99 })).toBeNull();
     expect(parseRecipeBalance("<script>")).toBeNull();
     expect(parseRecipeBalance({ ...stored, energy_kcal: 0 })).toBeNull();
+  });
+});
+
+describe("rebaseBalance", () => {
+  const aiText = "2 Zehen Knoblauch\n2 Dosen Tomaten\n200 Gramm Bulgur\n1 Pck. Feta";
+  const fresh = { version: BALANCE_VERSION, fingerprint: balanceFingerprint(aiText, 2), ...lentilCurry };
+
+  it("moves current facts to the rewritten text", () => {
+    const moved = rebaseBalance(fresh, aiText, "2 Zehe Knoblauch", 2);
+    expect(getBalanceState({ balance: moved, ingredients: "2 Zehe Knoblauch", serving_size: 2 }).kind).toBe("ready");
+  });
+
+  it("keeps stale facts stale", () => {
+    const stale = { ...fresh, fingerprint: "deadbeef" };
+    expect(rebaseBalance(stale, aiText, "2 Zehe Knoblauch", 2)).toBe(stale);
+    expect(rebaseBalance(null, aiText, "x", 2)).toBeNull();
+  });
+
+  it("keeps AI facts current through the editor, whatever units the AI spells out", () => {
+    const draft: RecipeDraft = {
+      name: "Bulgur-Pfanne",
+      ingredients: aiText,
+      preparation_steps: "",
+      source_url: "",
+      prep_time: "",
+      tags: [],
+      calories: null,
+      protein: null,
+      carbs: null,
+      fats: null,
+      serving_size: 2,
+      balance: fresh,
+    };
+    const saved = draftFromEditable(editableFromDraft(draft));
+    expect(saved.ingredients).not.toBe(aiText);
+    expect(getBalanceState(saved).kind).toBe("ready");
   });
 });

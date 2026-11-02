@@ -5,6 +5,7 @@ import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { createRecipeImagePath, getRecipeImagePathFromUrl, RECIPE_IMAGE_BUCKET } from "@/lib/recipe-images";
 import { syncRecipeTags } from "@/lib/save-recipe";
 import { isMissingColumnError, queryKeys, useUserId, type RecipesData } from "@/hooks/use-planner-data";
+import { parseRecipeBalance } from "@/lib/balance";
 import type { Recipe } from "@/types/database";
 
 const SHARE_ID_ALPHABET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -68,6 +69,8 @@ export type SharedRecipe = Pick<
 > & {
   author_name: string | null;
   tags: string[];
+  // "Ausgewogenheit" facts, only returned once migration 025 has run.
+  balance?: unknown;
 };
 
 const SAVED_STORAGE_KEY = "weekly-meal-planner:saved-shared-recipes";
@@ -138,9 +141,14 @@ export async function saveSharedRecipeCopy(source: SharedRecipe): Promise<Recipe
   const user = await getSessionUser();
   if (!user) throw new Error("Nicht angemeldet");
 
+  // Ingredients and portions are copied unchanged, so the facts stay current. Left
+  // out entirely when there are none, so copying works before migration 022 too.
+  const balance = parseRecipeBalance(source.balance);
+
   const { data, error } = await createClient()
     .from("recipes")
     .insert({
+      ...(balance ? { balance } : {}),
       user_id: user.id,
       name: source.name,
       ingredients: source.ingredients,
