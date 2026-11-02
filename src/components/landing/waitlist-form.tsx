@@ -17,17 +17,13 @@ export function WaitlistForm() {
   const captcha = useCaptcha();
 
   const submit = async () => {
-    if (!captcha.ready) {
-      setError(captcha.message);
-      setState("error");
-      return;
-    }
     setState("pending");
     try {
+      const captchaToken = await captcha.getToken();
       const response = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, website, captchaToken: captcha.take() }),
+        body: JSON.stringify({ email, website, captchaToken }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Das hat nicht geklappt");
