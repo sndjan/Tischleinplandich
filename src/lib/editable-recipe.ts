@@ -3,7 +3,7 @@
 
 import type { Recipe } from "@/types/database";
 import type { RecipeDraft } from "@/lib/recipe-draft";
-import { parseRecipeBalance, type RecipeBalance } from "@/lib/balance";
+import { parseRecipeBalance, rebaseBalance, type RecipeBalance } from "@/lib/balance";
 
 export type IngredientRow = {
   id: string;
@@ -141,12 +141,15 @@ const numberToField = (value: number | null | undefined) =>
   value === null || value === undefined ? "" : String(value);
 
 export function editableFromDraft(draft: RecipeDraft): EditableRecipe {
+  const ingredients = splitLines(draft.ingredients).map(parseIngredientLine);
+  const servingSize = draft.serving_size > 0 ? draft.serving_size : 1;
+
   return {
     name: draft.name,
-    ingredients: splitLines(draft.ingredients).map(parseIngredientLine),
+    ingredients,
     steps: parseSteps(draft.preparation_steps),
     prep_time: draft.prep_time,
-    serving_size: draft.serving_size > 0 ? draft.serving_size : 1,
+    serving_size: servingSize,
     calories: numberToField(draft.calories),
     protein: numberToField(draft.protein),
     carbs: numberToField(draft.carbs),
@@ -154,7 +157,14 @@ export function editableFromDraft(draft: RecipeDraft): EditableRecipe {
     tags: draft.tags,
     source_url: draft.source_url,
     is_public: true,
-    balance: draft.balance,
+    // The rows spell units their own way, which would otherwise make fresh AI facts
+    // look stale as soon as the recipe is saved.
+    balance: rebaseBalance(
+      draft.balance,
+      draft.ingredients,
+      ingredients.map(formatIngredientRow).filter(Boolean).join("\n"),
+      servingSize,
+    ),
   };
 }
 

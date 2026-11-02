@@ -126,7 +126,7 @@ Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros 
 
 Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Alte, selbst getippte oder von Hand geänderte Rezepte haben (noch) keinen aktuellen Wert; die Fakten lassen sich später gesammelt nachtragen (Format: `RecipeBalance` in `src/lib/balance.ts`, `fingerprint` per `balanceFingerprint`).
 
-Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), der Schalter zeigt einen Hinweis.
+Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), der Schalter zeigt einen Hinweis. Damit Kopien aus „Entdecken“ und Teilen-Links ihren Wert behalten, liefern die Teilen-Funktionen die Fakten mit (Migration `025_shared_recipe_balance.sql`); ohne sie haben solche Kopien keinen Wert.
 
 ## Warteliste (Double-Opt-in)
 

@@ -123,6 +123,21 @@ export function balanceFingerprint(ingredients: string, servingSize: number): st
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+/**
+ * Moves facts over to a rewritten ingredient text, e.g. when the editor turns the
+ * AI's "2 Zehen Knoblauch" into "2 Zehe Knoblauch". Only facts that matched the
+ * old text are moved; stale ones stay stale.
+ */
+export function rebaseBalance(
+  balance: RecipeBalance | null,
+  from: string,
+  to: string,
+  servingSize: number,
+): RecipeBalance | null {
+  if (!balance || balance.fingerprint !== balanceFingerprint(from, servingSize)) return balance;
+  return { ...balance, fingerprint: balanceFingerprint(to, servingSize) };
+}
+
 export type BalanceState =
   | { kind: "missing" }
   | { kind: "stale"; balance: RecipeBalance }

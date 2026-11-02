@@ -569,6 +569,7 @@ export type Database = {
         Args: { p_feedback_id: string; p_size: FeedbackRewardSize; p_note?: string | null };
         Returns: number;
       };
+      // Both return the recipe's balance facts too since migration 025.
       get_shared_recipe: {
         Args: { p_share_id: string };
         Returns: Json;
