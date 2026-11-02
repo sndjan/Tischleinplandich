@@ -84,6 +84,36 @@ function normalizeIngredientName(name: string): string {
   return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+// Irregular plurals the endings below don't cover.
+const PLURALS: Record<string, string> = { eier: "ei", äpfel: "apfel" };
+
+/**
+ * The key items are merged by: without notes in brackets or after a comma
+ * ("Petersilie (frisch)", "Zwiebel, fein gewürfelt") and with common German
+ * plural endings removed from the last word, so "Zwiebeln" and "Zwiebel" end up
+ * in one row. Only compared, never shown, so over-trimming a singular like
+ * "Hähnchen" does no harm as long as both forms trim the same way.
+ */
+export function shoppingMergeName(name: string): string {
+  const normalized = normalizeIngredientName(name);
+  const core = normalized
+    .replace(/\([^)]*\)/g, " ")
+    .split(",")[0]
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = (core || normalized).split(" ");
+  const last = words.pop() ?? "";
+
+  let singular = PLURALS[last] ?? last;
+  if (singular === last && last.length > 4) {
+    // Tomaten, Bohnen, Zwiebeln, Kartoffeln; Champignons, Avocados.
+    if (/[elr]n$/.test(last)) singular = last.slice(0, -1);
+    else if (/[aiouyn]s$/.test(last)) singular = last.slice(0, -1);
+  }
+
+  return [...words, singular].join(" ");
+}
+
 function parseSimpleFraction(token: string): number | null {
   if (!token) {
     return null;
@@ -320,7 +350,7 @@ export function mergeShoppingList(
       ? item.quantity
       : 0;
     const baseValue = toBaseUnit(normalizedQuantity, normalizedUnit);
-    const key = `${ingredientName}|${baseValue.unit}`;
+    const key = `${shoppingMergeName(ingredientName)}|${baseValue.unit}`;
 
     const existing = grouped.get(key);
 
@@ -340,16 +370,28 @@ export function mergeShoppingList(
     }
   }
 
-  return Array.from(grouped.values())
-    .map((item) => {
-      const display = toDisplayUnit(item.quantity, item.unit);
-      return {
-        ...item,
-        quantity: roundQuantity(display.quantity),
-        unit: display.unit,
-      };
-    })
-    .sort((first, second) => first.ingredient.localeCompare(second.ingredient));
+  // The same thing in units that don't convert ("2 Stück" and "100 g Ei") is
+  // still one thing to buy: one row, the other amounts listed alongside.
+  const byName = new Map<string, ShoppingListItem>();
+  for (const [key, item] of grouped) {
+    const display = toDisplayUnit(item.quantity, item.unit);
+    const shown = { ...item, quantity: roundQuantity(display.quantity), unit: display.unit };
+    const name = key.slice(0, key.lastIndexOf("|"));
+    const first = byName.get(name);
+
+    if (!first) {
+      byName.set(name, shown);
+      continue;
+    }
+    first.also = [...(first.also ?? []), { quantity: shown.quantity, unit: shown.unit }];
+    for (const source of shown.sources ?? []) {
+      if (!first.sources?.includes(source)) first.sources?.push(source);
+    }
+  }
+
+  return Array.from(byName.values()).sort((first, second) =>
+    first.ingredient.localeCompare(second.ingredient),
+  );
 }
 
 /**

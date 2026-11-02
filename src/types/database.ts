@@ -649,4 +649,7 @@ export type ShoppingListItem = {
   label?: string;
   // Names of the planned recipes that need this item.
   sources?: string[];
+  // Further amounts of the same item in units that don't convert, e.g. "100 g"
+  // next to "2 Stück".
+  also?: Array<{ quantity: number; unit: string }>;
 };

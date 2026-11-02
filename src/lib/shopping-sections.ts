@@ -199,3 +199,12 @@ export function shoppingItemLabel(item: ShoppingListItem) {
   if (item.label) return item.label;
   return item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1);
 }
+
+/**
+ * All amounts of an item, joined: "2 Stück + 100 g".
+ */
+export function formatShoppingItemAmount(item: Pick<ShoppingListItem, "quantity" | "unit" | "also">): string {
+  return [{ quantity: item.quantity, unit: item.unit }, ...(item.also ?? [])]
+    .map((amount) => formatShoppingAmount(amount.quantity, amount.unit))
+    .join(" + ");
+}

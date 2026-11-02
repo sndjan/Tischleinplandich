@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { generateShoppingListFromPlannedMeals, isBasicIngredient, parseIngredient } from "@/lib/shopping-list";
+import {
+  generateShoppingListFromPlannedMeals,
+  isBasicIngredient,
+  parseIngredient,
+  shoppingMergeName,
+} from "@/lib/shopping-list";
+import { formatShoppingItemAmount } from "@/lib/shopping-sections";
 
 describe("parseIngredient", () => {
   it("reads quantity, unit and name", () => {
@@ -77,5 +83,47 @@ describe("ingredient groups", () => {
       [{ id: "r1", name: "Pizza", ingredients: "# Teig\n200 g Mehl\n# Belag\n100 g Käse", serving_size: 1 }],
     );
     expect(items.map((item) => item.ingredient).sort()).toEqual(["käse", "mehl"]);
+  });
+});
+
+describe("merging the same ingredient", () => {
+  const listFor = (...ingredients: string[]) =>
+    generateShoppingListFromPlannedMeals(
+      ingredients.map((_, index) => ({ recipe_id: String(index), serving_size: 1 })),
+      ingredients.map((text, index) => ({ id: String(index), name: `R${index}`, ingredients: text, serving_size: 1 })),
+    );
+
+  it("treats singular and plural as one item", () => {
+    for (const [one, other] of [
+      ["Zwiebel", "Zwiebeln"],
+      ["Tomate", "Tomaten"],
+      ["Kartoffel", "Kartoffeln"],
+      ["Champignon", "Champignons"],
+      ["Ei", "Eier"],
+    ]) {
+      expect(shoppingMergeName(one)).toBe(shoppingMergeName(other));
+    }
+    expect(listFor("1 Zwiebel", "2 Zwiebeln")).toEqual([
+      expect.objectContaining({ quantity: 3, unit: "", sources: ["R0", "R1"] }),
+    ]);
+  });
+
+  it("ignores notes in brackets and after a comma", () => {
+    expect(listFor("1 Bund Petersilie (frisch)", "1 Bund Petersilie")).toHaveLength(1);
+    expect(listFor("1 Zwiebel, fein gewürfelt", "1 Zwiebel")).toEqual([
+      expect.objectContaining({ quantity: 2 }),
+    ]);
+  });
+
+  it("keeps different things apart", () => {
+    expect(shoppingMergeName("Lauchzwiebeln")).not.toBe(shoppingMergeName("Zwiebeln"));
+    expect(listFor("1 Zwiebel", "1 Knoblauch")).toHaveLength(2);
+  });
+
+  it("shows amounts in units that don't convert on one row", () => {
+    const list = listFor("2 Eier", "100 g Ei");
+    expect(list).toHaveLength(1);
+    expect(formatShoppingItemAmount(list[0]!)).toBe("2 + 100 g");
+    expect(list[0]!.sources).toEqual(["R0", "R1"]);
   });
 });

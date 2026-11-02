@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import type { ShoppingListItem } from "@/types/database";
 import { isBasicIngredient } from "@/lib/shopping-list";
 import {
-  formatShoppingAmount,
+  formatShoppingItemAmount,
   getShoppingSection,
   orderShoppingSections,
   shoppingItemLabel,
@@ -161,7 +161,7 @@ export function ShoppingList({
       ...items.map((item) => ({
         key: getItemKey(item),
         label: shoppingItemLabel(item),
-        amount: formatShoppingAmount(item.quantity, item.unit),
+        amount: formatShoppingItemAmount(item),
         sources: item.sources ?? [],
         section: getShoppingSection(item),
         basic: isBasicIngredient(item.ingredient, pantryStaples),
