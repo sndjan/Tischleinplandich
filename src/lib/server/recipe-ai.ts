@@ -11,6 +11,19 @@ import {
   type RecipeBalance,
 } from "@/lib/balance";
 import { safeFetch } from "@/lib/server/safe-fetch";
+import { formatIngredientHeader } from "@/lib/ingredient-lines";
+import {
+  ALLERGENS,
+  DETAIL_MEAL_TYPES,
+  DETAILS_VERSION,
+  DIFFICULTIES,
+  SHOPPING_SECTION_IDS,
+  detailsFingerprint,
+  formatMinutes,
+  isNutritionPlausible,
+  parseRecipeDetails,
+  sumIngredientNutrition,
+} from "@/lib/recipe-details";
 
 // Haiku is plenty for reading and adapting recipes and keeps each request at a
 // fraction of a cent. Low effort keeps the hidden reasoning (and its cost) short.
@@ -31,10 +44,24 @@ export class UserFacingError extends Error {
   }
 }
 
+// The AI schema has plain types only: the SDK drops min/max constraints from the
+// schema and checks them afterwards, so a broken one would fail the whole import.
+// Values are clamped by parseRecipeDetails instead.
 const IngredientSchema = z.object({
-  name: z.string(),
+  // Short id ("z1") the steps refer to.
+  id: z.string(),
   quantity: z.number().nullable(),
   unit: z.string().nullable(),
+  name: z.string(),
+  base_name: z.string(),
+  section: z.enum(SHOPPING_SECTION_IDS),
+  pantry: z.boolean(),
+  perishable: z.boolean(),
+  // For the listed amount (whole recipe); the app sums them per portion.
+  kcal: z.number().nullable(),
+  protein_g: z.number().nullable(),
+  carbs_g: z.number().nullable(),
+  fat_g: z.number().nullable(),
 });
 
 // Facts for the "Ausgewogenheit" score. The app calculates the score from them
@@ -61,15 +88,39 @@ export const BalanceFactsSchema = z.object({
 // progress steps shown while it is written.
 const RecipeFields = {
   name: z.string(),
-  prep_time: z.string().nullable(),
+  description: z.string(),
   serving_size: z.number(),
-  ingredients: z.array(IngredientSchema),
-  preparation_steps: z.array(z.string()),
+  active_minutes: z.number().nullable(),
+  total_minutes: z.number().nullable(),
+  time_from_source: z.boolean(),
+  difficulty: z.enum(DIFFICULTIES),
+  ingredient_groups: z.array(
+    z.object({
+      title: z.string().nullable(),
+      ingredients: z.array(IngredientSchema),
+    }),
+  ),
+  steps: z.array(
+    z.object({
+      text: z.string(),
+      uses: z.array(z.object({ ingredient_id: z.string(), fraction: z.number().nullable() })),
+    }),
+  ),
+  nutrition_from_source: z.boolean(),
   calories: z.number().nullable(),
   protein: z.number().nullable(),
   carbs: z.number().nullable(),
   fats: z.number().nullable(),
   balance: BalanceFactsSchema,
+  equipment: z.array(z.string()),
+  tips: z.array(z.string()),
+  allergens: z.array(z.enum(ALLERGENS)),
+  meal_types: z.array(z.enum(DETAIL_MEAL_TYPES)),
+  fridge_days: z.number().nullable(),
+  freezable: z.boolean(),
+  portable: z.boolean(),
+  leftovers: z.boolean(),
+  keywords: z.array(z.string()),
   tags: z.array(z.string()),
   source_url: z.string().nullable(),
 };
@@ -90,26 +141,56 @@ export const RefinedRecipeSchema = z.object({
 export type ExtractedRecipe = z.infer<typeof ExtractedRecipeSchema>;
 
 const BALANCE_RULES = `- balance: sachliche Schätzung PRO PORTION für eine Ernährungsauswertung (du bewertest nichts selbst):
-  - energy_kcal (wie calories), fiber_g (Ballaststoffe), added_sugar_g (nur zugesetzter Zucker inkl. Honig und Sirup, nicht der natürliche Zucker in Obst oder Milch), saturated_fat_g, salt_g (Salz inkl. Salz in Brühe, Sojasoße, Käse, Wurst).
+  - energy_kcal (wie die Kalorien pro Portion), fiber_g (Ballaststoffe), added_sugar_g (nur zugesetzter Zucker inkl. Honig und Sirup, nicht der natürliche Zucker in Obst oder Milch), saturated_fat_g, salt_g (Salz inkl. Salz in Brühe, Sojasoße, Käse, Wurst).
   - ingredients: jede Zutat mit grams (geschätztes Gewicht pro Portion), group, nova, whole_grain, plant.
   - group: vegetables (Gemüse, Pilze, Kräuter), fruit, legumes (Hülsenfrüchte inkl. Tofu, Tempeh), potatoes, grains (Getreide, Mehl, Nudeln, Reis, Brot), nuts_seeds, dairy (Milchprodukte, Käse), eggs, fish (Fisch, Meeresfrüchte), poultry, red_meat (Rind, Schwein, Lamm, Hack), processed_meat (Wurst, Schinken, Speck, Salami), fats_oils, sugar_sweets, condiments (Soßen, Brühe, Gewürze, Senf), beverages, other.
   - nova: 1 unverarbeitet oder minimal verarbeitet (frisches Gemüse, Obst, Fleisch, Eier, Milch, Mehl, Reis, Nudeln, getrocknete Hülsenfrüchte), 2 Küchenzutat (Öl, Butter, Zucker, Salz, Essig), 3 verarbeitet (Käse, Brot, Dosengemüse, geräucherter Fisch, Speck), 4 hochverarbeitet (Fertigsoßen, Instantbrühe, Wurst mit Zusatzstoffen, Fleischersatz-Fertigprodukte, Süßigkeiten, Toastbrot).
   - whole_grain: true nur bei Vollkorn (Vollkornmehl, -nudeln, Naturreis, Haferflocken).
   - plant: die Pflanze in einem Wort im Singular ("Tomate", "Kichererbse", "Weizen"), null bei tierischen Zutaten, Salz, Wasser und Zucker.`;
 
-const SHARED_RULES = `Regeln:
-- Schreibe Name, Zutaten, Zubereitungsschritte und Tags auf Deutsch.
+const SHARED_RULES = `Allgemein:
+- Schreibe alles auf Deutsch, Schritte in der Du-Form.
 - Mengen metrisch (g, kg, ml, l). Übliche Küchenmaße wie EL, TL, Prise, Stück, Bund, Dose bleiben erhalten. Ohne Mengenangabe ist quantity null.
-- preparation_steps: ein Schritt pro Eintrag, ohne Nummerierung.
 - serving_size: Anzahl der Portionen, die das Rezept ergibt (Standard 1).
-- Nährwerte (calories in kcal, protein/carbs/fats in g) gelten PRO PORTION. Stehen sie in der Quelle, übernimm sie (ggf. auf eine Portion umgerechnet). Fehlen sie, schätze sie realistisch anhand der Zutaten und Mengen.
+
+Zutaten:
+- ingredient_groups: Gruppen wie "Für den Teig" oder "Für die Soße", wenn das Gericht aus mehreren Teilen besteht; sonst genau eine Gruppe mit title null.
+- Innerhalb einer Gruppe steht jede Zutat nur einmal; wird sie dort mehrfach gebraucht, addiere die Mengen. In verschiedenen Gruppen darf sie wieder vorkommen.
+- id: kurze eindeutige Kennung je Zutat (z1, z2, …) für den Bezug aus den Schritten.
+- name: die Zutat ohne Menge, ein Zubereitungshinweis kurz dahinter ("Zwiebel, fein gewürfelt").
+- base_name: schlichter Name im Singular zum Zusammenfassen auf der Einkaufsliste ("Zwiebel", "Tomate (Dose)", "Gemüsebrühe").
+- section: Abteilung im Supermarkt. pantry: typische Vorratszutat (Salz, Pfeffer, Öl, Essig, Mehl, Zucker, Gewürze). perishable: verdirbt in wenigen Tagen (frischer Fisch, Hackfleisch, frische Kräuter, Blattsalat, Beeren).
+- kcal, protein_g, carbs_g, fat_g: Nährwerte für die angegebene Menge der Zutat im ganzen Rezept (nicht pro Portion), nach üblichen Nährwerttabellen. Bei Angaben wie "1 Zwiebel" nimm ein übliches Gewicht an. Salz, Wasser und Gewürze in kleinen Mengen: 0.
+
+Zubereitung:
+- Ein Schritt ist ein Arbeitsabschnitt. Handgriffe, die direkt zusammengehören, stehen in einem Schritt ("Nudeln in reichlich Salzwasser 10 Min. bissfest kochen", nicht "Wasser aufsetzen" und "Nudeln kochen" einzeln). Meist 4–8 Schritte, ohne Nummerierung.
+- Nenne Hitzestufe und Dauer im Text, Zeiten immer als Zahl mit "Min." oder "Std." ("5 Min.").
+- uses: die Zutaten, die in diesem Schritt verarbeitet werden, per ingredient_id. fraction: Anteil der Zutat in diesem Schritt (z. B. 0.5), wenn sie auf mehrere Schritte verteilt wird, sonst null. Sag dann auch im Text, wie viel ("die Hälfte des Knoblauchs").
+- Jede Zutat, die ein Schritt braucht, steht in der Zutatenliste.
+
+Zeit:
+- active_minutes: aktive Arbeitszeit; total_minutes: Gesamtzeit inklusive Garen, Backen und Ruhen. Aus der Quelle übernehmen (time_from_source true), sonst realistisch aus den Schritten schätzen (time_from_source false). Nicht leer lassen.
+
+Nährwerte:
+- nutrition_from_source: true nur, wenn die Quelle Nährwerte nennt. Dann calories (kcal), protein, carbs, fats PRO PORTION aus der Quelle (ggf. auf eine Portion umgerechnet). Sonst false und diese vier Felder null; die App rechnet sie aus den Zutaten aus.
 ${BALANCE_RULES}
-- prep_time als kurzer Text, z. B. "30 Min." oder null.
+
+Weitere Angaben:
+- description: ein kurzer Satz, was für ein Gericht das ist.
+- difficulty: easy, medium oder hard.
+- equipment: alle benötigten Küchengeräte, auch wenn die Quelle keine nennt, abgeleitet aus den Schritten ("Großer Topf", "Pfanne", "Backofen", "Pürierstab"). Keine Selbstverständlichkeiten wie Messer, Brett oder Löffel.
+- tips: 0–3 kurze, wirklich hilfreiche Tipps (vorbereiten, aufbewahren, häufige Fehler, Varianten). Lieber kein Tipp als ein banaler.
+- allergens: welche der 14 EU-Hauptallergene enthalten sind.
+- meal_types: wofür sich das Gericht eignet.
+- fridge_days: wie viele Tage es gekocht im Kühlschrank hält, null wenn man es frisch essen sollte. freezable: lässt sich einfrieren. portable: gut zum Mitnehmen. leftovers: schmeckt am nächsten Tag aufgewärmt noch gut.
+- keywords: 5–10 Suchwörter, die nicht schon im Namen stehen ("leicht", "sommerlich", "Feierabend", "Ofengericht").
 - tags: 1–4 kurze Tags (z. B. Mahlzeit, Küche, Eigenschaften). Verwende bevorzugt die vorhandenen Tags des Nutzers, wenn sie passen.`;
 
-export const IMPORT_SYSTEM_PROMPT = `Du extrahierst Kochrezepte aus Screenshots, Fotos, PDFs, kopiertem Text und Webseiten für eine Wochen-Essensplaner-App.
+export const IMPORT_SYSTEM_PROMPT = `Du liest Kochrezepte aus Screenshots, Fotos, PDFs, kopiertem Text und Webseiten für eine Wochen-Essensplaner-App und bringst sie in eine klare, einheitliche Form.
 
 Alle Eingaben des Nutzers gehören zu EINEM Rezept (z. B. Zutaten auf einem Screenshot, Zubereitung auf einem anderen, plus eine Notiz). Führe sie zusammen; Notizen des Nutzers haben Vorrang. Enthält die Eingabe mehrere verschiedene Rezepte, nimm nur das erste. Enthält sie gar kein Rezept, setze recipe_found auf false und lasse die übrigen Felder leer bzw. null.
+
+Übernimm Zutaten und Mengen genau. Die Zubereitung schreibst du mit eigenen Worten neu, klar und ohne Füllsätze, nach den Regeln unten.
 
 ${SHARED_RULES}
 - source_url: die Webseiten-URL, falls eine angegeben wurde, sonst null.
@@ -117,16 +198,31 @@ ${SHARED_RULES}
 
 export const IDEA_SYSTEM_PROMPT = `Du schreibst neue, alltagstaugliche Kochrezepte für eine Wochen-Essensplaner-App, passend zur Idee des Nutzers (z. B. ein Gericht, eine Stimmung oder Zutaten, die noch da sind).
 
-Nutze die genannten Zutaten sinnvoll, ergänze nur übliche Vorratszutaten und halte dich an die Wünsche. Schreibe klare, kurze Schritte. Setze recipe_found auf true, source_url und cover_image_index auf null.
+Nutze die genannten Zutaten sinnvoll, ergänze nur übliche Vorratszutaten und halte dich an die Wünsche. Setze recipe_found auf true, time_from_source und nutrition_from_source auf false, source_url und cover_image_index auf null.
 
 ${SHARED_RULES}`;
 
 export const REFINE_SYSTEM_PROMPT = `Du passt ein bestehendes Rezept nach der Anweisung des Nutzers an (z. B. andere Portionenzahl, vegan, mehr Protein, kürzere Schritte).
 
-Gib das vollständige angepasste Rezept zurück und ändere nur, was die Anweisung verlangt (plus nötige Folgeänderungen wie Nährwerte oder Tags). Bei einer neuen Portionenzahl skalierst du alle Mengen; die Nährwerte bleiben pro Portion.
+Gib das vollständige angepasste Rezept zurück und ändere nur, was die Anweisung verlangt, plus nötige Folgeänderungen. Bei einer neuen Portionenzahl skalierst du alle Mengen. Zeilen in den Zutaten, die mit # beginnen, sind Gruppenüberschriften. Fehlende Angaben (Zeiten, Küchengeräte, Allergene usw.) ergänzt du.
+- Nährwerte: Ändern sich Zutaten oder Mengen pro Portion nicht, behalte calories, protein, carbs und fats bei (nutrition_from_source true). Sonst setze sie auf null (nutrition_from_source false).
+- time_from_source: true, wenn die Zeiten aus dem Rezept stammen und gleich bleiben.
 - summary: ein kurzer Satz auf Deutsch, was du geändert hast.
 - changes: die bis zu 6 wichtigsten Änderungen als kurze Texte, z. B. before "200 g Orzo", after "400 g Orzo". Neue Dinge haben before null.
 
+${SHARED_RULES}`;
+
+export const RecalculatedRecipeSchema = z.object(RecipeFields);
+
+export const RECALCULATE_SYSTEM_PROMPT = `Du wertest ein Rezept neu aus, das der Nutzer selbst bearbeitet hat.
+
+Der Text gehört dem Nutzer: Übernimm Name, Portionen, Zutaten (Reihenfolge, Gruppen, Mengen und Wortlaut) und die Zubereitungsschritte (Reihenfolge und Wortlaut) unverändert, auch wenn sie nicht den Regeln unten entsprechen. Zeilen in den Zutaten, die mit # beginnen, sind Gruppenüberschriften; jede andere Zeile ist genau eine Zutat, und jede Zeile der Zubereitung ist genau ein Schritt.
+
+Neu bestimmst du nur die Auswertung: Nährwerte je Zutat, balance, Zeiten, Schwierigkeit, Küchengeräte, Tipps, Allergene und die übrigen Angaben. Vorhandene Küchengeräte und Tipps behältst du und ergänzt nur, was fehlt.
+- nutrition_from_source false und calories, protein, carbs, fats null; die App rechnet sie aus den Zutaten aus.
+- time_from_source false.
+
+Regeln für die Auswertung:
 ${SHARED_RULES}`;
 
 const roundOrNull = (value: number | null | undefined) =>
@@ -138,21 +234,55 @@ const formatQuantity = (quantity: number | null | undefined) =>
     : String(Math.round(quantity * 100) / 100).replace(".", ",");
 
 type RecipeLike = Partial<z.infer<z.ZodObject<typeof RecipeFields>>>;
+type AiIngredient = Partial<z.infer<typeof IngredientSchema>>;
 
-const formatIngredients = (ingredients: RecipeLike["ingredients"]) =>
-  (Array.isArray(ingredients) ? ingredients : [])
-    .filter((ingredient) => ingredient && typeof ingredient.name === "string")
-    .map((ingredient) =>
-      [formatQuantity(ingredient.quantity), ingredient.unit?.trim() ?? "", ingredient.name.trim()]
-        .filter(Boolean)
-        .join(" "),
-    )
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const asArray = <T>(value: unknown): Partial<T>[] =>
+  Array.isArray(value) ? value.filter(isObject).map((item) => item as Partial<T>) : [];
+
+const strings = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+    : [];
+
+const formatIngredient = (ingredient: AiIngredient) =>
+  [formatQuantity(ingredient.quantity), ingredient.unit?.trim() ?? "", ingredient.name?.trim() ?? ""]
     .filter(Boolean)
-    .join("\n");
+    .join(" ");
 
 /**
- * The model's facts, stamped with the ingredients they were estimated for, so the
- * app notices when the recipe is edited afterwards. Null while still streaming.
+ * The ingredient groups as text lines ("# Für die Soße" before each named group,
+ * unless there is only one), plus the ingredients in the same order.
+ */
+function flattenIngredients(groups: RecipeLike["ingredient_groups"]) {
+  const usable = asArray<{ title: string | null; ingredients: AiIngredient[] }>(groups)
+    .map((group) => ({
+      title: typeof group.title === "string" ? group.title.trim() : "",
+      ingredients: asArray<AiIngredient>(group.ingredients).filter(
+        (ingredient) => typeof ingredient.name === "string" && ingredient.name.trim(),
+      ),
+    }))
+    .filter((group) => group.ingredients.length > 0);
+  const withHeaders = usable.length > 1;
+
+  const lines: string[] = [];
+  const ingredients: AiIngredient[] = [];
+  for (const group of usable) {
+    if (withHeaders && group.title) lines.push(formatIngredientHeader(group.title));
+    for (const ingredient of group.ingredients) {
+      lines.push(formatIngredient(ingredient));
+      ingredients.push(ingredient);
+    }
+  }
+  return { text: lines.join("\n"), ingredients };
+}
+
+/**
+ * The facts for the balance score, stamped with the ingredients they were
+ * estimated for, so the app notices when the recipe is edited afterwards. Null
+ * while still streaming.
  */
 export function toRecipeBalance(
   facts: unknown,
@@ -169,33 +299,128 @@ export function toRecipeBalance(
 
 /**
  * Turns the (possibly still incomplete) model output into a draft for the client.
+ * Calories and macros come from the source when it has them, otherwise they are
+ * the sum of the per-ingredient estimates.
  */
-export function toRecipeDraft(recipe: RecipeLike, requestUrl = ""): RecipeDraft {
-  const steps = Array.isArray(recipe.preparation_steps) ? recipe.preparation_steps : [];
+export function toRecipeDraft(recipe: RecipeLike, requestUrl = "", sourceText: string | null = null): RecipeDraft {
   const servingSize =
     typeof recipe.serving_size === "number" && recipe.serving_size > 0 ? recipe.serving_size : 1;
-  const ingredients = formatIngredients(recipe.ingredients);
+  const { text: ingredients, ingredients: aiIngredients } = flattenIngredients(recipe.ingredient_groups);
+
+  const idToIndex = new Map<string, number>();
+  aiIngredients.forEach((ingredient, index) => {
+    if (typeof ingredient.id === "string" && !idToIndex.has(ingredient.id)) idToIndex.set(ingredient.id, index);
+  });
+
+  const stepEntries = asArray<{ text: string; uses: Array<{ ingredient_id: string; fraction: number | null }> }>(
+    recipe.steps,
+  )
+    .map((step) => ({ text: typeof step.text === "string" ? step.text.trim() : "", uses: step.uses }))
+    .filter((step) => step.text);
+  const preparationSteps = stepEntries.map((step) => step.text).join("\n");
+
+  const ingredientInfos = aiIngredients.map((ingredient) => ({
+    base_name: ingredient.base_name,
+    section: ingredient.section,
+    pantry: ingredient.pantry,
+    perishable: ingredient.perishable,
+    kcal: ingredient.kcal,
+    protein: ingredient.protein_g,
+    carbs: ingredient.carbs_g,
+    fat: ingredient.fat_g,
+  }));
+
+  const details = parseRecipeDetails({
+    version: DETAILS_VERSION,
+    fingerprint: detailsFingerprint(ingredients, preparationSteps),
+    description: recipe.description,
+    keywords: recipe.keywords,
+    active_minutes: recipe.active_minutes,
+    total_minutes: recipe.total_minutes,
+    time_estimated: recipe.time_from_source !== true,
+    difficulty: recipe.difficulty,
+    meal_types: recipe.meal_types,
+    equipment: recipe.equipment,
+    tips: recipe.tips,
+    allergens: recipe.allergens,
+    fridge_days: recipe.fridge_days,
+    freezable: recipe.freezable,
+    portable: recipe.portable,
+    leftovers: recipe.leftovers,
+    ingredients: ingredientInfos,
+    steps: stepEntries.map((step) => ({
+      uses: asArray<{ ingredient_id: string; fraction: number | null }>(step.uses).flatMap((use) => {
+        const index = typeof use.ingredient_id === "string" ? idToIndex.get(use.ingredient_id) : undefined;
+        if (index === undefined) return [];
+        const fraction = typeof use.fraction === "number" && use.fraction > 0 && use.fraction < 0.99 ? use.fraction : null;
+        return [{ i: index, fraction }];
+      }),
+    })),
+  });
+
+  // Values from the source win; otherwise the per-ingredient estimates are summed.
+  const fromSource =
+    recipe.nutrition_from_source === true && typeof recipe.calories === "number" && recipe.calories > 0;
+  const summed = details ? sumIngredientNutrition(details.ingredients, servingSize) : null;
+  const nutrition = fromSource
+    ? {
+        calories: roundOrNull(recipe.calories),
+        protein: roundOrNull(recipe.protein),
+        carbs: roundOrNull(recipe.carbs),
+        fats: roundOrNull(recipe.fats),
+      }
+    : {
+        calories: summed?.calories ?? null,
+        protein: summed?.protein ?? null,
+        carbs: summed?.carbs ?? null,
+        fats: summed?.fats ?? null,
+      };
+
+  if (details) {
+    details.nutrition_estimated = !fromSource && summed !== null;
+    details.nutrition_warning = nutrition.calories !== null && !isNutritionPlausible(nutrition);
+  }
+
+  const totalMinutes = details?.total_minutes ?? null;
 
   return {
     name: typeof recipe.name === "string" ? recipe.name.trim() : "",
     ingredients,
-    preparation_steps: steps
-      .filter((step): step is string => typeof step === "string")
-      .map((step) => step.trim())
-      .filter(Boolean)
-      .join("\n"),
+    preparation_steps: preparationSteps,
     source_url: recipe.source_url?.trim() || requestUrl,
-    prep_time: recipe.prep_time?.trim() ?? "",
-    tags: (Array.isArray(recipe.tags) ? recipe.tags : [])
-      .filter((tag): tag is string => typeof tag === "string")
-      .map((tag) => tag.trim())
-      .filter(Boolean),
-    calories: roundOrNull(recipe.calories),
-    protein: roundOrNull(recipe.protein),
-    carbs: roundOrNull(recipe.carbs),
-    fats: roundOrNull(recipe.fats),
+    prep_time: totalMinutes ? formatMinutes(totalMinutes, details?.time_estimated ?? false) : "",
+    tags: strings(recipe.tags),
+    ...nutrition,
     serving_size: servingSize,
     balance: toRecipeBalance(recipe.balance, ingredients, servingSize),
+    details,
+    source_text: sourceText,
+  };
+}
+
+/**
+ * A recipe draft as the AI reads it for changes: ingredient lines with group
+ * headers, steps, and the extras worth keeping.
+ */
+export function draftForRefine(draft: RecipeDraft) {
+  const details = parseRecipeDetails(draft.details);
+  return {
+    name: draft.name,
+    serving_size: draft.serving_size,
+    prep_time: draft.prep_time,
+    ingredients: draft.ingredients.split("\n").filter(Boolean),
+    preparation_steps: draft.preparation_steps.split("\n").filter(Boolean),
+    calories: draft.calories,
+    protein: draft.protein,
+    carbs: draft.carbs,
+    fats: draft.fats,
+    tags: draft.tags,
+    ...(details && {
+      equipment: details.equipment,
+      tips: details.tips,
+      active_minutes: details.active_minutes,
+      total_minutes: details.total_minutes,
+    }),
   };
 }
 

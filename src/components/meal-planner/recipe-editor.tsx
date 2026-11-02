@@ -12,6 +12,7 @@ import {
   Minus,
   PencilLine,
   Plus,
+  RefreshCw,
   Sparkles,
   Trash2,
   X,
@@ -31,8 +32,10 @@ import {
   formatIngredientAmount,
   type EditableRecipe,
 } from "@/lib/editable-recipe";
+import { emptyRecipeDetails, type RecipeDetails } from "@/lib/recipe-details";
 import { saveRecipe, SaveRecipeError } from "@/lib/save-recipe";
-import { refineRecipe } from "@/lib/recipe-ai-client";
+import { recalculateRecipe, refineRecipe } from "@/lib/recipe-ai-client";
+import { showUndoToast } from "@/lib/undo-toast";
 import { queryKeys, useUserId } from "@/hooks/use-planner-data";
 import { IngredientRowsEditor } from "./ingredient-rows-editor";
 import { RecipeRefineSheet, type RefineExchange } from "./recipe-refine-sheet";
@@ -112,6 +115,8 @@ export function RecipeEditor({
   const [pendingInstruction, setPendingInstruction] = useState<string | null>(null);
   const [exchanges, setExchanges] = useState<RefineExchange[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalculated, setRecalculated] = useState(false);
   const undoSnapshots = useRef(new Map<string, EditableRecipe>());
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
@@ -261,6 +266,43 @@ export function RecipeEditor({
     }
   };
 
+  // After hand edits the AI values are stale; this recomputes them for the
+  // recipe as it is now. The rows themselves stay as the user wrote them.
+  const recalculate = async () => {
+    if (recalculating || pendingInstruction) return;
+    if (!value.ingredients.some((row) => !row.header && row.name.trim())) {
+      toast.error("Mindestens eine Zutat fehlt");
+      return;
+    }
+
+    setRecalculating(true);
+    const before = value;
+    try {
+      const merged = await recalculateRecipe(draftFromEditable(before));
+      const computed = editableFromDraft(merged);
+      setValue((current) => ({
+        ...current,
+        prep_time: computed.prep_time,
+        calories: computed.calories,
+        protein: computed.protein,
+        carbs: computed.carbs,
+        fats: computed.fats,
+        balance: computed.balance,
+        details: computed.details,
+      }));
+      setRecalculated(true);
+      showUndoToast({
+        message: "Nährwerte und Details neu berechnet",
+        onUndo: () => setValue(before),
+        onCommit: () => {},
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Berechnen fehlgeschlagen");
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const undoExchange = (id: string) => {
     const snapshot = undoSnapshots.current.get(id);
     if (!snapshot) return;
@@ -278,7 +320,7 @@ export function RecipeEditor({
       return;
     }
 
-    if (!value.ingredients.some((row) => row.name.trim())) {
+    if (!value.ingredients.some((row) => !row.header && row.name.trim())) {
       toast.error("Mindestens eine Zutat fehlt");
       setView("ingredients");
       return;
@@ -323,6 +365,11 @@ export function RecipeEditor({
   }
 
   const ingredientRows = value.ingredients.filter((row) => row.name.trim() || row.quantity.trim());
+  const ingredientCount = ingredientRows.filter((row) => !row.header).length;
+  const details = value.details;
+  // Equipment and tips edited by hand; recipes without AI details get them here.
+  const updateDetails = (patch: Partial<RecipeDetails>) =>
+    update({ details: { ...(value.details ?? emptyRecipeDetails()), ...patch } });
   const coverUrl = cover.previewUrl;
 
   const composer = (
@@ -546,10 +593,21 @@ export function RecipeEditor({
               <NutritionField label="Carbs" suffix="g" value={value.carbs} onChange={(carbs) => update({ carbs })} />
               <NutritionField label="Fett" suffix="g" value={value.fats} onChange={(fats) => update({ fats })} />
             </div>
-            <p className="flex items-center gap-1.5 text-xs text-brand-secondary">
-              {fromAi && <Sparkles className="size-3" />}
-              {fromAi ? "Pro Portion, von der KI geschätzt" : "Pro Portion"}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-xs text-brand-secondary">
+                {(fromAi || recalculated) && <Sparkles className="size-3" />}
+                {fromAi || recalculated ? "Pro Portion, von der KI geschätzt" : "Pro Portion"}
+              </p>
+              <button
+                type="button"
+                onClick={() => void recalculate()}
+                disabled={recalculating || Boolean(pendingInstruction)}
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-brand-accent-bg px-3 text-xs font-bold text-brand-accent-dark transition-transform active:scale-95 disabled:opacity-60"
+              >
+                <RefreshCw className={cn("size-3.5", recalculating && "animate-spin")} />
+                {recalculating ? "Wird berechnet …" : "Neu berechnen"}
+              </button>
+            </div>
           </section>
 
           <section aria-label="Tags" className="flex flex-wrap items-center gap-2">
@@ -621,8 +679,8 @@ export function RecipeEditor({
             <div className="mb-1 flex items-center justify-between">
               <h2 className="font-heading text-lg font-extrabold">
                 Zutaten{" "}
-                {ingredientRows.length > 0 && (
-                  <span className="font-bold text-brand-secondary">· {ingredientRows.length}</span>
+                {ingredientCount > 0 && (
+                  <span className="font-bold text-brand-secondary">· {ingredientCount}</span>
                 )}
               </h2>
               <button
@@ -649,15 +707,24 @@ export function RecipeEditor({
                 className="block w-full text-left"
                 aria-label="Zutaten bearbeiten"
               >
-                {ingredientRows.map((row) => (
-                  <span
-                    key={row.id}
-                    className="flex gap-3 border-b border-brand-divider py-2.5 text-[15px] last:border-b-0"
-                  >
-                    <span className="w-[4.5rem] shrink-0 font-bold">{formatIngredientAmount(row)}</span>
-                    <span>{row.name}</span>
-                  </span>
-                ))}
+                {ingredientRows.map((row) =>
+                  row.header ? (
+                    <span
+                      key={row.id}
+                      className="block pb-0.5 pt-3 text-xs font-bold uppercase tracking-[0.06em] text-brand-accent-dark"
+                    >
+                      {row.name}
+                    </span>
+                  ) : (
+                    <span
+                      key={row.id}
+                      className="flex gap-3 border-b border-brand-divider py-2.5 text-[15px] last:border-b-0"
+                    >
+                      <span className="w-[4.5rem] shrink-0 font-bold">{formatIngredientAmount(row)}</span>
+                      <span>{row.name}</span>
+                    </span>
+                  ),
+                )}
               </button>
             )}
           </section>
@@ -695,6 +762,53 @@ export function RecipeEditor({
               <Plus className="size-4" strokeWidth={2.5} />
               Schritt hinzufügen
             </button>
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="font-heading text-lg font-extrabold">Küchengeräte</h2>
+            <ListInput
+              key={details?.equipment.join("|") ?? ""}
+              values={details?.equipment ?? []}
+              onChange={(equipment) => updateDetails({ equipment })}
+              placeholder="z. B. Topf, Pfanne, Backofen"
+              label="Küchengeräte, durch Komma getrennt"
+            />
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="font-heading text-lg font-extrabold">Tipps</h2>
+            {(details?.tips ?? []).map((tip, index) => (
+              <div key={index} className="flex gap-3">
+                <AutoTextarea
+                  aria-label={`Tipp ${index + 1}`}
+                  value={tip}
+                  onChange={(event) =>
+                    updateDetails({
+                      tips: (details?.tips ?? []).map((entry, i) => (i === index ? event.target.value : entry)),
+                    })
+                  }
+                  className="-my-0.5 px-1 py-0.5 text-[15px] leading-relaxed"
+                />
+                <button
+                  type="button"
+                  aria-label={`Tipp ${index + 1} entfernen`}
+                  onClick={() => updateDetails({ tips: (details?.tips ?? []).filter((_, i) => i !== index) })}
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-brand-muted active:bg-black/5"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
+            {(details?.tips.length ?? 0) < 5 && (
+              <button
+                type="button"
+                onClick={() => updateDetails({ tips: [...(details?.tips ?? []), ""] })}
+                className="flex h-10 items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-brand-accent-dark active:bg-brand-accent-bg"
+              >
+                <Plus className="size-4" strokeWidth={2.5} />
+                Tipp hinzufügen
+              </button>
+            )}
           </section>
 
           <section className="space-y-3 rounded-2xl bg-brand-app-bg p-3.5">
@@ -748,6 +862,42 @@ export function RecipeEditor({
 
       {cropTarget && <ImageCropper src={cropTarget.src} onCancel={closeCropper} onDone={applyCrop} />}
     </div>
+  );
+}
+
+/**
+ * A short list typed as one comma-separated line. The text is kept while typing
+ * and turned into the list when the field loses focus.
+ */
+function ListInput({
+  values,
+  onChange,
+  placeholder,
+  label,
+}: {
+  values: string[];
+  onChange: (values: string[]) => void;
+  placeholder: string;
+  label: string;
+}) {
+  const [text, setText] = useState(values.join(", "));
+
+  return (
+    <input
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={() =>
+        onChange(
+          text
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean),
+        )
+      }
+      placeholder={placeholder}
+      aria-label={label}
+      className="h-11 w-full rounded-xl border border-brand-input-border bg-white px-3 text-[15px] outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent-bg"
+    />
   );
 }
 

@@ -1,9 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { Clock, ExternalLink } from "lucide-react";
+import { ChefHat, Clock, ExternalLink, Gauge, Lightbulb, Refrigerator, Utensils } from "lucide-react";
 import type { Recipe } from "@/types/database";
-import { scaleIngredients } from "@/lib/recipe-scaling";
+import { groupIngredients, scaleIngredients } from "@/lib/recipe-scaling";
+import {
+  ALLERGEN_LABELS,
+  DIFFICULTY_LABELS,
+  formatMinutes,
+  parseRecipeDetails,
+  type RecipeDetails,
+} from "@/lib/recipe-details";
 import { Stepper } from "@/components/ui/controls";
 import { cn } from "@/lib/utils";
 import { safeHttpUrl } from "@/lib/safe-links";
@@ -41,7 +48,7 @@ export function RecipeBody({
   recipe: Pick<
     Recipe,
     "name" | "image_url" | "prep_time" | "calories" | "protein" | "carbs" | "fats" | "serving_size" | "ingredients" | "preparation_steps" | "source_url"
-  >;
+  > & { details?: unknown };
   tags: string[];
   servings: number;
   onServingsChange: (servings: number) => void;
@@ -58,6 +65,8 @@ export function RecipeBody({
   const ingredients = useMemo(() => scaleIngredients(recipe.ingredients, factor), [recipe.ingredients, factor]);
   const steps = getSteps(recipe.preparation_steps);
   const host = sourceHost(recipe.source_url);
+  const details = useMemo(() => parseRecipeDetails(recipe.details), [recipe.details]);
+  const storage = details ? storageHints(details) : [];
 
   const nutrition = [
     { label: "kcal", value: recipe.calories, unit: "" },
@@ -86,11 +95,21 @@ export function RecipeBody({
         <div className="space-y-2.5">
           {attribution}
           <h1 className="font-heading text-[26px] font-extrabold leading-[1.15] text-brand-ink">{recipe.name}</h1>
+          {details?.description && <p className="text-[15px] leading-snug text-brand-secondary">{details.description}</p>}
           <div className="flex flex-wrap gap-1.5 text-[13px] font-semibold">
             {recipe.prep_time && (
               <span className="flex h-[30px] items-center gap-1.5 rounded-full bg-brand-chip-neutral px-2.5 text-brand-ink">
                 <Clock className="size-3.5" />
                 {recipe.prep_time}
+                {details?.active_minutes ? (
+                  <span className="font-normal text-brand-secondary">· {formatMinutes(details.active_minutes)} aktiv</span>
+                ) : null}
+              </span>
+            )}
+            {details?.difficulty && (
+              <span className="flex h-[30px] items-center gap-1.5 rounded-full bg-brand-chip-neutral px-2.5 text-brand-ink">
+                <Gauge className="size-3.5" />
+                {DIFFICULTY_LABELS[details.difficulty]}
               </span>
             )}
             {tags.map((tag) => (
@@ -126,7 +145,14 @@ export function RecipeBody({
                 </div>
               ))}
             </div>
-            <p className="text-xs text-brand-secondary">Pro Portion</p>
+            <p className="text-xs text-brand-secondary">
+              Pro Portion{details?.nutrition_estimated && " · aus den Zutaten geschätzt"}
+            </p>
+            {details?.nutrition_warning && (
+              <p className="text-xs font-semibold text-[#8a5a00]">
+                Kalorien und Makros passen nicht ganz zusammen, prüf die Werte am besten kurz.
+              </p>
+            )}
           </section>
         )}
 
@@ -145,22 +171,47 @@ export function RecipeBody({
               Mengen umgerechnet vom Original ({formatNumber(baseServings)} {baseServings === 1 ? "Portion" : "Portionen"})
             </p>
           )}
-          <ul>
-            {ingredients.map((ingredient) => (
-              <li key={ingredient.id} className="flex gap-3 border-b border-brand-divider py-2.5 text-[15px] last:border-b-0">
-                <span
-                  className={cn(
-                    "w-[76px] shrink-0 font-bold",
-                    servings !== baseServings ? "text-brand-accent-dark" : "text-brand-ink",
-                  )}
-                >
-                  {ingredient.amount}
-                </span>
-                <span className="text-brand-ink">{ingredient.name}</span>
-              </li>
-            ))}
-          </ul>
+          {groupIngredients(ingredients).map((group, groupIndex) => (
+            <div key={groupIndex}>
+              {group.group && (
+                <h3 className="pb-0.5 pt-3 text-xs font-bold uppercase tracking-[0.06em] text-brand-accent-dark">
+                  {group.group}
+                </h3>
+              )}
+              <ul>
+                {group.items.map((ingredient) => (
+                  <li key={ingredient.id} className="flex gap-3 border-b border-brand-divider py-2.5 text-[15px] last:border-b-0">
+                    <span
+                      className={cn(
+                        "w-[76px] shrink-0 font-bold",
+                        servings !== baseServings ? "text-brand-accent-dark" : "text-brand-ink",
+                      )}
+                    >
+                      {ingredient.amount}
+                    </span>
+                    <span className="text-brand-ink">{ingredient.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
+
+        {details && details.equipment.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="flex items-center gap-2 font-heading text-lg font-extrabold text-brand-ink">
+              <Utensils className="size-5 text-brand-accent-dark" />
+              Das brauchst du
+            </h2>
+            <ul className="flex flex-wrap gap-1.5">
+              {details.equipment.map((item) => (
+                <li key={item} className="rounded-full bg-brand-chip-neutral px-3 py-1.5 text-[13px] font-semibold text-brand-ink">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {steps.length > 0 && (
           <section className="space-y-3">
@@ -177,9 +228,53 @@ export function RecipeBody({
             </ol>
           </section>
         )}
+
+        {details && details.tips.length > 0 && (
+          <section className="space-y-2 rounded-2xl bg-brand-accent-bg-light p-3.5">
+            <h2 className="flex items-center gap-2 font-heading text-lg font-extrabold text-brand-ink">
+              <Lightbulb className="size-5 text-brand-accent-dark" />
+              Tipps
+            </h2>
+            <ul className="space-y-1.5">
+              {details.tips.map((tip) => (
+                <li key={tip} className="flex gap-2 text-[15px] leading-relaxed text-brand-ink">
+                  <ChefHat className="mt-1 size-4 shrink-0 text-brand-accent-dark" />
+                  {tip}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {details && (details.allergens.length > 0 || storage.length > 0) && (
+          <section className="space-y-1.5 text-[13px] leading-relaxed text-brand-secondary">
+            {storage.length > 0 && (
+              <p className="flex gap-1.5">
+                <Refrigerator className="mt-0.5 size-3.5 shrink-0" />
+                {storage.join(" · ")}
+              </p>
+            )}
+            {details.allergens.length > 0 && (
+              <p>
+                <b className="font-semibold text-brand-ink">Allergene:</b>{" "}
+                {details.allergens.map((allergen) => ALLERGEN_LABELS[allergen]).join(", ")}
+                <span> (von der KI geschätzt, ohne Gewähr)</span>
+              </p>
+            )}
+          </section>
+        )}
       </main>
     </>
   );
+}
+
+function storageHints(details: RecipeDetails): string[] {
+  return [
+    details.fridge_days ? `Hält ${details.fridge_days} ${details.fridge_days === 1 ? "Tag" : "Tage"} im Kühlschrank` : null,
+    details.freezable ? "lässt sich einfrieren" : null,
+    details.portable ? "gut zum Mitnehmen" : null,
+    details.leftovers ? "schmeckt auch aufgewärmt" : null,
+  ].filter((hint): hint is string => Boolean(hint));
 }
 
 export function HeroButton({

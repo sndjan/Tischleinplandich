@@ -1,6 +1,7 @@
 "use client";
 
 import type { Recipe } from "@/types/database";
+import { ingredientHeaderName, isIngredientHeader } from "@/lib/ingredient-lines";
 
 /**
  * All recipes as Markdown files in a ZIP (one file per recipe, photos in
@@ -85,7 +86,7 @@ export function recipeToMarkdown(recipe: Recipe, tags: string[], imagePath: stri
       : null,
     "## Zutaten",
     "",
-    ...ingredients.map((line) => `- ${line}`),
+    ...ingredients.map((line) => (isIngredientHeader(line) ? `\n**${ingredientHeaderName(line)}**\n` : `- ${line}`)),
     "",
     steps.length > 0 ? ["## Zubereitung", "", ...steps.map((step, index) => `${index + 1}. ${step}`), ""].join("\n") : null,
     recipe.source_url ? `Quelle: <${recipe.source_url}>\n` : null,

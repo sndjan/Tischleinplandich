@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, GripVertical, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, GripVertical, Heading, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -46,8 +46,8 @@ export function IngredientRowsEditor({
 
   const removeRow = (id: string) => onChange(rows.filter((row) => row.id !== id));
 
-  const addRow = () => {
-    const row = emptyRow();
+  const addRow = (header = false) => {
+    const row = { ...emptyRow(), ...(header && { header: true }) };
     onChange([...rows, row]);
     requestAnimationFrame(() => nameInputs.current.get(row.id)?.focus());
   };
@@ -190,71 +190,113 @@ export function IngredientRowsEditor({
                 draggingId === row.id && "relative z-10 bg-white shadow-lg",
               )}
             >
-              <div className="grid grid-cols-[20px_56px_68px_minmax(0,1fr)_32px] items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Zum Verschieben ziehen"
-                  onPointerDown={(event) => handlePointerDown(row.id, event)}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={() => setDraggingId(null)}
-                  onPointerCancel={() => setDraggingId(null)}
-                  className="flex h-10 cursor-grab touch-none items-center justify-center text-brand-muted"
-                >
-                  <GripVertical className="size-4" />
-                </button>
-                <input
-                  aria-label="Menge"
-                  inputMode="decimal"
-                  value={row.quantity}
-                  onChange={(event) => updateRow(row.id, { quantity: event.target.value })}
-                  onFocus={() => setFocusedRowId(row.id)}
-                  onPaste={(event) => handlePaste(row.id, event)}
-                  className="h-10 w-full rounded-lg border border-brand-input-border bg-white px-2 text-right text-[15px] font-semibold outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent-bg"
-                />
-                <select
-                  aria-label="Einheit"
-                  value={row.unit}
-                  onChange={(event) => updateRow(row.id, { unit: event.target.value })}
-                  onFocus={() => setFocusedRowId(row.id)}
-                  className="h-10 w-full rounded-lg border border-brand-input-border bg-brand-app-bg-alt px-1.5 text-sm outline-none focus:border-brand-accent"
-                >
-                  <option value="">–</option>
-                  {unitOptions(row.unit).map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unit}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  ref={(element) => {
-                    if (element) nameInputs.current.set(row.id, element);
-                    else nameInputs.current.delete(row.id);
-                  }}
-                  aria-label="Zutat"
-                  value={row.name}
-                  placeholder="Zutat"
-                  onChange={(event) => updateRow(row.id, { name: event.target.value })}
-                  onFocus={() => setFocusedRowId(row.id)}
-                  onPaste={(event) => handlePaste(row.id, event)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addRow();
-                    }
-                  }}
-                  className="h-10 w-full min-w-0 rounded-lg border border-brand-input-border bg-white px-2.5 text-[15px] outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent-bg"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeRow(row.id)}
-                  aria-label={`${row.name || "Zutat"} entfernen`}
-                  className="flex h-10 w-8 items-center justify-center rounded-lg text-brand-secondary active:bg-black/5"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
+              {row.header ? (
+                <div className="grid grid-cols-[20px_minmax(0,1fr)_32px] items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Zum Verschieben ziehen"
+                    onPointerDown={(event) => handlePointerDown(row.id, event)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={() => setDraggingId(null)}
+                    onPointerCancel={() => setDraggingId(null)}
+                    className="flex h-10 cursor-grab touch-none items-center justify-center text-brand-muted"
+                  >
+                    <GripVertical className="size-4" />
+                  </button>
+                  <input
+                    ref={(element) => {
+                      if (element) nameInputs.current.set(row.id, element);
+                      else nameInputs.current.delete(row.id);
+                    }}
+                    aria-label="Gruppe"
+                    value={row.name}
+                    placeholder="Gruppe, z. B. Für die Soße"
+                    onChange={(event) => updateRow(row.id, { name: event.target.value })}
+                    onFocus={() => setFocusedRowId(row.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addRow();
+                      }
+                    }}
+                    className="h-10 w-full min-w-0 rounded-lg border border-brand-input-border bg-brand-app-bg-alt px-2.5 text-[13px] font-bold uppercase tracking-[0.06em] text-brand-accent-dark outline-none placeholder:normal-case placeholder:tracking-normal focus:border-brand-accent focus:ring-2 focus:ring-brand-accent-bg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRow(row.id)}
+                    aria-label={`Gruppe ${row.name} entfernen`}
+                    className="flex h-10 w-8 items-center justify-center rounded-lg text-brand-secondary active:bg-black/5"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-[20px_56px_68px_minmax(0,1fr)_32px] items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Zum Verschieben ziehen"
+                    onPointerDown={(event) => handlePointerDown(row.id, event)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={() => setDraggingId(null)}
+                    onPointerCancel={() => setDraggingId(null)}
+                    className="flex h-10 cursor-grab touch-none items-center justify-center text-brand-muted"
+                  >
+                    <GripVertical className="size-4" />
+                  </button>
+                  <input
+                    aria-label="Menge"
+                    inputMode="decimal"
+                    value={row.quantity}
+                    onChange={(event) => updateRow(row.id, { quantity: event.target.value })}
+                    onFocus={() => setFocusedRowId(row.id)}
+                    onPaste={(event) => handlePaste(row.id, event)}
+                    className="h-10 w-full rounded-lg border border-brand-input-border bg-white px-2 text-right text-[15px] font-semibold outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent-bg"
+                  />
+                  <select
+                    aria-label="Einheit"
+                    value={row.unit}
+                    onChange={(event) => updateRow(row.id, { unit: event.target.value })}
+                    onFocus={() => setFocusedRowId(row.id)}
+                    className="h-10 w-full rounded-lg border border-brand-input-border bg-brand-app-bg-alt px-1.5 text-sm outline-none focus:border-brand-accent"
+                  >
+                    <option value="">–</option>
+                    {unitOptions(row.unit).map((unit) => (
+                      <option key={unit} value={unit}>
+                        {unit}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    ref={(element) => {
+                      if (element) nameInputs.current.set(row.id, element);
+                      else nameInputs.current.delete(row.id);
+                    }}
+                    aria-label="Zutat"
+                    value={row.name}
+                    placeholder="Zutat"
+                    onChange={(event) => updateRow(row.id, { name: event.target.value })}
+                    onFocus={() => setFocusedRowId(row.id)}
+                    onPaste={(event) => handlePaste(row.id, event)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addRow();
+                      }
+                    }}
+                    className="h-10 w-full min-w-0 rounded-lg border border-brand-input-border bg-white px-2.5 text-[15px] outline-none focus:border-brand-accent focus:ring-2 focus:ring-brand-accent-bg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRow(row.id)}
+                    aria-label={`${row.name || "Zutat"} entfernen`}
+                    className="flex h-10 w-8 items-center justify-center rounded-lg text-brand-secondary active:bg-black/5"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              )}
 
-              {focusedRowId === row.id && matchingSuggestions.length > 0 && (
+              {!row.header && focusedRowId === row.id && matchingSuggestions.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pb-1.5 pl-[168px] pt-1.5 max-[420px]:pl-7">
                   {matchingSuggestions.map((name) => (
                     <button
@@ -273,17 +315,28 @@ export function IngredientRowsEditor({
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={addRow}
-          className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-brand-disabled bg-brand-app-bg-alt text-sm font-semibold text-brand-accent-dark transition-transform active:scale-[0.98]"
-        >
-          <Plus className="size-4" strokeWidth={2.5} />
-          Zutat hinzufügen
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => addRow()}
+            className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-brand-disabled bg-brand-app-bg-alt text-sm font-semibold text-brand-accent-dark transition-transform active:scale-[0.98]"
+          >
+            <Plus className="size-4" strokeWidth={2.5} />
+            Zutat hinzufügen
+          </button>
+          <button
+            type="button"
+            onClick={() => addRow(true)}
+            className="flex h-12 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-brand-disabled bg-brand-app-bg-alt px-4 text-sm font-semibold text-brand-accent-dark transition-transform active:scale-[0.98]"
+          >
+            <Heading className="size-4" strokeWidth={2.5} />
+            Gruppe
+          </button>
+        </div>
         <p className="px-1 text-[13px] leading-relaxed text-brand-secondary">
           Mehrere Zeilen einfügen legt automatisch einzelne Zutaten an. Vorschläge kommen aus
-          Zutaten, die du schon verwendest, damit die Einkaufsliste sauber zusammenfasst.
+          Zutaten, die du schon verwendest, damit die Einkaufsliste sauber zusammenfasst. Mit
+          „Gruppe“ teilst du die Zutaten auf, z. B. in Teig und Füllung.
         </p>
       </main>
     </div>

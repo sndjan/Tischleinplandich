@@ -5,6 +5,7 @@ import type { RecipeDraft, RecipeRefineResult } from '@/lib/recipe-draft';
 import {
   anthropic,
   consumeAiQuota,
+  draftForRefine,
   RECIPE_AI_EFFORT,
   RECIPE_AI_MODEL,
   REFINE_SYSTEM_PROMPT,
@@ -45,18 +46,7 @@ export async function POST(request: Request) {
       throw new UserFacingError('Anweisung ist zu lang', 400);
     }
 
-    const recipeJson = JSON.stringify({
-      name: draft.name,
-      serving_size: draft.serving_size,
-      prep_time: draft.prep_time,
-      ingredients: draft.ingredients.split('\n').filter(Boolean),
-      preparation_steps: draft.preparation_steps.split('\n').filter(Boolean),
-      calories: draft.calories,
-      protein: draft.protein,
-      carbs: draft.carbs,
-      fats: draft.fats,
-      tags: draft.tags,
-    });
+    const recipeJson = JSON.stringify(draftForRefine(draft));
 
     if (recipeJson.length > 30_000) {
       throw new UserFacingError('Rezept ist zu lang für Änderungen', 400);
@@ -90,7 +80,11 @@ export async function POST(request: Request) {
 
     const { recipe, summary, changes } = response.parsed_output;
     const result: RecipeRefineResult = {
-      draft: { ...toRecipeDraft(recipe, draft.source_url), source_url: draft.source_url },
+      // The source text isn't sent to the model, so it is carried over as is.
+      draft: {
+        ...toRecipeDraft(recipe, draft.source_url, draft.source_text ?? null),
+        source_url: draft.source_url,
+      },
       summary: summary.trim(),
       changes: changes.slice(0, 6),
     };

@@ -6,6 +6,7 @@ import { createRecipeImagePath, getRecipeImagePathFromUrl, RECIPE_IMAGE_BUCKET }
 import { syncRecipeTags } from "@/lib/save-recipe";
 import { isMissingColumnError, queryKeys, useUserId, type RecipesData } from "@/hooks/use-planner-data";
 import { parseRecipeBalance } from "@/lib/balance";
+import { parseRecipeDetails } from "@/lib/recipe-details";
 import type { Recipe } from "@/types/database";
 
 const SHARE_ID_ALPHABET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -71,6 +72,8 @@ export type SharedRecipe = Pick<
   tags: string[];
   // "Ausgewogenheit" facts, only returned once migration 025 has run.
   balance?: unknown;
+  // Equipment, tips, allergens etc., only returned once migration 028 has run.
+  details?: unknown;
 };
 
 const SAVED_STORAGE_KEY = "weekly-meal-planner:saved-shared-recipes";
@@ -142,13 +145,15 @@ export async function saveSharedRecipeCopy(source: SharedRecipe): Promise<Recipe
   if (!user) throw new Error("Nicht angemeldet");
 
   // Ingredients and portions are copied unchanged, so the facts stay current. Left
-  // out entirely when there are none, so copying works before migration 022 too.
+  // out entirely when there are none, so copying works before migrations 022 and 028 too.
   const balance = parseRecipeBalance(source.balance);
+  const details = parseRecipeDetails(source.details);
 
   const { data, error } = await createClient()
     .from("recipes")
     .insert({
       ...(balance ? { balance } : {}),
+      ...(details ? { details } : {}),
       user_id: user.id,
       name: source.name,
       ingredients: source.ingredients,

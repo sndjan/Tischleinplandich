@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import type { Recipe } from "@/types/database";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { scaleIngredients } from "@/lib/recipe-scaling";
+import { ingredientLines } from "@/lib/ingredient-lines";
 import { cn } from "@/lib/utils";
 import { useShoppingWeek } from "@/hooks/use-shopping-week";
 import { useSelectedWeek } from "@/hooks/use-selected-week";
@@ -29,11 +30,9 @@ export function AddToListSheet({
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const factor = servings / baseServings;
 
-  // Raw lines are stored, so the list parses them like a planned recipe's.
-  const lines = useMemo(
-    () => (recipe.ingredients ?? "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
-    [recipe.ingredients],
-  );
+  // Raw lines are stored, so the list parses them like a planned recipe's. Group
+  // headers are left out, matching the scaled rows index for index.
+  const lines = useMemo(() => ingredientLines(recipe.ingredients).map(({ line }) => line), [recipe.ingredients]);
   const scaled = useMemo(() => scaleIngredients(recipe.ingredients, factor), [recipe.ingredients, factor]);
   const [selected, setSelected] = useState<Set<number>>(() => new Set(lines.map((_, index) => index)));
 

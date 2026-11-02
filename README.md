@@ -71,9 +71,13 @@ Automatisch: Eine geplante Claude-Code-Aufgabe (täglich, 5:47 Uhr) liest alle E
 
 ## KI-Nutzung und Kosten
 
-Rezept-Import, „Aus Idee“ und „Mit KI ändern“ laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
+Rezept-Import, „Aus Idee“, „Mit KI ändern“ und „Neu berechnen“ im Editor laufen über Claude Haiku 5.5 mit niedrigem Aufwand (ca. 0,1–0,3 Cent pro Anfrage). Pro Nutzer und Tag sind 30 KI-Anfragen erlaubt (Migration `010_create_ai_usage.sql`, Grenze in `src/lib/server/recipe-ai.ts`). Solange die Migration fehlt, gilt kein Limit. PDFs dürfen höchstens 20 Seiten haben.
 
 Im Profil steht unter „KI-Anfragen heute“, wie viele davon schon verbraucht sind (nur sichtbar, wenn die Migration läuft).
+
+### Rezept-Details
+
+Die KI schreibt die Zubereitung in eigenen Worten neu (zusammengehörige Handgriffe in einem Schritt), ordnet Zutaten in Gruppen und schätzt Nährwerte Zutat für Zutat; die App summiert sie pro Portion und markiert unplausible Werte. Gruppen stehen als Zeilen `# Für die Soße` im Zutatentext. Zeiten, Küchengeräte, Tipps, Allergene, Haltbarkeit, Suchwörter und pro Zutat bzw. Schritt Einkaufsabteilung, Nährwerte und Mengenanteile landen in `recipes.details` (geprüft mit `parseRecipeDetails` in `src/lib/recipe-details.ts`, Version in `DETAILS_VERSION`). Der gelesene Quelltext von Text- und Link-Importen wird privat in `recipe_sources` gespeichert, um Rezepte später neu aufbereiten zu können. Beides kommt mit Migration `028_recipe_details.sql` (im SQL Editor ausführen); ohne sie speichern Rezepte weiter, nur ohne Details und Quelltext.
 
 Verbrauch pro Tag:
 
@@ -124,7 +128,7 @@ Profil → Tagesziele → „Nährwerte anzeigen“ blendet Kalorien und Makros 
 
 ## Ausgewogenheit
 
-Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Alte, selbst getippte oder von Hand geänderte Rezepte haben (noch) keinen aktuellen Wert; die Fakten lassen sich später gesammelt nachtragen (Format: `RecipeBalance` in `src/lib/balance.ts`, `fingerprint` per `balanceFingerprint`).
+Rezepte und Wochen bekommen einen Wert von 0 bis 100 (Profil → Tagesziele → „Ausgewogenheit anzeigen“). Die KI schätzt beim Import, bei „Aus Idee“ und „Mit KI ändern“ nur Fakten pro Portion (Zutatengruppen, Gramm, NOVA-Verarbeitungsgrad, Ballaststoffe, Zucker, Salz, gesättigte Fette); die Punkte rechnet `src/lib/balance.ts` nach festen Regeln aus. Die Regeln mit Quellen stehen öffentlich unter `/ausgewogenheit` und lesen ihre Grenzwerte aus derselben Datei. Alte, selbst getippte oder von Hand geänderte Rezepte haben (noch) keinen aktuellen Wert, bis man im Editor „Neu berechnen“ tippt (`/api/recipes/recalculate`, behält den Text und rechnet Nährwerte, Fakten und Details neu; Logik in `src/lib/recipe-recalculate.ts`); die Fakten lassen sich später gesammelt nachtragen (Format: `RecipeBalance` in `src/lib/balance.ts`, `fingerprint` per `balanceFingerprint`).
 
 Gespeichert wird in `recipes.balance` und `user_preferences.show_balance` (Migration `022_recipe_balance.sql`, im SQL Editor ausführen). Ohne die Migration speichern Rezepte weiter (ohne Wert), der Schalter zeigt einen Hinweis. Damit Kopien aus „Entdecken“ und Teilen-Links ihren Wert behalten, liefern die Teilen-Funktionen die Fakten mit (Migration `025_shared_recipe_balance.sql`); ohne sie haben solche Kopien keinen Wert.
 

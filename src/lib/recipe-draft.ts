@@ -2,10 +2,11 @@
 // recipe editor. Shared between the API routes and the client components.
 
 import type { RecipeBalance } from "@/lib/balance";
+import type { RecipeDetails } from "@/lib/recipe-details";
 
 export type RecipeDraft = {
   name: string;
-  // One ingredient per line ("200 g Feta").
+  // One ingredient per line ("200 g Feta"); "# Für die Soße" starts a group.
   ingredients: string;
   // One step per line.
   preparation_steps: string;
@@ -19,6 +20,11 @@ export type RecipeDraft = {
   serving_size: number;
   // Facts for the "Ausgewogenheit" score, estimated along with the recipe.
   balance: RecipeBalance | null;
+  // Equipment, tips, times and per-line extras (migration 028).
+  details: RecipeDetails | null;
+  // Text the import was read from (web page or pasted text), kept privately so
+  // the recipe can be processed again later. Null for photos, PDFs and ideas.
+  source_text: string | null;
 };
 
 export type RecipeStreamStage = "reading" | "ingredients" | "steps" | "nutrition";

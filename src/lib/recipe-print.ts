@@ -1,4 +1,5 @@
 import type { Recipe } from "@/types/database";
+import { ingredientHeaderName, isIngredientHeader } from "@/lib/ingredient-lines";
 
 const escapeHtml = (text: string) =>
   text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -30,7 +31,13 @@ function recipeSection(recipe: Recipe, tags: string[]) {
   <div class="columns">
     <div>
       <h2>Zutaten</h2>
-      <ul>${splitLines(recipe.ingredients).map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>
+      <ul>${splitLines(recipe.ingredients)
+        .map((line) =>
+          isIngredientHeader(line)
+            ? `<li class="group">${escapeHtml(ingredientHeaderName(line))}</li>`
+            : `<li>${escapeHtml(line)}</li>`,
+        )
+        .join("")}</ul>
     </div>
     ${steps.length > 0 ? `<div><h2>Zubereitung</h2><ol>${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></div>` : ""}
   </div>
@@ -61,6 +68,7 @@ export function recipesToPrintHtml(recipes: Recipe[], tagsById: Record<string, s
   .columns { display: grid; grid-template-columns: 1fr 2fr; gap: 18pt; }
   ul, ol { margin: 0; padding-left: 16pt; }
   li { margin-bottom: 3pt; break-inside: avoid; }
+  li.group { list-style: none; margin: 8pt 0 3pt -14pt; font-weight: 700; }
 </style>
 </head>
 <body>
