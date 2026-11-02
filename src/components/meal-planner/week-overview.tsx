@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
@@ -148,12 +148,13 @@ interface WeekAgendaProps {
   recipesById: Map<string, Recipe>;
   nutritionTargets: NutritionTargetSettings;
   onSelectDay: (dayIndex: number) => void;
+  onRemoveMeal: (meal: PlannedMeal) => void;
 }
 
 /**
  * The week as an agenda for small screens: date on the left, the day's meals
- * on the right. Tapping a meal opens the recipe; the date or "Planen" opens the
- * day, where meals are added and removed.
+ * on the right. Tapping a meal opens the recipe and its cross removes it; the
+ * date or "Planen" opens the day to add meals.
  */
 export function WeekAgenda({
   todayIndex,
@@ -162,6 +163,7 @@ export function WeekAgenda({
   recipesById,
   nutritionTargets,
   onSelectDay,
+  onRemoveMeal,
 }: WeekAgendaProps) {
   const { openScreen } = useScreenStack();
 
@@ -226,38 +228,47 @@ export function WeekAgenda({
                   {meals.map((meal) => {
                     const { recipe, isRecipe } = getMealRecipe(meal, recipesById)!;
                     return (
-                      <button
-                        key={meal.id}
-                        type="button"
-                        // Eating out has no recipe to open; the day has its details.
-                        onClick={() =>
-                          isRecipe
-                            ? openScreen({ kind: "recipe-preview", recipe, servings: meal.serving_size })
-                            : onSelectDay(dayIndex)
-                        }
-                        className="flex w-full touch-manipulation items-center gap-2.5 py-1.5 text-left transition-transform active:scale-[0.98]"
-                      >
-                        <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-brand-chip-neutral">
-                          {recipe.image_url ? (
-                            <Image
-                              src={recipe.image_url}
-                              alt=""
-                              width={80}
-                              height={80}
-                              className="h-full w-full object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            <RecipePlaceholder name={recipe.name} className="text-xl" />
-                          )}
-                        </span>
-                        <span className="flex min-w-0 flex-col">
-                          <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-brand-tertiary">
-                            {MEAL_TYPE_LABELS[meal.meal_type]}
+                      <div key={meal.id} className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          // Eating out has no recipe to open; the day has its details.
+                          onClick={() =>
+                            isRecipe
+                              ? openScreen({ kind: "recipe-preview", recipe, servings: meal.serving_size })
+                              : onSelectDay(dayIndex)
+                          }
+                          className="flex min-w-0 flex-1 touch-manipulation items-center gap-2.5 py-1.5 text-left transition-transform active:scale-[0.98]"
+                        >
+                          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-brand-chip-neutral">
+                            {recipe.image_url ? (
+                              <Image
+                                src={recipe.image_url}
+                                alt=""
+                                width={80}
+                                height={80}
+                                className="h-full w-full object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <RecipePlaceholder name={recipe.name} className="text-xl" />
+                            )}
                           </span>
-                          <span className="truncate text-sm font-bold text-brand-ink">{recipe.name}</span>
-                        </span>
-                      </button>
+                          <span className="flex min-w-0 flex-col">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-brand-tertiary">
+                              {MEAL_TYPE_LABELS[meal.meal_type]}
+                            </span>
+                            <span className="truncate text-sm font-bold text-brand-ink">{recipe.name}</span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveMeal(meal)}
+                          aria-label={`${recipe.name} entfernen`}
+                          className="-mr-1.5 flex size-9 shrink-0 items-center justify-center rounded-full text-brand-muted transition-colors active:bg-black/5"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
                     );
                   })}
                   <div className="flex items-center justify-between gap-2 border-t border-brand-divider pb-0.5 pt-1.5">

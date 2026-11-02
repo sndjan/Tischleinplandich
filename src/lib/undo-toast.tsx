@@ -8,6 +8,9 @@ const UNDO_WINDOW_MS = 5000;
 // hidden, so a deletion isn't lost when the app is closed right after.
 const pendingCommits = new Set<() => void>();
 let flushListenerAdded = false;
+// Only one undo toast is shown at a time; stacked ones covered the screen when
+// removing several things in a row. A new toast commits the one before it.
+let commitCurrent: (() => void) | null = null;
 
 function ensureFlushListener() {
   if (flushListenerAdded || typeof window === "undefined") return;
@@ -35,6 +38,7 @@ interface UndoToastOptions {
  */
 export function showUndoToast({ message, onUndo, onCommit }: UndoToastOptions) {
   ensureFlushListener();
+  commitCurrent?.();
 
   let settled = false;
   const toastId = `undo-${crypto.randomUUID()}`;
@@ -47,6 +51,7 @@ export function showUndoToast({ message, onUndo, onCommit }: UndoToastOptions) {
     settled = true;
     clearTimeout(timer);
     pendingCommits.delete(commit);
+    if (commitCurrent === commit) commitCurrent = null;
     toast.dismiss(toastId);
     onCommit();
   };
@@ -56,12 +61,14 @@ export function showUndoToast({ message, onUndo, onCommit }: UndoToastOptions) {
     settled = true;
     clearTimeout(timer);
     pendingCommits.delete(commit);
+    if (commitCurrent === commit) commitCurrent = null;
     toast.dismiss(toastId);
     onUndo();
   };
 
   const timer = setTimeout(commit, UNDO_WINDOW_MS);
   pendingCommits.add(commit);
+  commitCurrent = commit;
 
   toast.custom(
     (t) => (

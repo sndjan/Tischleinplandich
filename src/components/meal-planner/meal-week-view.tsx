@@ -336,6 +336,7 @@ export function MealWeekView({
               recipesById={recipesById}
               nutritionTargets={nutritionTargets}
               onSelectDay={openDay}
+              onRemoveMeal={handleRemoveMeal}
             />
           </div>
 

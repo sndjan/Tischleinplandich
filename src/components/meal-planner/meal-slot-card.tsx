@@ -95,7 +95,7 @@ export function MealSlotCard({
           <button
             type="button"
             onClick={onRemove}
-            className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-white text-brand-muted opacity-0 shadow-sm transition-opacity hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100"
+            className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-white text-brand-muted opacity-0 shadow-sm transition-opacity hover:text-brand-ink focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
             aria-label={`${recipe.name} entfernen`}
           >
             <X className="size-4" />
@@ -164,7 +164,7 @@ export function MealSlotCard({
             onRemove();
           }}
           // Desktop: floats over the corner on hover instead of taking width from the name.
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-brand-muted transition-colors hover:bg-black/5 active:bg-black/5 lg:absolute lg:right-1.5 lg:top-1.5 lg:size-7 lg:bg-white lg:opacity-0 lg:shadow-sm lg:group-hover:opacity-100"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-brand-muted transition-colors hover:bg-black/5 active:bg-black/5 lg:absolute lg:right-1.5 lg:top-1.5 lg:size-7 lg:bg-white lg:opacity-0 lg:shadow-sm lg:group-hover:opacity-100 [@media(hover:none)]:lg:opacity-100"
           aria-label={`${recipe.name} entfernen`}
         >
           <X className="size-4" />
