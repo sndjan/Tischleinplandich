@@ -8,6 +8,7 @@ import { DiscoverRecipes } from "./discover-recipes";
 import { SegmentedTabs } from "./segmented-tabs";
 import { useShowNutrition } from "./nutrition-target-settings";
 import { useScreenStack } from "./screen-stack";
+import { useShowBalance } from "./balance-display";
 
 export type LibraryTab = "mine" | "discover";
 
@@ -19,6 +20,7 @@ export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {})
   const { openScreen } = useScreenStack();
   const { data, isPending } = useRecipesQuery();
   const showNutrition = useShowNutrition();
+  const showBalance = useShowBalance();
   const [ownTab, setTab] = useState<LibraryTab>("mine");
   const tab = controlledTab ?? ownTab;
   const count = data?.recipes.length;
@@ -43,6 +45,7 @@ export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {})
           recipeTagsById={data?.tagsById ?? {}}
           loading={isPending}
           showNutrition={showNutrition}
+          showBalance={showBalance}
           toolbarActions={
             <button
               type="button"

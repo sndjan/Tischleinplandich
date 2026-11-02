@@ -14,6 +14,8 @@ import { useScreenStack } from "./screen-stack";
 import { useShowNutrition } from "./nutrition-target-settings";
 import { withSafeLinks } from "@/lib/safe-links";
 import { RecipePlaceholder } from "./recipe-placeholder";
+import { RecipeCoverChips, useShowBalance } from "./balance-display";
+import { parsePrepMinutes } from "@/lib/prep-time";
 
 const formatNumber = (value: number) => Math.round(value).toLocaleString("de-DE");
 
@@ -86,6 +88,7 @@ export function DiscoverRecipes() {
   const debouncedSearch = useDebounced(search.trim(), 300);
   const { savedIds, savingId, save } = useSavedSharedRecipes();
   const showNutrition = useShowNutrition();
+  const showBalance = useShowBalance();
 
   const { data, isPending, error } = useQuery({
     queryKey: queryKeys.discover(debouncedSearch),
@@ -152,13 +155,18 @@ export function DiscoverRecipes() {
                   onClick={() => openScreen({ kind: "shared-recipe", recipe })}
                   className="block w-full text-left transition-transform active:scale-[0.98]"
                 >
-                  <div className="aspect-[4/3] bg-brand-chip-neutral">
+                  <div className="relative aspect-[4/3] bg-brand-chip-neutral">
                     {recipe.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={recipe.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
                     ) : (
                       <RecipePlaceholder name={recipe.name} className="text-4xl" />
                     )}
+                    <RecipeCoverChips
+                      minutes={parsePrepMinutes(recipe.prep_time)}
+                      recipe={recipe}
+                      showBalance={showBalance}
+                    />
                   </div>
                   <div className="space-y-0.5 px-2.5 pb-3 pt-2">
                     <h3 className="line-clamp-2 text-sm font-bold leading-tight text-brand-ink">{recipe.name}</h3>

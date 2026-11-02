@@ -588,6 +588,7 @@ function DemoRecipeList({
       recipeTagsById={tagsById}
       loading={false}
       showNutrition={DEMO_TARGETS.show_nutrition}
+      showBalance={DEMO_TARGETS.show_balance}
       disableDrag
       toolbarActions={
         <button

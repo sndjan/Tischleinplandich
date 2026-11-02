@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { HeroButton, RecipeBody } from "./recipe-body";
 import { useSavedSharedRecipes } from "./discover-recipes";
 import { useShowNutrition } from "./nutrition-target-settings";
+import { RecipeBalanceSection, useShowBalance } from "./balance-display";
 
 export function SharedByLine({ name }: { name: string | null }) {
   return (
@@ -30,6 +31,7 @@ export function SharedRecipeScreen({ recipe, onBack }: { recipe: SharedRecipe; o
   const [servings, setServings] = useState(recipe.serving_size > 0 ? recipe.serving_size : 1);
   const { savedIds, savingId, save, ensureCopy } = useSavedSharedRecipes();
   const showNutrition = useShowNutrition();
+  const showBalance = useShowBalance();
   const { data: own } = useRecipesQuery();
   const [planning, setPlanning] = useState<Recipe | null>(null);
   const saved = savedIds.has(recipe.id);
@@ -49,6 +51,7 @@ export function SharedRecipeScreen({ recipe, onBack }: { recipe: SharedRecipe; o
           showNutrition={showNutrition}
           onServingsChange={setServings}
           attribution={<SharedByLine name={recipe.author_name} />}
+          balance={showBalance && <RecipeBalanceSection recipe={recipe} />}
           heroActions={
             <HeroButton label="Zurück" onClick={onBack}>
               <ChevronLeft className="size-6" />
