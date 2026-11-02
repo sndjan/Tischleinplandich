@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Recipe } from "@/types/database";
 import { useScreenStack } from "./screen-stack";
-import { Clock, Info, Search, SlidersHorizontal, Star } from "lucide-react";
-import { formatPrepMinutes, parsePrepMinutes } from "@/lib/prep-time";
+import { Info, Search, SlidersHorizontal, Star } from "lucide-react";
+import { parsePrepMinutes } from "@/lib/prep-time";
+import { RecipeCoverChips } from "./balance-display";
 import { RecipePlaceholder } from "./recipe-placeholder";
 
 type VisibilityFilter = "all" | "private" | "public";
@@ -67,6 +68,8 @@ interface RecipeListProps {
   toolbarActions?: React.ReactNode;
   // Calories and protein on the cards and the protein sort; off when the user hides nutrition.
   showNutrition?: boolean;
+  // The "Ausgewogenheit" score on the covers; off when the user hides it.
+  showBalance?: boolean;
 }
 
 export function RecipeList({
@@ -79,6 +82,7 @@ export function RecipeList({
   selectedRecipeId = null,
   toolbarActions,
   showNutrition = true,
+  showBalance = true,
 }: RecipeListProps) {
   const { openScreen } = useScreenStack();
   const [searchQuery, setSearchQuery] = useState("");
@@ -409,12 +413,7 @@ export function RecipeList({
                     ) : (
                       <RecipePlaceholder name={recipe.name} className="text-4xl" />
                     )}
-                    {minutes !== null && (
-                      <span className="absolute bottom-1.5 left-1.5 flex h-6 items-center gap-1 rounded-full bg-white/90 px-2 text-[11px] font-bold text-brand-ink shadow-sm backdrop-blur">
-                        <Clock className="size-3" strokeWidth={2.5} />
-                        {formatPrepMinutes(minutes)}
-                      </span>
-                    )}
+                    <RecipeCoverChips minutes={minutes} recipe={recipe} showBalance={showBalance} />
                   </div>
 
                   <div className="space-y-1.5 p-2.5">

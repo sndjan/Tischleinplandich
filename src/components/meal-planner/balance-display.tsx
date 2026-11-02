@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, Scale } from "lucide-react";
+import { ChevronDown, Clock, Scale } from "lucide-react";
 import {
   balanceTone,
   getBalanceState,
@@ -12,6 +12,7 @@ import {
   type WeekBalanceMeal,
 } from "@/lib/balance";
 import type { PlannedMeal, Recipe } from "@/types/database";
+import { formatPrepMinutes } from "@/lib/prep-time";
 import { cn } from "@/lib/utils";
 import { useNutritionTargets } from "./nutrition-target-settings";
 
@@ -32,6 +33,44 @@ const TONE_TEXT: Record<BalanceTone, string> = {
 /** Whether the "Ausgewogenheit" score is shown at all. */
 export function useShowBalance() {
   return useNutritionTargets()[0].show_balance;
+}
+
+const COVER_CHIP =
+  "flex h-6 items-center gap-1 rounded-full bg-white/90 px-2 text-[11px] font-bold text-brand-ink shadow-sm backdrop-blur";
+
+/**
+ * Time and score chips on a recipe cover. The score only appears while the facts
+ * still match the ingredients, as in the week score.
+ */
+export function RecipeCoverChips({
+  minutes,
+  recipe,
+  showBalance,
+}: {
+  minutes: number | null;
+  recipe: { ingredients: string; serving_size: number; balance?: unknown };
+  showBalance: boolean;
+}) {
+  const state = showBalance ? getBalanceState(recipe) : null;
+  const score = state?.kind === "ready" ? scoreRecipe(state.balance).score : null;
+  if (minutes === null && score === null) return null;
+
+  return (
+    <span className="absolute bottom-1.5 left-1.5 flex gap-1">
+      {minutes !== null && (
+        <span className={COVER_CHIP}>
+          <Clock className="size-3" strokeWidth={2.5} />
+          {formatPrepMinutes(minutes)}
+        </span>
+      )}
+      {score !== null && (
+        <span className={cn(COVER_CHIP, "tabular-nums")} aria-label={`Ausgewogenheit ${score} von 100`}>
+          <Scale className="size-3" strokeWidth={2.5} style={{ color: TONE_RING[balanceTone(score)] }} aria-hidden />
+          {score}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export function BalanceRing({ score, size = 52 }: { score: number; size?: number }) {
@@ -149,7 +188,11 @@ const METHOD_LINK = (
  * The recipe's score with its reasons. Recipes without facts show nothing; facts
  * that no longer match the ingredients show greyed out until they are re-estimated.
  */
-export function RecipeBalanceSection({ recipe }: { recipe: Pick<Recipe, "ingredients" | "serving_size" | "balance"> }) {
+export function RecipeBalanceSection({
+  recipe,
+}: {
+  recipe: { ingredients: string; serving_size: number; balance?: unknown };
+}) {
   const [open, setOpen] = useState(false);
   const state = getBalanceState(recipe);
   if (state.kind === "missing") return null;
