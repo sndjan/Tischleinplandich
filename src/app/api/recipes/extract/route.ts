@@ -150,9 +150,10 @@ export async function POST(request: Request) {
           throw new UserFacingError('Kein Rezept erkannt', 422);
         }
 
+        // -1 means none of the photos shows the dish.
         const coverIndex = extracted.cover_image_index;
         const coverImageIndex =
-          coverIndex !== null && Number.isInteger(coverIndex) && coverIndex >= 0 && coverIndex < input.images.length
+          Number.isInteger(coverIndex) && coverIndex >= 0 && coverIndex < input.images.length
             ? coverIndex
             : null;
         // Without a suitable attached photo, the recipe page's own photo is the cover.
@@ -327,9 +328,9 @@ function safePartialParse(json: string): Partial<ExtractedRecipe> | null {
 }
 
 function getStage(partial: Partial<ExtractedRecipe>) {
-  if ('nutrition_from_source' in partial) return 'nutrition' as const;
+  if ('calories' in partial) return 'nutrition' as const;
   if ('steps' in partial) return 'steps' as const;
-  if ('ingredient_groups' in partial) return 'ingredients' as const;
+  if ('ingredients' in partial) return 'ingredients' as const;
   return 'reading' as const;
 }
 

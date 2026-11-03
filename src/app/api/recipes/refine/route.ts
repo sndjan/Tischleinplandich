@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       throw new UserFacingError('Antwort unvollständig, bitte erneut versuchen', 502);
     }
 
-    const { recipe, summary, changes } = response.parsed_output;
+    const { summary, changes, ...recipe } = response.parsed_output;
     const result: RecipeRefineResult = {
       // The source text isn't sent to the model, so it is carried over as is.
       draft: {
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         source_url: draft.source_url,
       },
       summary: summary.trim(),
-      changes: changes.slice(0, 6),
+      changes: changes.slice(0, 6).map((change) => ({ before: change.before.trim() || null, after: change.after })),
     };
 
     return NextResponse.json(result);
