@@ -47,10 +47,10 @@ const base = {
     },
   ],
   nutrition_from_source: false,
-  calories: null,
-  protein: null,
-  carbs: null,
-  fats: null,
+  calories: 0,
+  protein: 0,
+  carbs: 0,
+  fats: 0,
   equipment: ["Topf", "Pfanne"],
   tips: ["Nudelwasser aufheben."],
 };
@@ -100,5 +100,35 @@ describe("toRecipeDraft", () => {
     const draft = toRecipeDraft({ name: "Pa", ingredient_groups: [{ title: null, ingredients: [{ id: "z1" }] }] } as never);
     expect(draft.ingredients).toBe("");
     expect(draft.calories).toBeNull();
+  });
+});
+
+describe("AI output schemas", () => {
+  // Counts the fields that compile to a type union: anyOf (nullable) or a type array.
+  function countUnions(node: unknown): number {
+    if (Array.isArray(node)) return node.reduce((sum: number, item) => sum + countUnions(item), 0);
+    if (!node || typeof node !== "object") return 0;
+    const record = node as Record<string, unknown>;
+    const own = "anyOf" in record || Array.isArray(record.type) ? 1 : 0;
+    return own + Object.values(record).reduce((sum: number, value) => sum + countUnions(value), 0);
+  }
+
+  // The API rejects a request whose output schema has more than 16 union-typed
+  // fields ("Parameters with union types" in the structured outputs limits).
+  it("stay within the API's limit on nullable fields", async () => {
+    const { zodOutputFormat } = await import("@anthropic-ai/sdk/helpers/zod");
+    const { ExtractedRecipeSchema, RefinedRecipeSchema, RecalculatedRecipeSchema } = await import(
+      "@/lib/server/recipe-ai"
+    );
+
+    for (const schema of [ExtractedRecipeSchema, RefinedRecipeSchema, RecalculatedRecipeSchema]) {
+      expect(countUnions(zodOutputFormat(schema).schema)).toBeLessThanOrEqual(16);
+    }
+  });
+
+  it("treats 0 minutes as no time", () => {
+    const draft = toRecipeDraft({ ...base, active_minutes: 0, total_minutes: 0 });
+    expect(draft.prep_time).toBe("");
+    expect(draft.details?.total_minutes).toBeNull();
   });
 });

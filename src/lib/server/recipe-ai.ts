@@ -47,6 +47,10 @@ export class UserFacingError extends Error {
 // The AI schema has plain types only: the SDK drops min/max constraints from the
 // schema and checks them afterwards, so a broken one would fail the whole import.
 // Values are clamped by parseRecipeDetails instead.
+//
+// The API rejects schemas with more than 16 nullable fields (each one is a type
+// union) with a 400, so numbers the model can always give are plain numbers
+// with 0 for "none". The limit is checked in recipe-ai.test.ts.
 const IngredientSchema = z.object({
   // Short id ("z1") the steps refer to.
   id: z.string(),
@@ -58,10 +62,10 @@ const IngredientSchema = z.object({
   pantry: z.boolean(),
   perishable: z.boolean(),
   // For the listed amount (whole recipe); the app sums them per portion.
-  kcal: z.number().nullable(),
-  protein_g: z.number().nullable(),
-  carbs_g: z.number().nullable(),
-  fat_g: z.number().nullable(),
+  kcal: z.number(),
+  protein_g: z.number(),
+  carbs_g: z.number(),
+  fat_g: z.number(),
 });
 
 // Facts for the "Ausgewogenheit" score. The app calculates the score from them
@@ -90,8 +94,8 @@ const RecipeFields = {
   name: z.string(),
   description: z.string(),
   serving_size: z.number(),
-  active_minutes: z.number().nullable(),
-  total_minutes: z.number().nullable(),
+  active_minutes: z.number(),
+  total_minutes: z.number(),
   time_from_source: z.boolean(),
   difficulty: z.enum(DIFFICULTIES),
   ingredient_groups: z.array(
@@ -107,10 +111,11 @@ const RecipeFields = {
     }),
   ),
   nutrition_from_source: z.boolean(),
-  calories: z.number().nullable(),
-  protein: z.number().nullable(),
-  carbs: z.number().nullable(),
-  fats: z.number().nullable(),
+  // 0 unless nutrition_from_source.
+  calories: z.number(),
+  protein: z.number(),
+  carbs: z.number(),
+  fats: z.number(),
   balance: BalanceFactsSchema,
   equipment: z.array(z.string()),
   tips: z.array(z.string()),
@@ -172,7 +177,7 @@ Zeit:
 - active_minutes: aktive Arbeitszeit; total_minutes: Gesamtzeit inklusive Garen, Backen und Ruhen. Aus der Quelle übernehmen (time_from_source true), sonst realistisch aus den Schritten schätzen (time_from_source false). Nicht leer lassen.
 
 Nährwerte:
-- nutrition_from_source: true nur, wenn die Quelle Nährwerte nennt. Dann calories (kcal), protein, carbs, fats PRO PORTION aus der Quelle (ggf. auf eine Portion umgerechnet). Sonst false und diese vier Felder null; die App rechnet sie aus den Zutaten aus.
+- nutrition_from_source: true nur, wenn die Quelle Nährwerte nennt. Dann calories (kcal), protein, carbs, fats PRO PORTION aus der Quelle (ggf. auf eine Portion umgerechnet). Sonst false und diese vier Felder 0; die App rechnet sie aus den Zutaten aus.
 ${BALANCE_RULES}
 
 Weitere Angaben:
@@ -205,7 +210,7 @@ ${SHARED_RULES}`;
 export const REFINE_SYSTEM_PROMPT = `Du passt ein bestehendes Rezept nach der Anweisung des Nutzers an (z. B. andere Portionenzahl, vegan, mehr Protein, kürzere Schritte).
 
 Gib das vollständige angepasste Rezept zurück und ändere nur, was die Anweisung verlangt, plus nötige Folgeänderungen. Bei einer neuen Portionenzahl skalierst du alle Mengen. Zeilen in den Zutaten, die mit # beginnen, sind Gruppenüberschriften. Fehlende Angaben (Zeiten, Küchengeräte, Allergene usw.) ergänzt du.
-- Nährwerte: Ändern sich Zutaten oder Mengen pro Portion nicht, behalte calories, protein, carbs und fats bei (nutrition_from_source true). Sonst setze sie auf null (nutrition_from_source false).
+- Nährwerte: Ändern sich Zutaten oder Mengen pro Portion nicht, behalte calories, protein, carbs und fats bei (nutrition_from_source true). Sonst setze sie auf 0 (nutrition_from_source false).
 - time_from_source: true, wenn die Zeiten aus dem Rezept stammen und gleich bleiben.
 - summary: ein kurzer Satz auf Deutsch, was du geändert hast.
 - changes: die bis zu 6 wichtigsten Änderungen als kurze Texte, z. B. before "200 g Orzo", after "400 g Orzo". Neue Dinge haben before null.
@@ -219,7 +224,7 @@ export const RECALCULATE_SYSTEM_PROMPT = `Du wertest ein Rezept neu aus, das der
 Der Text gehört dem Nutzer: Übernimm Name, Portionen, Zutaten (Reihenfolge, Gruppen, Mengen und Wortlaut) und die Zubereitungsschritte (Reihenfolge und Wortlaut) unverändert, auch wenn sie nicht den Regeln unten entsprechen. Zeilen in den Zutaten, die mit # beginnen, sind Gruppenüberschriften; jede andere Zeile ist genau eine Zutat, und jede Zeile der Zubereitung ist genau ein Schritt.
 
 Neu bestimmst du nur die Auswertung: Nährwerte je Zutat, balance, Zeiten, Schwierigkeit, Küchengeräte, Tipps, Allergene und die übrigen Angaben. Vorhandene Küchengeräte und Tipps behältst du und ergänzt nur, was fehlt.
-- nutrition_from_source false und calories, protein, carbs, fats null; die App rechnet sie aus den Zutaten aus.
+- nutrition_from_source false und calories, protein, carbs, fats 0; die App rechnet sie aus den Zutaten aus.
 - time_from_source false.
 
 Regeln für die Auswertung:
@@ -335,8 +340,9 @@ export function toRecipeDraft(recipe: RecipeLike, requestUrl = "", sourceText: s
     fingerprint: detailsFingerprint(ingredients, preparationSteps),
     description: recipe.description,
     keywords: recipe.keywords,
-    active_minutes: recipe.active_minutes,
-    total_minutes: recipe.total_minutes,
+    // 0 means the model had no estimate.
+    active_minutes: recipe.active_minutes || null,
+    total_minutes: recipe.total_minutes || null,
     time_estimated: recipe.time_from_source !== true,
     difficulty: recipe.difficulty,
     meal_types: recipe.meal_types,
