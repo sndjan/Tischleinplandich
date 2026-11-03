@@ -498,6 +498,98 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Club work assignments at /verein; server (service role) only. Migration 030.
+      club_events: {
+        Row: {
+          id: string;
+          title: string;
+          description: string;
+          location: string;
+          starts_at: string;
+          ends_at: string | null;
+          helpers_needed: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string;
+          location?: string;
+          starts_at: string;
+          ends_at?: string | null;
+          helpers_needed?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string;
+          location?: string;
+          starts_at?: string;
+          ends_at?: string | null;
+          helpers_needed?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // Names signed up for a club work assignment; server only. Migration 030.
+      club_event_signups: {
+        Row: {
+          id: string;
+          event_id: string;
+          name: string;
+          remove_token: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          name: string;
+          remove_token?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          name?: string;
+          remove_token?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "club_event_signups_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "club_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      // Web Push subscriptions of devices that turned on club notifications; server only. Migration 030.
+      club_push_subscriptions: {
+        Row: {
+          id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       // Launch waitlist with double opt-in; server (service role) only. Migration 015.
       waitlist: {
         Row: {

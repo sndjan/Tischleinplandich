@@ -15,4 +15,4 @@ export const OPERATOR = {
 // Where Supabase stores the data; pick the region of your project.
 export const SUPABASE_REGION = "[PLATZHALTER: z. B. Frankfurt, EU (eu-central-1)]";
 
-export const LEGAL_UPDATED = "Oktober 2026";
+export const LEGAL_UPDATED = "November 2026";

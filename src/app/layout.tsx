@@ -24,6 +24,7 @@ export const metadata: Metadata = {
   description:
     "Plane deine wöchentlichen Mahlzeiten und erstelle automatisch Einkaufslisten",
   applicationName: "Tischleinplandich",
+  manifest: "/app.webmanifest",
   appleWebApp: {
     capable: true,
     title: "Tischlein",

@@ -167,3 +167,17 @@ Migration `016_limit_user_content.sql` (im SQL Editor ausführen) setzt Grenzen,
 - **Fotos**: nur JPEG, PNG oder WebP, höchstens 5 MB (prüft Supabase Storage). Andere Formate wandelt die App vor dem Hochladen in JPEG um.
 - **Links**: `source_url` nur `http(s)://`, `image_url` nur aus dem Bucket `recipe-images`. Die App zeigt zusätzlich nur Bilder aus dem eigenen Supabase-Projekt.
 - **Längen**: Name 200, Zutaten und Schritte je 10.000 Zeichen, Tags 50; höchstens 2000 Rezepte pro Konto.
+
+## Vereinsapp: Arbeitseinsätze (Prototyp)
+
+Unter `/verein` läuft eine eigene kleine App für einen Verein: Organisatoren erstellen Arbeitseinsätze (Titel, Datum, Uhrzeit, Ort, Beschreibung, benötigte Helfer), Mitglieder tragen sich mit ihrem Namen ein und bekommen bei jedem neuen Einsatz eine Push-Benachrichtigung. Mitglieder brauchen kein Konto.
+
+Einrichten:
+
+1. Migration `030_club_work_events.sql` im SQL Editor ausführen (ohne sie zeigt die Seite einen Hinweis).
+2. `npx web-push generate-vapid-keys` ausführen und in Vercel `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` und `VAPID_SUBJECT` setzen, dazu `CLUB_ADMIN_CODE` als gemeinsamen Organisator-Code. Danach neu deployen (der öffentliche Schlüssel wird in den Build eingebaut).
+3. `/verein` öffnen, über den Schlüssel oben rechts den Organisator-Code eingeben, dann „Neu“.
+
+Die Seite hat ein eigenes Manifest (`/verein/app.webmanifest`) und einen eigenen Service Worker (`public/verein-sw.js`, Scope `/verein`), lässt sich also getrennt von Tischleinplandich installieren. Android, Desktop-Chrome/Edge/Firefox: einfach „Benachrichtigungen einschalten“. iPhone (ab iOS 16.4): erst in Safari „Teilen → Zum Home-Bildschirm“, dann die App vom Home-Bildschirm öffnen und dort einschalten. „Testen“ schickt eine Benachrichtigung nur an das eigene Gerät.
+
+Alles läuft über die Server-Routen unter `src/app/api/verein/` mit dem Service-Role-Key; die Tabellen haben RLS ohne Policies.

@@ -126,21 +126,35 @@ export default function DatenschutzPage() {
         Standardvertragsklauseln. Unbestätigte Einträge löschen wir nach 30 Tagen.
       </p>
 
-      <h2>10. Cookies und Speicher im Browser</h2>
+      <h2>10. Vereinsapp (Arbeitseinsätze)</h2>
+      <p>
+        Unter <Link href="/verein">/verein</Link> betreiben wir als Test eine kleine App für Arbeitseinsätze in
+        einem Verein. Trägst du dich dort für einen Einsatz ein, speichern wir den Namen, den du angibst, und den
+        Zeitpunkt; der Name ist für alle sichtbar, die die Seite öffnen. Schaltest du Benachrichtigungen ein,
+        speichern wir die Push-Adresse deines Browsers (eine zufällige Kennung ohne Bezug zu deinem Namen) und
+        schicken darüber Nachrichten zu neuen Einsätzen. Zugestellt werden sie vom Push-Dienst deines
+        Browserherstellers, etwa Google (Chrome, Android), Apple (Safari, iPhone) oder Mozilla (Firefox), die dafür
+        den Inhalt der Nachricht verschlüsselt weiterleiten. Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1
+        lit. a DSGVO): Du kannst dich jederzeit austragen und Benachrichtigungen in der App oder im Browser
+        ausschalten; dann löschen wir die Push-Adresse. Einsätze und Eintragungen speichert Supabase für uns.
+      </p>
+
+      <h2>11. Cookies und Speicher im Browser</h2>
       <p>
         Wir setzen nur technisch notwendige Cookies für die Anmeldung und speichern zur schnelleren Anzeige deine
-        App-Daten im Speicher deines Browsers (§ 25 Abs. 2 TDDDG). Es gibt keine Analyse-, Tracking- oder
+        App-Daten im Speicher deines Browsers (§ 25 Abs. 2 TDDDG). In der Vereinsapp merkt sich dein Browser
+        deinen Namen und deine Eintragungen, damit du dich wieder austragen kannst. Es gibt keine Analyse-, Tracking- oder
         Werbe-Cookies.
       </p>
 
-      <h2>11. Speicherdauer</h2>
+      <h2>12. Speicherdauer</h2>
       <p>
         Wir speichern deine Daten, solange du dein Konto hast. Im Profil kannst du dein Konto jederzeit löschen;
         dann werden alle Rezepte, Fotos, Pläne, Einstellungen und Premium-Gutschriften sofort gelöscht. Feedback
         bleibt ohne Bezug zu deinem Konto erhalten. Gesetzliche Aufbewahrungspflichten (z. B. für Rechnungen) bleiben unberührt.
       </p>
 
-      <h2>12. Deine Rechte</h2>
+      <h2>13. Deine Rechte</h2>
       <ul>
         <li>Auskunft (Art. 15 DSGVO)</li>
         <li>Berichtigung (Art. 16 DSGVO)</li>

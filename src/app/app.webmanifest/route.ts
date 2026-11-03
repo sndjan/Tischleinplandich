@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
+import { NextResponse } from "next/server";
 
-export default function manifest(): MetadataRoute.Manifest {
+// A plain route instead of the app/manifest.ts convention (or anything named manifest.*
+// at the app root): Next links that on every page, so /verein could not point to its own
+// manifest. Linked in app/layout.tsx.
+function manifest(): MetadataRoute.Manifest {
   return {
     name: "Tischleinplandich",
     short_name: "Tischlein",
@@ -32,4 +36,10 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icon/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
+}
+
+export const dynamic = "force-static";
+
+export function GET() {
+  return NextResponse.json(manifest(), { headers: { "Content-Type": "application/manifest+json" } });
 }
