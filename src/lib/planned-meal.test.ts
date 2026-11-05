@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { getMealRecipe } from "@/lib/planned-meal";
+import { detachRecipe, getMealRecipe } from "@/lib/planned-meal";
 import type { Recipe } from "@/types/database";
 
 const recipes = new Map([["r1", { id: "r1", name: "Dal" } as Recipe]]);
@@ -20,4 +20,21 @@ it("stands in for a meal without a recipe", () => {
 
 it("ignores rows with neither recipe nor label", () => {
   expect(getMealRecipe({ id: "m3", recipe_id: null }, recipes)).toBeUndefined();
+});
+
+it("keeps name and calories when a recipe is detached", () => {
+  const meal = { id: "m3", recipe_id: "r1", label: null, calories: null, serving_size: 2 };
+  expect(detachRecipe(meal, { name: "  Dal  ", calories: 450 })).toEqual({
+    id: "m3",
+    recipe_id: null,
+    label: "Dal",
+    calories: 450,
+    serving_size: 2,
+  });
+});
+
+it("cuts long names and drops implausible calories when detaching", () => {
+  const detached = detachRecipe({ recipe_id: "r1", label: null, calories: null }, { name: "x".repeat(120), calories: 99999 });
+  expect(detached.label).toHaveLength(80);
+  expect(detached.calories).toBeNull();
 });

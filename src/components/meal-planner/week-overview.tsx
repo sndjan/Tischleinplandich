@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
-import { sumMealNutrition } from "./day-summary";
+import { sumMealNutrition, usePerPersonNutrition } from "./day-summary";
 import { useScreenStack } from "./screen-stack";
 import { RecipePlaceholder } from "./recipe-placeholder";
 import { getMealRecipe } from "@/lib/planned-meal";
@@ -40,10 +40,12 @@ export function WeekSummary({
   weekRange,
   onSelectDay,
 }: WeekSummaryProps) {
+  const perPerson = usePerPersonNutrition();
   const dayTotals = SHORT_DAYS.map((_, dayIndex) =>
     sumMealNutrition(
       plannedMeals.filter((meal) => meal.day_of_week === dayIndex),
       recipesById,
+      perPerson,
     ),
   );
   const plannedDays = dayTotals.filter((totals) => totals.calories > 0);
@@ -166,6 +168,7 @@ export function WeekAgenda({
   onRemoveMeal,
 }: WeekAgendaProps) {
   const { openScreen } = useScreenStack();
+  const perPerson = usePerPersonNutrition();
 
   return (
     <ol className="space-y-2.5">
@@ -175,7 +178,7 @@ export function WeekAgenda({
         const meals = [...(plannedMealsByDay.get(dayIndex) ?? [])]
           .filter((meal) => getMealRecipe(meal, recipesById))
           .sort((a, b) => MEAL_TYPE_ORDER.indexOf(a.meal_type) - MEAL_TYPE_ORDER.indexOf(b.meal_type));
-        const totals = sumMealNutrition(meals, recipesById);
+        const totals = sumMealNutrition(meals, recipesById, perPerson);
         const left = nutritionTargets.calories_target - totals.calories;
 
         return (

@@ -29,7 +29,10 @@ export type Screen =
   | { kind: "add-meal"; dayIndex: number; mealType: MealType }
   | { kind: "nutrition-targets" }
   | { kind: "pantry-staples" }
-  | { kind: "whats-new" };
+  | { kind: "whats-new" }
+  // Choosing, creating and managing households (migration 030).
+  | { kind: "households" }
+  | { kind: "household"; householdId: string };
 
 // On desktop these open in a side panel next to the planner, so recipes can
 // still be dragged onto days; everything else (cooking, settings) takes the page.

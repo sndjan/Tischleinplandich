@@ -1,5 +1,6 @@
 "use client";
 
+import { createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
 import type { PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
@@ -7,19 +8,29 @@ import { getMealRecipe } from "@/lib/planned-meal";
 
 export type NutritionTotals = { calories: number; protein: number; carbs: number; fats: number };
 
+// In a shared household a meal's portions are for everyone at the table, while
+// targets are personal: the day then counts one portion of each meal.
+const PerPersonNutritionContext = createContext(false);
+
+export const PerPersonNutritionProvider = PerPersonNutritionContext.Provider;
+
+export const usePerPersonNutrition = () => useContext(PerPersonNutritionContext);
+
 /**
- * Nutrition of the given planned meals, scaled by their serving size.
+ * Nutrition of the given planned meals, scaled by their serving size, or one
+ * portion each with `perPerson` (shared household).
  */
 export function sumMealNutrition(
   meals: PlannedMeal[],
   recipesById: Map<string, Recipe>,
+  perPerson = false,
 ): NutritionTotals {
   return meals.reduce(
     (acc, meal) => {
       const recipe = getMealRecipe(meal, recipesById)?.recipe;
       if (!recipe) return acc;
 
-      const multiplier = meal.serving_size || 1;
+      const multiplier = perPerson ? 1 : meal.serving_size || 1;
 
       return {
         calories: acc.calories + (recipe.calories ?? 0) * multiplier,

@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, ChefHat, ChevronLeft, Pencil, Share2, ShoppingCart, Trash2 } from "lucide-react";
+import { CalendarPlus, ChefHat, ChevronLeft, Copy, Loader2, Pencil, Share2, ShoppingCart, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 import type { Recipe } from "@/types/database";
-import { useRecipesQuery } from "@/hooks/use-planner-data";
+import { useRecipesQuery, useUserId, type HouseholdRecipe } from "@/hooks/use-planner-data";
+import { findOwnCopy, useSaveSharedRecipe } from "@/lib/recipe-sharing";
+import { SharedByLine } from "./shared-recipe-screen";
 import { HeroButton, RecipeBody } from "./recipe-body";
 import { PlanRecipeSheet } from "./plan-recipe-sheet";
 import { AddToListSheet } from "./add-to-list-sheet";
@@ -21,18 +24,58 @@ interface RecipeViewProps {
   onEdit: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
   onCook: (recipe: Recipe, servings: number) => void;
+  // Another member's recipe was copied (or already had a copy): show that one.
+  onOpenCopy: (copy: Recipe) => void;
 }
 
-export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBack, onEdit, onDelete, onCook }: RecipeViewProps) {
+export function RecipeView({
+  recipe: initialRecipe,
+  tags,
+  initialServings,
+  onBack,
+  onEdit,
+  onDelete,
+  onCook,
+  onOpenCopy,
+}: RecipeViewProps) {
   // Follow the cached copy, so a new share link shows up without reopening.
   const { data } = useRecipesQuery();
+  const userId = useUserId();
   const recipe = data?.recipes.find((candidate) => candidate.id === initialRecipe.id) ?? initialRecipe;
+  // Another member's recipe in a shared household: read, plan and cook it;
+  // changing it (also with AI) needs an own copy first.
+  const isOwn = !userId || recipe.user_id === userId;
+  const saveCopy = useSaveSharedRecipe();
+  const [copying, setCopying] = useState(false);
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const [servings, setServings] = useState(initialServings ?? baseServings);
   const [sheet, setSheet] = useState<"plan" | "share" | "list" | null>(null);
   const rateRecipe = useRateRecipe();
   const showNutrition = useShowNutrition();
   const showBalance = useShowBalance();
+
+  const openCopy = async () => {
+    if (copying) return;
+    const member = recipe as HouseholdRecipe;
+    const source = { ...member, tags, author_name: member.author_name ?? null };
+    const existing = findOwnCopy(source, data?.recipes ?? []);
+    if (existing) {
+      onOpenCopy(existing);
+      return;
+    }
+
+    setCopying(true);
+    try {
+      const copy = await saveCopy(source);
+      toast.success("In deinen Rezepten gespeichert, jetzt kannst du sie ändern");
+      onOpenCopy(copy);
+    } catch (error) {
+      console.error(error);
+      toast.error("Speichern fehlgeschlagen");
+    } finally {
+      setCopying(false);
+    }
+  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-white">
@@ -44,26 +87,42 @@ export function RecipeView({ recipe: initialRecipe, tags, initialServings, onBac
           onServingsChange={setServings}
           showNutrition={showNutrition}
           balance={showBalance && <RecipeBalanceSection recipe={recipe} />}
-          rating={<StarRating value={recipe.rating ?? null} onChange={(value) => void rateRecipe(recipe, value)} />}
+          rating={
+            isOwn ? (
+              <StarRating value={recipe.rating ?? null} onChange={(value) => void rateRecipe(recipe, value)} />
+            ) : undefined
+          }
+          attribution={isOwn ? undefined : <SharedByLine name={(recipe as HouseholdRecipe).author_name ?? null} />}
           heroActions={
             <>
               <HeroButton label="Zurück" onClick={onBack}>
                 <ChevronLeft className="size-6" />
               </HeroButton>
-              <div className="flex gap-2">
-                <HeroButton label="Auf die Einkaufsliste" onClick={() => setSheet("list")}>
-                  <ShoppingCart className="size-[18px]" />
-                </HeroButton>
-                <HeroButton label="Teilen" onClick={() => setSheet("share")}>
-                  <Share2 className="size-[18px]" />
-                </HeroButton>
-                <HeroButton label="Bearbeiten" onClick={() => onEdit(recipe)}>
-                  <Pencil className="size-[18px]" />
-                </HeroButton>
-                <HeroButton label="Löschen" onClick={() => onDelete(recipe)} className="text-brand-red">
-                  <Trash2 className="size-[18px]" />
-                </HeroButton>
-              </div>
+              {isOwn ? (
+                <div className="flex gap-2">
+                  <HeroButton label="Auf die Einkaufsliste" onClick={() => setSheet("list")}>
+                    <ShoppingCart className="size-[18px]" />
+                  </HeroButton>
+                  <HeroButton label="Teilen" onClick={() => setSheet("share")}>
+                    <Share2 className="size-[18px]" />
+                  </HeroButton>
+                  <HeroButton label="Bearbeiten" onClick={() => onEdit(recipe)}>
+                    <Pencil className="size-[18px]" />
+                  </HeroButton>
+                  <HeroButton label="Löschen" onClick={() => onDelete(recipe)} className="text-brand-red">
+                    <Trash2 className="size-[18px]" />
+                  </HeroButton>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <HeroButton label="Auf die Einkaufsliste" onClick={() => setSheet("list")}>
+                    <ShoppingCart className="size-[18px]" />
+                  </HeroButton>
+                  <HeroButton label="Kopie in meine Rezepte speichern, um sie zu ändern" onClick={() => void openCopy()}>
+                    {copying ? <Loader2 className="size-[18px] animate-spin" /> : <Copy className="size-[18px]" />}
+                  </HeroButton>
+                </div>
+              )}
             </>
           }
         />

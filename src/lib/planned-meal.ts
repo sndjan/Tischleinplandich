@@ -33,3 +33,16 @@ export function getMealRecipe(
 
   return { recipe: standIn, isRecipe: false };
 }
+
+/**
+ * A planned meal after its recipe went away (deleted, or its owner left the
+ * household): a meal without a recipe that keeps the name and calories per
+ * portion. Mirrors detach_deleted_recipe in migration 030.
+ */
+export function detachRecipe<T extends Pick<PlannedMeal, "recipe_id" | "label" | "calories">>(
+  meal: T,
+  recipe: Pick<Recipe, "name" | "calories">,
+): T {
+  const calories = recipe.calories != null && recipe.calories >= 0 && recipe.calories <= 10000 ? recipe.calories : null;
+  return { ...meal, recipe_id: null, label: recipe.name.trim().slice(0, 80).trim() || "Rezept", calories };
+}

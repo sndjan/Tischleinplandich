@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import type { MealType, Recipe } from "@/types/database";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
 import { useMealPlanData } from "@/hooks/use-planner-data";
+import { getDefaultServings } from "@/lib/households";
 import { useAddMeal } from "@/hooks/use-planner-mutations";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Stepper } from "@/components/ui/controls";
@@ -34,14 +35,14 @@ function guessMealType(tags: string[]): MealType {
  * meal, and a meal already in that slot is replaced.
  */
 export function PlanRecipeSheet({ recipe, onClose }: { recipe: Recipe; servings?: number; onClose: () => void }) {
-  const { plannedMeals, recipes, tagsById } = useMealPlanData();
+  const { plannedMeals, recipes, tagsById, household } = useMealPlanData();
   const addMeal = useAddMeal();
   const { isCurrentWeek, label: weekLabel } = useSelectedWeek();
   // Switching the week here switches the planner too, so the plan shows where it went.
   const todayIndex = isCurrentWeek ? getTodayIndex() : -1;
   const [dayIndex, setDayIndex] = useState(getTodayIndex);
   const [mealType, setMealType] = useState<MealType>(() => guessMealType(tagsById[recipe.id] ?? []));
-  const [portions, setPortions] = useState(1);
+  const [portions, setPortions] = useState(() => getDefaultServings(household));
 
   const recipesById = useMemo(() => new Map(recipes.map((entry) => [entry.id, entry])), [recipes]);
 

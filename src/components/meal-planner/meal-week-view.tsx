@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useAddMeal, useRemoveMeal } from "@/hooks/use-planner-mutations";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
+import { PerPersonNutritionProvider } from "./day-summary";
 import { DEFAULT_NUTRITION_TARGETS } from "./nutrition-target-settings";
 import { useSelectedWeek } from "@/hooks/use-selected-week";
 import { formatWeekRange, getDayIndex, getWeekDates } from "@/lib/week";
@@ -150,6 +151,10 @@ interface MealWeekViewProps {
   nutritionTargets?: NutritionTargetSettings;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode, remember?: boolean) => void;
+  // Portions a dropped recipe is planned with (the household's number of people).
+  defaultServings?: number;
+  // Shared household: day totals count one portion of each meal.
+  perPersonNutrition?: boolean;
 }
 
 export function MealWeekView({
@@ -159,6 +164,8 @@ export function MealWeekView({
   nutritionTargets = DEFAULT_NUTRITION_TARGETS,
   viewMode,
   onViewModeChange,
+  defaultServings = 1,
+  perPersonNutrition = false,
 }: MealWeekViewProps) {
   const { offset, monday } = useSelectedWeek();
   // Past weeks count as fully past, later weeks as not started yet.
@@ -231,7 +238,7 @@ export function MealWeekView({
       recipeId: recipe.id,
       dayIndex,
       mealType,
-      servingSize: 1,
+      servingSize: defaultServings,
       replaceMealId: replacedMeal?.id,
     });
   };
@@ -254,114 +261,116 @@ export function MealWeekView({
   }
 
   return (
-    <div className="space-y-3">
-      <WeekSwitcher className={cn(viewMode === "day" && "mx-auto max-w-xl")} />
-      {viewMode === "day" ? (
-        <div className="mx-auto max-w-xl space-y-2.5">
-          <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">
-            {SHORT_DAYS.map((day, index) => {
-              const selected = index === selectedDayIndex;
-              const hasMeals = (plannedMealsByDay.get(index)?.length ?? 0) > 0;
+    <PerPersonNutritionProvider value={perPersonNutrition}>
+      <div className="space-y-3">
+        <WeekSwitcher className={cn(viewMode === "day" && "mx-auto max-w-xl")} />
+        {viewMode === "day" ? (
+          <div className="mx-auto max-w-xl space-y-2.5">
+            <div role="tablist" aria-label="Tag" className="grid grid-cols-7 gap-1">
+              {SHORT_DAYS.map((day, index) => {
+                const selected = index === selectedDayIndex;
+                const hasMeals = (plannedMealsByDay.get(index)?.length ?? 0) > 0;
 
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
-                  onClick={() => setSelectedDayIndex(index)}
-                  className={cn(
-                    "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
-                    selected
-                      ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
-                      : cn(
-                          "text-brand-ink ring-1 ring-brand-card-border",
-                          index < todayIndex ? "bg-brand-chip-neutral" : "bg-white",
-                        ),
-                    !selected && index === todayIndex && "ring-2 ring-brand-accent",
-                  )}
-                >
-                  <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>
-                    {day}
-                  </span>
-                  <span className="font-heading text-[17px] font-extrabold leading-none">{weekDates[index]}</span>
-                  <span
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-label={`${DAYS[index]}${index === todayIndex ? ", heute" : ""}`}
+                    onClick={() => setSelectedDayIndex(index)}
                     className={cn(
-                      "size-1.5 rounded-full",
-                      hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent",
+                      "flex h-[62px] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-[14px] transition-all duration-150 active:scale-95",
+                      selected
+                        ? "bg-brand-accent-dark text-white shadow-[0_4px_12px_rgba(47,122,82,0.3)]"
+                        : cn(
+                            "text-brand-ink ring-1 ring-brand-card-border",
+                            index < todayIndex ? "bg-brand-chip-neutral" : "bg-white",
+                          ),
+                      !selected && index === todayIndex && "ring-2 ring-brand-accent",
                     )}
-                  />
-                </button>
-              );
-            })}
-          </div>
+                  >
+                    <span className={cn("text-[11px] font-semibold", selected ? "text-white/80" : "text-brand-secondary")}>
+                      {day}
+                    </span>
+                    <span className="font-heading text-[17px] font-extrabold leading-none">{weekDates[index]}</span>
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        hasMeals ? (selected ? "bg-white" : "bg-brand-accent") : "bg-transparent",
+                      )}
+                    />
+                  </button>
+                );
+              })}
+            </div>
 
-          <DayCard
-            key={selectedDayIndex}
-            summaryTitle={DAYS[selectedDayIndex]}
-            dayIndex={selectedDayIndex}
-            isToday={selectedDayIndex === todayIndex}
-            fullWidth
-            recipesById={recipesById}
-            plannedMealsForDay={plannedMealsByDay.get(selectedDayIndex) ?? []}
-            nutritionTargets={nutritionTargets}
-            onRemoveMeal={handleRemoveMeal}
-            onDropRecipe={handleDropRecipe}
-          />
-        </div>
-      ) : (
-        <>
-          {nutritionTargets.show_nutrition && (
-            <WeekSummary
-              plannedMeals={plannedMeals}
+            <DayCard
+              key={selectedDayIndex}
+              summaryTitle={DAYS[selectedDayIndex]}
+              dayIndex={selectedDayIndex}
+              isToday={selectedDayIndex === todayIndex}
+              fullWidth
               recipesById={recipesById}
+              plannedMealsForDay={plannedMealsByDay.get(selectedDayIndex) ?? []}
               nutritionTargets={nutritionTargets}
-              todayIndex={todayIndex}
-              weekRange={weekRange}
-              onSelectDay={openDay}
-            />
-          )}
-
-          {nutritionTargets.show_balance && (
-            <WeekBalanceCard plannedMeals={plannedMeals} recipesById={recipesById} />
-          )}
-
-          {/* Mobile: agenda; the date or "Planen" opens the day to add meals */}
-          <div className="lg:hidden">
-            <WeekAgenda
-              todayIndex={todayIndex}
-              weekDates={weekDates}
-              plannedMealsByDay={plannedMealsByDay}
-              recipesById={recipesById}
-              nutritionTargets={nutritionTargets}
-              onSelectDay={openDay}
               onRemoveMeal={handleRemoveMeal}
+              onDropRecipe={handleDropRecipe}
             />
           </div>
-
-          {/* Desktop: the whole week in one row once there is room; narrower
-              screens like an iPad wrap the days instead of scrolling sideways. */}
-          <div className="hidden items-start gap-2 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] xl:grid-cols-7">
-            {DAYS.map((day, index) => (
-              <DayCard
-                key={day}
-                // Short, so the label fits a seventh of the width.
-                dayLabel={`${SHORT_DAYS[index]} ${weekDates[index]}`}
-                compact
-                dayIndex={index}
-                isToday={index === todayIndex}
-                isPast={index < todayIndex}
+        ) : (
+          <>
+            {nutritionTargets.show_nutrition && (
+              <WeekSummary
+                plannedMeals={plannedMeals}
                 recipesById={recipesById}
-                plannedMealsForDay={plannedMealsByDay.get(index) ?? []}
                 nutritionTargets={nutritionTargets}
-                onRemoveMeal={handleRemoveMeal}
-                onDropRecipe={handleDropRecipe}
+                todayIndex={todayIndex}
+                weekRange={weekRange}
+                onSelectDay={openDay}
               />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+            )}
+
+            {nutritionTargets.show_balance && (
+              <WeekBalanceCard plannedMeals={plannedMeals} recipesById={recipesById} />
+            )}
+
+            {/* Mobile: agenda; the date or "Planen" opens the day to add meals */}
+            <div className="lg:hidden">
+              <WeekAgenda
+                todayIndex={todayIndex}
+                weekDates={weekDates}
+                plannedMealsByDay={plannedMealsByDay}
+                recipesById={recipesById}
+                nutritionTargets={nutritionTargets}
+                onSelectDay={openDay}
+                onRemoveMeal={handleRemoveMeal}
+              />
+            </div>
+
+            {/* Desktop: the whole week in one row once there is room; narrower
+                screens like an iPad wrap the days instead of scrolling sideways. */}
+            <div className="hidden items-start gap-2 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] xl:grid-cols-7">
+              {DAYS.map((day, index) => (
+                <DayCard
+                  key={day}
+                  // Short, so the label fits a seventh of the width.
+                  dayLabel={`${SHORT_DAYS[index]} ${weekDates[index]}`}
+                  compact
+                  dayIndex={index}
+                  isToday={index === todayIndex}
+                  isPast={index < todayIndex}
+                  recipesById={recipesById}
+                  plannedMealsForDay={plannedMealsByDay.get(index) ?? []}
+                  nutritionTargets={nutritionTargets}
+                  onRemoveMeal={handleRemoveMeal}
+                  onDropRecipe={handleDropRecipe}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </PerPersonNutritionProvider>
   );
 }
