@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  combineHouseholdRecipes,
   formatMemberNames,
   getActiveHousehold,
   getDefaultServings,
@@ -122,5 +123,30 @@ describe("isInviteToken", () => {
     expect(isInviteToken("0123456789abcdef0123456789abcdef")).toBe(true);
     expect(isInviteToken("short")).toBe(false);
     expect(isInviteToken("../../etc/passwd/aaaaaaaaaaaa")).toBe(false);
+  });
+});
+
+describe("combineHouseholdRecipes", () => {
+  const own = [
+    { id: "a", user_id: "me", created_at: "2026-01-03" },
+    { id: "b", user_id: "me", created_at: "2026-01-01" },
+  ];
+  const others = [
+    { id: "c", user_id: "anna", created_at: "2026-01-02" },
+    { id: "d", user_id: "ben", created_at: "2026-01-04" },
+    // Already in the own list (e.g. a stale member list); shown once.
+    { id: "a", user_id: "me", created_at: "2026-01-03" },
+  ];
+
+  it("shows everyone's recipes newest first", () => {
+    expect(combineHouseholdRecipes(own, others, "me", "all").map((recipe) => recipe.id)).toEqual(["d", "a", "c", "b"]);
+  });
+
+  it("narrows to the user's own recipes", () => {
+    expect(combineHouseholdRecipes(own, others, "me", "me").map((recipe) => recipe.id)).toEqual(["a", "b"]);
+  });
+
+  it("narrows to one other member", () => {
+    expect(combineHouseholdRecipes(own, others, "me", { userId: "anna" }).map((recipe) => recipe.id)).toEqual(["c"]);
   });
 });
