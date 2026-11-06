@@ -70,6 +70,13 @@ interface RecipeListProps {
   showNutrition?: boolean;
   // The "Ausgewogenheit" score on the covers; off when the user hides it.
   showBalance?: boolean;
+  // False for other people's recipes (the household tab): no filter by sharing
+  // and no sort by rating, since neither is theirs to see.
+  ownRecipes?: boolean;
+  // Shown instead of the hint for an empty own library.
+  emptyText?: string;
+  // Extra line under a card's name, e.g. who the recipe belongs to.
+  cardFooter?: (recipe: Recipe) => React.ReactNode;
 }
 
 export function RecipeList({
@@ -81,6 +88,9 @@ export function RecipeList({
   disableDrag = false,
   selectedRecipeId = null,
   toolbarActions,
+  ownRecipes = true,
+  emptyText = "Noch keine Rezepte. Tippe auf „Neu“, um eins zu importieren oder schreiben zu lassen.",
+  cardFooter,
   showNutrition = true,
   showBalance = true,
 }: RecipeListProps) {
@@ -254,21 +264,23 @@ export function RecipeList({
 
       {showFilters && (
         <div className="grid animate-fade-up grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2">
-          <Select
-            value={visibilityFilter}
-            onValueChange={(value: VisibilityFilter) =>
-              setVisibilityFilter(value)
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Sichtbarkeit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle</SelectItem>
-              <SelectItem value="private">Privat</SelectItem>
-              <SelectItem value="public">Öffentlich</SelectItem>
-            </SelectContent>
-          </Select>
+          {ownRecipes && (
+            <Select
+              value={visibilityFilter}
+              onValueChange={(value: VisibilityFilter) =>
+                setVisibilityFilter(value)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sichtbarkeit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle</SelectItem>
+                <SelectItem value="private">Privat</SelectItem>
+                <SelectItem value="public">Öffentlich</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
           <Select
             value={selectedTag}
@@ -317,7 +329,7 @@ export function RecipeList({
               <SelectItem value="name-desc">Name (Z-A)</SelectItem>
               {showNutrition && <SelectItem value="protein-desc">Protein</SelectItem>}
               <SelectItem value="time-asc">Schnellste zuerst</SelectItem>
-              <SelectItem value="rating-desc">Beste Bewertung</SelectItem>
+              {ownRecipes && <SelectItem value="rating-desc">Beste Bewertung</SelectItem>}
             </SelectContent>
           </Select>
         </div>
@@ -336,9 +348,7 @@ export function RecipeList({
           ))}
         </div>
       ) : recipes.length === 0 ? (
-        <p className="py-6 text-center text-sm text-brand-secondary">
-          Noch keine Rezepte. Tippe auf „Neu“, um eins zu importieren oder schreiben zu lassen.
-        </p>
+        <p className="py-6 text-center text-sm text-brand-secondary">{emptyText}</p>
       ) : filteredRecipes.length === 0 ? (
         <p className="text-sm text-brand-tertiary">
           {maxMinutes > 0
@@ -450,6 +460,7 @@ export function RecipeList({
                         ) : null}
                       </div>
                     )}
+                    {cardFooter?.(recipe)}
                   </div>
                 </button>
 

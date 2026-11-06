@@ -78,6 +78,15 @@ export default function DatenschutzPage() {
         sehen. Schaltest du „In Entdecken zeigen“ ein, sehen es alle angemeldeten Nutzer. Beides kannst du
         jederzeit wieder abschalten.
       </p>
+      <p>
+        In einem gemeinsamen Haushalt sehen alle Mitglieder deinen Anzeigenamen, deine Rezepte samt Fotos und die
+        Wochenpläne des Haushalts, und sie können deine Rezepte einplanen. Deine E-Mail-Adresse, deine Bewertungen,
+        deine Tagesziele und den gelesenen Quelltext von Importen sehen sie nicht. Wer einen Einladungslink hat, sieht
+        vor dem Beitreten den Namen des Haushalts und die Anzeigenamen der Mitglieder. Änderungen am Plan schicken wir
+        den anderen Mitgliedern über Supabase sofort in ihre geöffnete App. Verlässt du den Haushalt, sehen die
+        anderen deine Rezepte nicht mehr; in ihren Plänen bleiben nur Name und Kalorien der eingeplanten Rezepte
+        stehen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.
+      </p>
 
       <h2>7. KI-Funktionen</h2>
       <p>
@@ -136,8 +145,9 @@ export default function DatenschutzPage() {
       <h2>11. Speicherdauer</h2>
       <p>
         Wir speichern deine Daten, solange du dein Konto hast. Im Profil kannst du dein Konto jederzeit löschen;
-        dann werden alle Rezepte, Fotos, Pläne, Einstellungen und Premium-Gutschriften sofort gelöscht. Feedback
-        bleibt ohne Bezug zu deinem Konto erhalten. Gesetzliche Aufbewahrungspflichten (z. B. für Rechnungen) bleiben unberührt.
+        dann werden alle Rezepte, Fotos, Pläne, Einstellungen und Premium-Gutschriften sofort gelöscht. Pläne
+        gemeinsamer Haushalte gehören allen Mitgliedern und bleiben für die anderen erhalten, mit Namen und Kalorien
+        deiner eingeplanten Rezepte, aber ohne Bezug zu dir. Feedback bleibt ohne Bezug zu deinem Konto erhalten. Gesetzliche Aufbewahrungspflichten (z. B. für Rechnungen) bleiben unberührt.
       </p>
 
       <h2>12. Deine Rechte</h2>

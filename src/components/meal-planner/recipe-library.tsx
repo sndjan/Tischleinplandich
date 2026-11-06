@@ -2,27 +2,32 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { useRecipesQuery } from "@/hooks/use-planner-data";
+import { useActiveHousehold, useRecipesQuery } from "@/hooks/use-planner-data";
 import { RecipeList } from "./recipe-list";
 import { DiscoverRecipes } from "./discover-recipes";
+import { HouseholdRecipes } from "./household-recipes";
 import { SegmentedTabs } from "./segmented-tabs";
 import { useShowNutrition } from "./nutrition-target-settings";
 import { useScreenStack } from "./screen-stack";
 import { useShowBalance } from "./balance-display";
 
-export type LibraryTab = "mine" | "discover";
+export type LibraryTab = "mine" | "household" | "discover";
 
 /**
- * Own recipes and "Entdecken". With `tab` set, the parent shows the tabs
- * itself (the desktop panel merges them with "Einkaufsliste").
+ * Own recipes, the other members' recipes ("Haushalt", only while a shared
+ * household is active) and "Entdecken". With `tab` set, the parent shows the
+ * tabs itself (the desktop panel merges them with "Einkaufsliste").
  */
 export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {}) {
   const { openScreen } = useScreenStack();
   const { data, isPending } = useRecipesQuery();
   const showNutrition = useShowNutrition();
   const showBalance = useShowBalance();
+  const { isShared } = useActiveHousehold();
   const [ownTab, setTab] = useState<LibraryTab>("mine");
-  const tab = controlledTab ?? ownTab;
+  const chosenTab = controlledTab ?? ownTab;
+  // Switching to the personal household hides the tab; fall back to own recipes.
+  const tab = chosenTab === "household" && !isShared ? "mine" : chosenTab;
   const count = data?.recipes.length;
 
   return (
@@ -34,6 +39,7 @@ export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {})
           onChange={setTab}
           options={[
             { value: "mine", label: count !== undefined ? `Meine · ${count}` : "Meine" },
+            ...(isShared ? [{ value: "household" as const, label: "Haushalt" }] : []),
             { value: "discover", label: "Entdecken" },
           ]}
         />
@@ -57,6 +63,8 @@ export function RecipeLibrary({ tab: controlledTab }: { tab?: LibraryTab } = {})
             </button>
           }
         />
+      ) : tab === "household" ? (
+        <HouseholdRecipes />
       ) : (
         <DiscoverRecipes />
       )}

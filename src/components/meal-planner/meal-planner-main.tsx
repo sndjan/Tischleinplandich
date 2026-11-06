@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MessageSquarePlus, Plus, WifiOff } from "lucide-react";
+import { MessageSquarePlus, Plus, Users, WifiOff } from "lucide-react";
 import { MealWeekView, useViewMode, ViewModeToggle, WeekSwitcher } from "./meal-week-view";
 import { RecipeLibrary } from "./recipe-library";
 import { DesktopNavRail, type DesktopPanelTab } from "./desktop-nav-rail";
@@ -17,6 +17,7 @@ import { ShoppingList } from "./shopping-list";
 import { MobileTabBar, type MobileTab } from "./mobile-tab-bar";
 import { FeedbackPopover } from "./feedback-popover";
 import { WhatsNewScreen } from "./whats-new-screen";
+import { HouseholdScreen, HouseholdsScreen } from "./household-screens";
 import { useRewardThanks } from "./feedback-rewards";
 import { PantryStaplesScreen, usePantryStaples } from "./pantry-staples-settings";
 import {
@@ -37,9 +38,12 @@ import { takeSharedContent } from "@/lib/share-target";
 import { QueryProvider } from "@/lib/query-provider";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
-import { useMealPlanData, useProfileQuery } from "@/hooks/use-planner-data";
+import { useMealPlanData, useProfileQuery, useRecipesQuery } from "@/hooks/use-planner-data";
 import { SelectedWeekProvider, useSelectedWeek } from "@/hooks/use-selected-week";
 import { useShoppingWeek } from "@/hooks/use-shopping-week";
+import { useWeekRealtime } from "@/hooks/use-week-realtime";
+import { useHouseholdGoneNotice } from "@/hooks/use-households";
+import { getDefaultServings, householdLabel } from "@/lib/households";
 import { useDeleteRecipe } from "@/hooks/use-planner-mutations";
 import { sumMealNutrition } from "./day-summary";
 import { useEntrance } from "@/hooks/use-entrance";
@@ -96,6 +100,14 @@ function MealPlanner() {
   const mealPlanData = useMealPlanData();
   const selectedWeek = useSelectedWeek();
   const deleteRecipe = useDeleteRecipe();
+  const { household, isSharedHousehold } = mealPlanData;
+  const { data: ownRecipes } = useRecipesQuery();
+  const defaultServings = getDefaultServings(household);
+  // The other members' changes to the shown week arrive live.
+  useWeekRealtime();
+  // Says once when a shared household was deleted or the user was removed.
+  useHouseholdGoneNotice();
+  const panelTab = desktopRightPanelTab === "household" && !isSharedHousehold ? "mine" : desktopRightPanelTab;
 
   const shoppingWeek = useShoppingWeek();
 
@@ -141,7 +153,7 @@ function MealPlanner() {
     const todayMeals = mealPlanData.plannedMeals.filter(
       (meal) => meal.day_of_week === getTodayDayIndex(),
     );
-    const planned = sumMealNutrition(todayMeals, recipesById);
+    const planned = sumMealNutrition(todayMeals, recipesById, isSharedHousehold);
     const parts: string[] = [];
 
     if (nutritionTargets.calories_target_enabled) {
@@ -156,7 +168,7 @@ function MealPlanner() {
     }
 
     return parts.length > 0 ? parts.join(" · ") : null;
-  }, [mealPlanData.recipes, mealPlanData.plannedMeals, nutritionTargets, selectedWeek.isCurrentWeek]);
+  }, [mealPlanData.recipes, mealPlanData.plannedMeals, nutritionTargets, selectedWeek.isCurrentWeek, isSharedHousehold]);
 
   // Content shared into the app from another app (see public/sw.js).
   useEffect(() => {
@@ -185,7 +197,7 @@ function MealPlanner() {
   // Stored with feedback to help reproduce bugs.
   const currentContext = () =>
     window.matchMedia("(min-width: 1024px)").matches
-      ? `Desktop · ${desktopRightPanelTab}`
+      ? `Desktop · ${panelTab}`
       : `Mobil · ${mobileTab}`;
 
   const toggleFeedback = (context = currentContext()) =>
@@ -240,6 +252,7 @@ function MealPlanner() {
             onEdit={(recipe) => replaceScreen({ kind: "recipe-form", recipe })}
             onDelete={handleRecipeDelete}
             onCook={(recipe, servings) => openScreen({ kind: "cooking-mode", recipe, servings })}
+            onOpenCopy={(copy) => replaceScreen({ kind: "recipe-preview", recipe: copy, servings: screen.servings })}
           />
         );
       case "cooking-mode":
@@ -275,6 +288,10 @@ function MealPlanner() {
         );
       case "whats-new":
         return <WhatsNewScreen onBack={closeScreen} />;
+      case "households":
+        return <HouseholdsScreen onBack={closeScreen} />;
+      case "household":
+        return <HouseholdScreen householdId={screen.householdId} onBack={closeScreen} />;
       case "pantry-staples":
         return (
           <PantryStaplesScreen
@@ -291,19 +308,24 @@ function MealPlanner() {
   const panelOpen = topEntry !== undefined && inPanel(topEntry);
   const fullPageOpen = topEntry !== undefined && !panelOpen;
   const panelEntries = stack.filter(inPanel);
-  const recipeCount = mealPlanData.loading ? null : mealPlanData.recipes.length;
+  // Own recipes only; mealPlanData.recipes also holds the other members' ones.
+  const recipeCount = ownRecipes ? ownRecipes.recipes.length : null;
 
   const panelHeading = {
     mine: {
       title: "Meine Rezepte",
       subtitle: recipeCount === null ? "Zum Planen auf einen Tag ziehen" : `${recipeCount} · zum Planen auf einen Tag ziehen`,
     },
+    household: {
+      title: "Haushalt",
+      subtitle: household ? `Rezepte der anderen in „${householdLabel(household)}“` : "Rezepte der anderen",
+    },
     discover: { title: "Entdecken", subtitle: "Rezepte, die andere geteilt haben" },
     shopping: {
       title: "Einkaufsliste",
       subtitle: selectedWeek.isCurrentWeek ? "Aus den Mahlzeiten dieser Woche" : selectedWeek.label,
     },
-  }[desktopRightPanelTab];
+  }[panelTab];
 
   return (
     <>
@@ -315,7 +337,11 @@ function MealPlanner() {
           fullPageOpen && "hidden lg:hidden",
         )}
       >
-        <DesktopNavRail value={desktopRightPanelTab} onChange={setDesktopRightPanelTab} />
+        <DesktopNavRail
+          value={panelTab}
+          onChange={setDesktopRightPanelTab}
+          showHousehold={isSharedHousehold}
+        />
 
         <div className="lg:flex lg:min-w-0 lg:flex-1 lg:flex-col">
           <header className="sticky top-0 z-40 border-b border-brand-card-border bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
@@ -334,6 +360,18 @@ function MealPlanner() {
                   </>
                 )}
               </h1>
+              {household && isSharedHousehold && (
+                // Planning happens in this household; tapping it leads to switching.
+                <button
+                  type="button"
+                  onClick={() => openScreen({ kind: "households" })}
+                  aria-label={`Haushalt: ${householdLabel(household)}. Wechseln`}
+                  className="mr-auto flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-brand-accent-bg px-3 text-[13px] font-bold text-brand-accent-dark transition-transform active:scale-95"
+                >
+                  <Users className="size-3.5 shrink-0" strokeWidth={2.4} />
+                  <span className="truncate">{householdLabel(household)}</span>
+                </button>
+              )}
               <div className="flex items-center gap-2">
                 <div className={cn(mobileTab !== "plan" && "hidden lg:block")}>
                   <ViewModeToggle value={viewMode} onChange={setViewMode} />
@@ -394,6 +432,8 @@ function MealPlanner() {
                   nutritionTargets={nutritionTargets}
                   viewMode={viewMode}
                   onViewModeChange={setViewMode}
+                  defaultServings={defaultServings}
+                  perPersonNutrition={isSharedHousehold}
                 />
               </div>
               <aside
@@ -405,7 +445,7 @@ function MealPlanner() {
                   <p className="min-w-0 truncate text-[13px] text-brand-secondary">{panelHeading.subtitle}</p>
                 </div>
                 <div className="relative -mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
-                  {desktopRightPanelTab === "shopping" ? (
+                  {panelTab === "shopping" ? (
                     <ShoppingList
                       key={selectedWeek.weekKey}
                       items={shoppingListItems}
@@ -416,7 +456,7 @@ function MealPlanner() {
                       onRemoveExtra={shoppingWeek.removeExtra}
                     />
                   ) : (
-                    <RecipeLibrary tab={desktopRightPanelTab} />
+                    <RecipeLibrary tab={panelTab} />
                   )}
                 </div>
               </aside>
@@ -432,6 +472,8 @@ function MealPlanner() {
                   nutritionTargets={nutritionTargets}
                   viewMode={viewMode}
                   onViewModeChange={setViewMode}
+                  defaultServings={defaultServings}
+                  perPersonNutrition={isSharedHousehold}
                 />
               )}
               {mobileTab === "shopping" && (

@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Check, ChevronRight, Search, Store } from "lucide-react";
 import type { MealType, Recipe } from "@/types/database";
 import { MEAL_TYPE_LABELS } from "@/lib/meal-labels";
-import { useMealPlanData } from "@/hooks/use-planner-data";
+import { useMealPlanData, useUserId, type HouseholdRecipe } from "@/hooks/use-planner-data";
+import { getDefaultServings } from "@/lib/households";
 import { useAddMeal } from "@/hooks/use-planner-mutations";
 import { Button } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/controls";
@@ -74,10 +75,14 @@ export function AddMealScreen({
   onBack,
   onMealAdded,
 }: AddMealScreenProps) {
-  const { recipes, tagsById, plannedMeals, loading } = useMealPlanData();
+  const { recipes, tagsById, plannedMeals, loading, household, isSharedHousehold } = useMealPlanData();
+  const userId = useUserId();
   const addMeal = useAddMeal();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [servings, setServings] = useState(1);
+  const [servings, setServings] = useState(() => getDefaultServings(household));
+  // Targets are personal: in a shared household the portions are for everyone,
+  // so what counts for the day is one portion.
+  const portionsEaten = isSharedHousehold ? 1 : servings;
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>({ kind: "all" });
   const [recent] = useState(readRecent);
@@ -91,6 +96,7 @@ export function AddMealScreen({
     const planned = sumMealNutrition(
       plannedMeals.filter((meal) => meal.day_of_week === dayOfWeek),
       recipesById,
+      isSharedHousehold,
     );
     const show = nutritionTargets.show_nutrition;
     return {
@@ -99,15 +105,15 @@ export function AddMealScreen({
       protein:
         show && nutritionTargets.protein_target_enabled ? nutritionTargets.protein_target - planned.protein : null,
     };
-  }, [plannedMeals, dayOfWeek, recipesById, nutritionTargets]);
+  }, [plannedMeals, dayOfWeek, recipesById, nutritionTargets, isSharedHousehold]);
 
   const fits = (recipe: Recipe) =>
     remaining.calories !== null &&
     remaining.calories > 0 &&
     recipe.calories != null &&
-    recipe.calories * servings <= remaining.calories + 50 &&
+    recipe.calories * portionsEaten <= remaining.calories + 50 &&
     // Big enough to matter for the day, not just a snack that fits anywhere.
-    recipe.calories * servings >= Math.min(remaining.calories * 0.4, 400);
+    recipe.calories * portionsEaten >= Math.min(remaining.calories * 0.4, 400);
 
   const mealTags = MEAL_TYPE_TAGS[mealType];
 
@@ -147,9 +153,9 @@ export function AddMealScreen({
       if (filter.kind === "recent") return recentRank.get(a.id)! - recentRank.get(b.id)!;
       return score(b) - score(a) || (recentRank.get(a.id) ?? 99) - (recentRank.get(b.id) ?? 99);
     });
-    // fits() depends on servings and remaining, both listed.
+    // fits() depends on portionsEaten and remaining, both listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipes, tagsById, search, filter, recent, servings, remaining, mealTags]);
+  }, [recipes, tagsById, search, filter, recent, portionsEaten, remaining, mealTags]);
 
   const handleAdd = () => {
     if (!selectedId) return;
@@ -295,11 +301,12 @@ export function AddMealScreen({
             const facts = [
               nutritionTargets.show_nutrition &&
                 recipe.calories != null &&
-                `${formatNumber(recipe.calories * servings)} kcal`,
+                `${formatNumber(recipe.calories * portionsEaten)} kcal`,
               nutritionTargets.show_nutrition &&
                 recipe.protein != null &&
-                `${formatNumber(recipe.protein * servings)} g Protein`,
+                `${formatNumber(recipe.protein * portionsEaten)} g Protein`,
               recipe.prep_time,
+              recipe.user_id !== userId && `von ${(recipe as HouseholdRecipe).author_name || "jemandem"}`,
             ].filter(Boolean);
 
             return (

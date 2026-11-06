@@ -7,17 +7,18 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteRecipe } from "@/lib/recipes";
 import { showUndoToast } from "@/lib/undo-toast";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
-import { useSelectedWeek } from "./use-selected-week";
 import {
   isPendingId,
   mealsAwaitingRemoval,
   PENDING_ID_PREFIX,
   queryKeys,
+  useHouseholdsQuery,
   useUserId,
+  useWeekScope,
   type RecipesData,
   type WeekData,
 } from "./use-planner-data";
-import { getMealRecipe } from "@/lib/planned-meal";
+import { detachRecipe, getMealRecipe } from "@/lib/planned-meal";
 
 export type AddMealInput = {
   // Null for a meal without a recipe, which then needs a label (migration 020).
@@ -31,23 +32,34 @@ export type AddMealInput = {
   replaceMealId?: string;
 };
 
-async function getOrCreateMealPlanId(userId: string, weekStart: string): Promise<string> {
-  const supabase = createClient();
-  const { data: existing, error } = await supabase
-    .from("meal_plans")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("week_start_date", weekStart)
+async function findMealPlanId(userId: string, householdId: string | null, weekStart: string) {
+  const query = createClient().from("meal_plans").select("id").eq("week_start_date", weekStart);
+  const { data, error } = await (householdId ? query.eq("household_id", householdId) : query.eq("user_id", userId))
     .maybeSingle<{ id: string }>();
 
   if (error) throw error;
-  if (existing) return existing.id;
+  return data?.id ?? null;
+}
 
-  const { data: created, error: createError } = await supabase
+/**
+ * The week's plan in the household (or the user's own plan before migration 030),
+ * created on first use.
+ */
+async function getOrCreateMealPlanId(userId: string, householdId: string | null, weekStart: string): Promise<string> {
+  const existing = await findMealPlanId(userId, householdId, weekStart);
+  if (existing) return existing;
+
+  const { data: created, error: createError } = await createClient()
     .from("meal_plans")
-    .insert({ user_id: userId, week_start_date: weekStart })
+    .insert({ user_id: userId, week_start_date: weekStart, ...(householdId && { household_id: householdId }) })
     .select("id")
     .single<{ id: string }>();
+
+  // Another member created the same week at the same moment.
+  if (createError?.code === "23505") {
+    const raced = await findMealPlanId(userId, householdId, weekStart);
+    if (raced) return raced;
+  }
 
   if (createError || !created) throw createError ?? new Error("Plan not created");
   return created.id;
@@ -59,9 +71,7 @@ async function getOrCreateMealPlanId(userId: string, weekStart: string): Promise
  */
 export function useAddMeal() {
   const queryClient = useQueryClient();
-  const userId = useUserId();
-  const { weekKey: weekStart } = useSelectedWeek();
-  const weekKey = queryKeys.week(userId ?? "", weekStart);
+  const { userId, householdId, weekStart, queryKey: weekKey } = useWeekScope();
 
   const mutation = useMutation({
     mutationFn: async (input: AddMealInput & { pendingId: string }) => {
@@ -70,7 +80,7 @@ export function useAddMeal() {
       const supabase = createClient();
       const mealPlanId =
         queryClient.getQueryData<WeekData>(weekKey)?.mealPlanId ??
-        (await getOrCreateMealPlanId(userId, weekStart));
+        (await getOrCreateMealPlanId(userId, householdId, weekStart));
 
       if (input.replaceMealId && !isPendingId(input.replaceMealId)) {
         const { error } = await supabase
@@ -162,9 +172,7 @@ export function useAddMeal() {
  */
 export function useRemoveMeal(recipesById: Map<string, Recipe>) {
   const queryClient = useQueryClient();
-  const userId = useUserId();
-  const { weekKey: weekStart } = useSelectedWeek();
-  const weekKey = queryKeys.week(userId ?? "", weekStart);
+  const { queryKey: weekKey } = useWeekScope();
 
   const deleteMutation = useMutation({
     mutationFn: async (mealId: string) => {
@@ -217,6 +225,9 @@ export function useRemoveMeal(recipesById: Map<string, Recipe>) {
 export function useDeleteRecipe() {
   const queryClient = useQueryClient();
   const userId = useUserId();
+  // Since migration 030 planned meals keep the deleted recipe's name and calories.
+  const { data: households } = useHouseholdsQuery();
+  const mealsStay = households?.ready === true;
   const recipesKey = queryKeys.recipes(userId ?? "");
   // Every cached week: the recipe can be planned in any of them.
   const weeksKey = queryKeys.allWeeks(userId ?? "");
@@ -244,10 +255,16 @@ export function useDeleteRecipe() {
           ? { ...current, recipes: current.recipes.filter((entry) => entry.id !== recipe.id) }
           : current,
       );
-      // Planned meals of a deleted recipe are deleted with it in the database.
+      // The database turns its planned meals into meals without a recipe (or,
+      // before migration 030, deletes them); the cache does the same right away.
       queryClient.setQueriesData<WeekData>({ queryKey: weeksKey }, (current) =>
         current
-          ? { ...current, meals: current.meals.filter((meal) => meal.recipe_id !== recipe.id) }
+          ? {
+              ...current,
+              meals: mealsStay
+                ? current.meals.map((meal) => (meal.recipe_id === recipe.id ? detachRecipe(meal, recipe) : meal))
+                : current.meals.filter((meal) => meal.recipe_id !== recipe.id),
+            }
           : current,
       );
 
@@ -260,6 +277,6 @@ export function useDeleteRecipe() {
         onCommit: () => deleteMutation.mutate(recipe),
       });
     },
-    [queryClient, recipesKey, weeksKey, deleteMutation],
+    [queryClient, recipesKey, weeksKey, deleteMutation, mealsStay],
   );
 }

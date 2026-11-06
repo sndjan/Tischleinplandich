@@ -8,7 +8,8 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/context";
 import { isStandalone, promptInstall } from "@/lib/install-prompt";
-import { queryKeys, useProfileQuery, useRecipesQuery, useUserId } from "@/hooks/use-planner-data";
+import { queryKeys, useActiveHousehold, useProfileQuery, useRecipesQuery, useUserId } from "@/hooks/use-planner-data";
+import { formatMemberNames, householdLabel } from "@/lib/households";
 import { DAILY_AI_LIMIT } from "@/lib/recipe-draft";
 import { exportRecipesAsZip } from "@/lib/recipe-export";
 import { recipesToPrintHtml } from "@/lib/recipe-print";
@@ -171,6 +172,7 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
   const hasUnseenChanges = useHasUnseenChanges();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [choosingExport, setChoosingExport] = useState(false);
+  const { household, data: households } = useActiveHousehold();
 
   useEffect(() => setCanInstall(!isStandalone()), []);
 
@@ -206,6 +208,21 @@ export function ProfileScreen({ targets, pantryStaples, onFeedback, onBack }: Pr
   };
 
   const rows = [
+    // Hidden until migration 030 has run.
+    ...(households?.ready && household
+      ? [
+          {
+            key: "household",
+            emoji: "🏠",
+            tint: "bg-brand-accent-bg",
+            title: "Haushalt",
+            subtitle: household.isPersonal
+              ? "Persönlich · gemeinsam planen"
+              : `${householdLabel(household)} · ${formatMemberNames(household.members.map((member) => member.displayName))}`,
+            onClick: () => openScreen({ kind: "households" }),
+          },
+        ]
+      : []),
     {
       key: "targets",
       emoji: "🎯",
@@ -406,7 +423,7 @@ function DeleteAccountSheet({ onExport, onClose }: { onExport: () => void; onClo
   return (
     <BottomSheet
       title="Konto löschen?"
-      description="Alle Rezepte, Fotos, Wochenpläne und Einstellungen werden endgültig gelöscht. Geteilte Links funktionieren danach nicht mehr."
+      description="Alle Rezepte, Fotos, Wochenpläne und Einstellungen werden endgültig gelöscht. Geteilte Links funktionieren danach nicht mehr. In gemeinsamen Haushalten bleiben deine eingeplanten Rezepte nur mit Namen stehen."
       onClose={onClose}
     >
       <div className="flex flex-col gap-2.5">

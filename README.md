@@ -21,7 +21,6 @@ Feedback, das eine Neugestaltung braucht (Einträge in `feedback` bleiben auf `n
 
 ### Später (größer)
 
-- Wochenpläne teilen und gemeinsam bearbeiten (z. B. mit der Familie)
 - Drag & Drop: Rezept halten, Tage erscheinen, auf einen Tag ziehen
 
 ## Entwicklung
@@ -53,6 +52,14 @@ Migration `011_recipe_sharing.sql` (im SQL Editor ausführen) fügt Teilen hinzu
 - **Name**: steht als „Geteilt von …“ beim Rezept, wird im Profil gesetzt (`users.display_name`).
 
 Ohne die Migration läuft die App weiter, nur Teilen, Entdecken und der Name zeigen einen Hinweis.
+
+## Gemeinsam planen (Haushalte)
+
+Migration `030_households.sql` (im SQL Editor ausführen) bringt Haushalte. Jedes Konto hat einen persönlichen Haushalt, in den die bisherigen Wochenpläne wandern. Unter Profil → „Haushalt“ legt man bis zu zwei gemeinsame Haushalte an (je höchstens 10 Leute) und lädt per Link (`/einladen/<token>`, 7 Tage gültig, jederzeit zurücksetzbar) ein. Alle planen dieselbe Woche, Änderungen kommen per Supabase Realtime sofort an, und die Rezepte der anderen stehen im Tab „Haushalt“ (ohne Bewertungen, ändern nur als eigene Kopie). Gelöschte Rezepte, Rezepte von Leuten, die den Haushalt verlassen, und Rezepte gelöschter Konten bleiben im Plan mit Namen und Kalorien stehen. Entwurf und Entscheidungen: `docs/households.md`.
+
+Ohne die Migration läuft die App wie bisher allein weiter; Profil → „Haushalt“ fehlt dann. Die Migration fügt `planned_meals` und `meal_plans` der Publikation `supabase_realtime` hinzu; falls Realtime im Projekt aus ist, aktualisiert sich der Plan beim Zurückkehren in die App.
+
+Einkaufsliste und Grundzutaten sind noch pro Gerät bzw. pro Person; sie ziehen in einem zweiten Schritt in den Haushalt um.
 
 ## Feedback lesen
 

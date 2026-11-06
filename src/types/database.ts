@@ -16,6 +16,8 @@ export type Database = {
           email: string;
           // Shown on shared recipes ("Geteilt von …"). Added in migration 011.
           display_name: string | null;
+          // Household the app shows; null means the personal one. Migration 030.
+          active_household_id?: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -23,6 +25,7 @@ export type Database = {
           id?: string;
           email: string;
           display_name?: string | null;
+          active_household_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -30,6 +33,7 @@ export type Database = {
           id?: string;
           email?: string;
           display_name?: string | null;
+          active_household_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -177,7 +181,10 @@ export type Database = {
       meal_plans: {
         Row: {
           id: string;
-          user_id: string;
+          // Who created the plan; null once their account is gone. Migration 030.
+          user_id: string | null;
+          // One plan per household and week. Migration 030.
+          household_id?: string;
           week_start_date: string;
           created_at: string;
           updated_at: string;
@@ -185,13 +192,15 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
+          household_id?: string;
           week_start_date: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          user_id?: string | null;
+          household_id?: string;
           week_start_date?: string;
           created_at?: string;
           updated_at?: string;
@@ -583,6 +592,59 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Personal (personal_for set) or shared; written only through the household
+      // functions below. Migration 030.
+      households: {
+        Row: {
+          id: string;
+          name: string | null;
+          personal_for: string | null;
+          default_servings: number | null;
+          invite_token: string | null;
+          invite_expires_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name?: string | null;
+          personal_for?: string | null;
+          default_servings?: number | null;
+          invite_token?: string | null;
+          invite_expires_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string | null;
+          personal_for?: string | null;
+          default_servings?: number | null;
+          invite_token?: string | null;
+          invite_expires_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      household_members: {
+        Row: {
+          household_id: string;
+          user_id: string;
+          role: HouseholdRole;
+          joined_at: string;
+        };
+        Insert: {
+          household_id: string;
+          user_id: string;
+          role?: HouseholdRole;
+          joined_at?: string;
+        };
+        Update: {
+          household_id?: string;
+          user_id?: string;
+          role?: HouseholdRole;
+          joined_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -603,6 +665,56 @@ export type Database = {
       };
       discover_recipes: {
         Args: { p_search?: string | null; p_limit?: number };
+        Returns: Json;
+      };
+      // Households, migration 030. Errors are raised with the reason as message,
+      // e.g. "household_limit_reached" (see src/lib/households.ts).
+      get_my_households: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      create_household: {
+        Args: { p_name: string };
+        Returns: string;
+      };
+      preview_household_invite: {
+        Args: { p_token: string };
+        Returns: Json;
+      };
+      join_household: {
+        Args: { p_token: string };
+        Returns: string;
+      };
+      get_household_invite: {
+        Args: { p_household_id: string; p_reset?: boolean };
+        Returns: Json;
+      };
+      leave_household: {
+        Args: { p_household_id: string };
+        Returns: undefined;
+      };
+      remove_household_member: {
+        Args: { p_household_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      rename_household: {
+        Args: { p_household_id: string; p_name: string };
+        Returns: undefined;
+      };
+      set_household_servings: {
+        Args: { p_household_id: string; p_servings: number | null };
+        Returns: undefined;
+      };
+      delete_household: {
+        Args: { p_household_id: string };
+        Returns: undefined;
+      };
+      set_active_household: {
+        Args: { p_household_id: string | null };
+        Returns: undefined;
+      };
+      household_recipes: {
+        Args: { p_household_id: string };
         Returns: Json;
       };
     };
@@ -633,6 +745,7 @@ export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'extra';
 export type FoodColor = 'red' | 'yellow' | 'green' | 'purple' | 'brown';
 export type FeedbackCategory = 'bug' | 'idea' | 'other';
 export type FeedbackRewardSize = 'small' | 'medium' | 'large';
+export type HouseholdRole = 'owner' | 'member';
 
 export type NutritionValues = {
   calories: number;

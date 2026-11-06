@@ -1,12 +1,13 @@
 "use client";
 
-import { BookOpen, Compass, ShoppingCart } from "lucide-react";
+import { BookOpen, Compass, ShoppingCart, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type DesktopPanelTab = "mine" | "discover" | "shopping";
+export type DesktopPanelTab = "mine" | "household" | "discover" | "shopping";
 
 const ITEMS: { value: DesktopPanelTab; label: string; Icon: typeof BookOpen }[] = [
   { value: "mine", label: "Rezepte", Icon: BookOpen },
+  { value: "household", label: "Haushalt", Icon: Users },
   { value: "discover", label: "Entdecken", Icon: Compass },
   { value: "shopping", label: "Einkauf", Icon: ShoppingCart },
 ];
@@ -18,9 +19,12 @@ const ITEMS: { value: DesktopPanelTab; label: string; Icon: typeof BookOpen }[] 
 export function DesktopNavRail({
   value,
   onChange,
+  showHousehold = false,
 }: {
   value: DesktopPanelTab;
   onChange: (tab: DesktopPanelTab) => void;
+  // Only while a shared household is active.
+  showHousehold?: boolean;
 }) {
   return (
     <nav
@@ -30,7 +34,7 @@ export function DesktopNavRail({
       <div aria-hidden="true" className="mb-2 flex h-[61px] w-full items-center justify-center border-b border-brand-card-border text-[26px]">
         🥗
       </div>
-      {ITEMS.map(({ value: tab, label, Icon }) => {
+      {ITEMS.filter((item) => showHousehold || item.value !== "household").map(({ value: tab, label, Icon }) => {
         const active = tab === value;
 
         return (

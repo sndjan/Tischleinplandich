@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { AddMealButton } from "./add-meal-button";
-import { DaySummary, sumMealNutrition } from "./day-summary";
+import { DaySummary, sumMealNutrition, usePerPersonNutrition } from "./day-summary";
 import { MealSlotCard } from "./meal-slot-card";
 import type { MealType, PlannedMeal, Recipe } from "@/types/database";
 import type { NutritionTargetSettings } from "./nutrition-target-settings";
@@ -54,7 +54,8 @@ export function DayCard({
 }: DayCardProps) {
   const [dragOverSlot, setDragOverSlot] = useState<MealType | null>(null);
 
-  const totals = sumMealNutrition(plannedMealsForDay, recipesById);
+  const perPerson = usePerPersonNutrition();
+  const totals = sumMealNutrition(plannedMealsForDay, recipesById, perPerson);
 
   const extraMeals = plannedMealsForDay.filter((meal) => meal.meal_type === "extra");
 
