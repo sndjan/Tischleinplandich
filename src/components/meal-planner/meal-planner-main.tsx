@@ -326,7 +326,7 @@ function MealPlanner() {
     },
     household: {
       title: "Haushalt",
-      subtitle: household ? `Rezepte der anderen in „${householdLabel(household)}“` : "Rezepte der anderen",
+      subtitle: household ? `Alle Rezepte in „${householdLabel(household)}“` : "Alle Rezepte im Haushalt",
     },
     discover: { title: "Entdecken", subtitle: "Rezepte, die andere geteilt haben" },
     shopping: {
@@ -358,8 +358,16 @@ function MealPlanner() {
                 {mobileTab === "plan" ? (
                   <>
                     <span aria-hidden="true" className="text-[26px] lg:hidden">🥗</span>
-                    <span className="sm:hidden">Tischlein</span>
-                    <span className="hidden sm:inline">Tischleinplandich</span>
+                    {isSharedHousehold ? (
+                      // Next to the household's name there is no room for the app's
+                      // name on phones and tablets; screen readers still get it.
+                      <span className="sr-only lg:not-sr-only">Tischleinplandich</span>
+                    ) : (
+                      <>
+                        <span className="sm:hidden">Tischlein</span>
+                        <span className="hidden sm:inline">Tischleinplandich</span>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -380,7 +388,7 @@ function MealPlanner() {
                   <span className="truncate">{householdLabel(household)}</span>
                 </button>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <div className={cn(mobileTab !== "plan" && "hidden lg:block")}>
                   <ViewModeToggle value={viewMode} onChange={setViewMode} />
                 </div>

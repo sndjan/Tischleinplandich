@@ -150,3 +150,25 @@ const INVITE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 export const isInviteToken = (value: string) => INVITE_TOKEN_PATTERN.test(value);
 
 export const inviteUrl = (origin: string, token: string) => `${origin}/einladen/${token}`;
+
+// "Alle", the user's own recipes, or one other member's.
+export type RecipeAuthorFilter = "all" | "me" | { userId: string };
+
+/**
+ * The "Haushalt" tab's list: the user's own recipes and the other members',
+ * newest first, narrowed to one person if asked.
+ */
+export function combineHouseholdRecipes<T extends { id: string; user_id: string; created_at: string }>(
+  own: T[],
+  others: T[],
+  userId: string | null,
+  filter: RecipeAuthorFilter,
+): T[] {
+  const ownIds = new Set(own.map((recipe) => recipe.id));
+  const all = [...own, ...others.filter((recipe) => !ownIds.has(recipe.id))];
+  const shown =
+    filter === "all"
+      ? all
+      : all.filter((recipe) => (filter === "me" ? recipe.user_id === userId : recipe.user_id === filter.userId));
+  return shown.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}

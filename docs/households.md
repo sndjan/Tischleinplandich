@@ -37,7 +37,9 @@ implementation; the code follows them.
   the household or deletes their account), its planned meals turn into meals
   without a recipe that keep the name and calories per portion. This applies to
   the personal household too, so deleting a recipe no longer empties past weeks.
-- The "Haushalt" tab is hidden while the personal household is active.
+- The "Haushalt" tab shows the user's own recipes together with the other
+  members', so search and filters work across all of them, with chips to show
+  only one person's. It is hidden while the personal household is active.
 
 ## Plan
 
