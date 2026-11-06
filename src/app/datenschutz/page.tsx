@@ -79,11 +79,12 @@ export default function DatenschutzPage() {
         jederzeit wieder abschalten.
       </p>
       <p>
-        In einem gemeinsamen Haushalt sehen alle Mitglieder deinen Anzeigenamen, deine Rezepte samt Fotos und die
-        Wochenpläne des Haushalts, und sie können deine Rezepte einplanen. Deine E-Mail-Adresse, deine Bewertungen,
+        In einem gemeinsamen Haushalt sehen alle Mitglieder deinen Anzeigenamen, deine Rezepte samt Fotos, die
+        Wochenpläne, die Einkaufsliste (was abgehakt, entfernt oder von Hand ergänzt ist) und die Grundzutaten des
+        Haushalts, und sie können deine Rezepte einplanen. Deine E-Mail-Adresse, deine Bewertungen,
         deine Tagesziele und den gelesenen Quelltext von Importen sehen sie nicht. Wer einen Einladungslink hat, sieht
-        vor dem Beitreten den Namen des Haushalts und die Anzeigenamen der Mitglieder. Änderungen am Plan schicken wir
-        den anderen Mitgliedern über Supabase sofort in ihre geöffnete App. Verlässt du den Haushalt, sehen die
+        vor dem Beitreten den Namen des Haushalts und die Anzeigenamen der Mitglieder. Änderungen an Plan, Einkaufsliste
+        und Grundzutaten schicken wir den anderen Mitgliedern über Supabase sofort in ihre geöffnete App. Verlässt du den Haushalt, sehen die
         anderen deine Rezepte nicht mehr; in ihren Plänen bleiben nur Name und Kalorien der eingeplanten Rezepte
         stehen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.
       </p>
@@ -138,7 +139,8 @@ export default function DatenschutzPage() {
       <h2>10. Cookies und Speicher im Browser</h2>
       <p>
         Wir setzen nur technisch notwendige Cookies für die Anmeldung und speichern zur schnelleren Anzeige deine
-        App-Daten im Speicher deines Browsers (§ 25 Abs. 2 TDDDG). Es gibt keine Analyse-, Tracking- oder
+        App-Daten im Speicher deines Browsers (§ 25 Abs. 2 TDDDG). Änderungen an der Einkaufsliste, die du ohne
+        Internetverbindung machst, liegen dort, bis sie an Supabase geschickt sind. Es gibt keine Analyse-, Tracking- oder
         Werbe-Cookies.
       </p>
 

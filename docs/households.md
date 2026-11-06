@@ -60,6 +60,24 @@ Nothing is pushed or mailed. Someone whose household was deleted, or who was
 removed, lands back in their personal household and sees a short note the next
 time they open the app.
 
+## Shopping list (PR 2)
+
+- Stored per household: marks per week (`shopping_marks`: checked, removed,
+  excluded recipe), items (`shopping_items`: own items without a week, recipe
+  extras per week) and the settings on `households`. Rows are only inserted
+  and deleted, so concurrent changes resolve as last write wins per item.
+- Realtime delete events reach every subscriber with only the primary key, so
+  the tables use surrogate ids: item names never leave the household that way.
+- Changes go through an outbox in the browser (`use-shopping-store.ts`): shown
+  at once, sent in order, retried when back online. Errors the database answers
+  with (e.g. a limit) drop that change with a note.
+- A shared list never forgets checks of rows it doesn't show: another member's
+  view may still be loading them.
+- Each browser imports its old localStorage list once into the personal
+  household (recent four weeks).
+- Pantry staples belong to a household; a new shared household copies the
+  creator's staples and list settings.
+
 ## Rollout
 
 1. **PR 1:** households, membership, invites, active household, shared plan with

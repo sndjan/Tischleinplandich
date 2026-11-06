@@ -53,6 +53,15 @@ describe("parseHouseholds", () => {
     expect(parseHouseholds(null)).toEqual({ ready: true, households: [], activeHouseholdId: null });
   });
 
+  it("reads the shared list settings, with defaults before migration 031", () => {
+    const data = parseHouseholds({
+      households: [{ ...raw.households[1], shopping_hide_basics: false, shopping_section_order: ["dairy", 3] }],
+    });
+    expect(data.households[0].shoppingHideBasics).toBe(false);
+    expect(data.households[0].shoppingSectionOrder).toEqual(["dairy"]);
+    expect(parseHouseholds(raw).households[0].shoppingHideBasics).toBe(true);
+  });
+
   it("keeps a stored number of people", () => {
     const data = parseHouseholds({ households: [{ ...raw.households[1], default_servings: "3" }] });
     expect(data.households[0].defaultServings).toBe(3);

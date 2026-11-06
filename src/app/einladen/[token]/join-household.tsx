@@ -113,7 +113,7 @@ export function JoinHousehold({ token, preview }: { token: string; preview: Invi
         ) : (
           <>
             <p className="text-[15px] leading-relaxed text-brand-secondary">
-              Ihr plant dieselbe Woche und könnt eure Rezepte gegenseitig einplanen. Die anderen sehen deinen Namen und
+              Ihr plant dieselbe Woche, teilt die Einkaufsliste und könnt eure Rezepte gegenseitig einplanen. Die anderen sehen deinen Namen und
               deine Rezepte, aber nicht deine Bewertungen.
             </p>
             {preview.needs_display_name && (

@@ -8,7 +8,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { scaleIngredients } from "@/lib/recipe-scaling";
 import { ingredientLines } from "@/lib/ingredient-lines";
 import { cn } from "@/lib/utils";
-import { useShoppingWeek } from "@/hooks/use-shopping-week";
+import { extraOp, useShoppingStore } from "@/hooks/use-shopping-store";
 import { useSelectedWeek } from "@/hooks/use-selected-week";
 import { WeekSwitcher } from "./meal-week-view";
 
@@ -25,7 +25,7 @@ export function AddToListSheet({
   servings: number;
   onClose: () => void;
 }) {
-  const { addExtra } = useShoppingWeek();
+  const { apply } = useShoppingStore();
   const { isCurrentWeek, label: weekLabel } = useSelectedWeek();
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const factor = servings / baseServings;
@@ -48,11 +48,13 @@ export function AddToListSheet({
 
   const add = () => {
     if (navigator.vibrate) navigator.vibrate(10);
-    addExtra({
-      recipeName: recipe.name,
-      lines: lines.filter((_, index) => selected.has(index)),
-      multiplier: factor,
-    });
+    apply(
+      extraOp({
+        recipeName: recipe.name,
+        lines: lines.filter((_, index) => selected.has(index)),
+        multiplier: factor,
+      }),
+    );
     toast.success(`Auf der Einkaufsliste${isCurrentWeek ? "" : ` (${weekLabel})`}`);
     onClose();
   };
