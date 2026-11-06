@@ -154,21 +154,36 @@ export const inviteUrl = (origin: string, token: string) => `${origin}/einladen/
 // "Alle", the user's own recipes, or one other member's.
 export type RecipeAuthorFilter = "all" | "me" | { userId: string };
 
+// Same name and ingredients, ignoring case and spacing: a copy someone saved
+// ("Kopie speichern", "Entdecken") of another member's recipe.
+const recipeContentKey = (recipe: { name: string; ingredients: string }) =>
+  `${recipe.name.trim().toLowerCase()}\n${recipe.ingredients.replace(/\s+/g, " ").trim().toLowerCase()}`;
+
 /**
  * The "Haushalt" tab's list: the user's own recipes and the other members',
- * newest first, narrowed to one person if asked.
+ * newest first, narrowed to one person if asked. Showing everyone, copies of
+ * the same recipe appear once: the user's own if they have one (it can be
+ * edited and rated), else the oldest, i.e. the original.
  */
-export function combineHouseholdRecipes<T extends { id: string; user_id: string; created_at: string }>(
-  own: T[],
-  others: T[],
-  userId: string | null,
-  filter: RecipeAuthorFilter,
-): T[] {
+export function combineHouseholdRecipes<
+  T extends { id: string; user_id: string; created_at: string; name: string; ingredients: string },
+>(own: T[], others: T[], userId: string | null, filter: RecipeAuthorFilter): T[] {
   const ownIds = new Set(own.map((recipe) => recipe.id));
-  const all = [...own, ...others.filter((recipe) => !ownIds.has(recipe.id))];
-  const shown =
-    filter === "all"
-      ? all
-      : all.filter((recipe) => (filter === "me" ? recipe.user_id === userId : recipe.user_id === filter.userId));
+  const oldestFirst = (a: T, b: T) => a.created_at.localeCompare(b.created_at);
+  const all = [...own, ...others.filter((recipe) => !ownIds.has(recipe.id)).sort(oldestFirst)];
+
+  let shown: T[];
+  if (filter === "all") {
+    const seen = new Set<string>();
+    shown = all.filter((recipe) => {
+      const key = recipeContentKey(recipe);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  } else {
+    shown = all.filter((recipe) => (filter === "me" ? recipe.user_id === userId : recipe.user_id === filter.userId));
+  }
+
   return shown.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }

@@ -127,26 +127,70 @@ describe("isInviteToken", () => {
 });
 
 describe("combineHouseholdRecipes", () => {
-  const own = [
-    { id: "a", user_id: "me", created_at: "2026-01-03" },
-    { id: "b", user_id: "me", created_at: "2026-01-01" },
-  ];
+  const recipe = (id: string, userId: string, createdAt: string, name = `Rezept ${id}`, ingredients = id) => ({
+    id,
+    user_id: userId,
+    created_at: createdAt,
+    name,
+    ingredients,
+  });
+  const own = [recipe("a", "me", "2026-01-03"), recipe("b", "me", "2026-01-01")];
   const others = [
-    { id: "c", user_id: "anna", created_at: "2026-01-02" },
-    { id: "d", user_id: "ben", created_at: "2026-01-04" },
+    recipe("c", "anna", "2026-01-02"),
+    recipe("d", "ben", "2026-01-04"),
     // Already in the own list (e.g. a stale member list); shown once.
-    { id: "a", user_id: "me", created_at: "2026-01-03" },
+    recipe("a", "me", "2026-01-03"),
   ];
 
   it("shows everyone's recipes newest first", () => {
-    expect(combineHouseholdRecipes(own, others, "me", "all").map((recipe) => recipe.id)).toEqual(["d", "a", "c", "b"]);
+    expect(combineHouseholdRecipes(own, others, "me", "all").map((entry) => entry.id)).toEqual(["d", "a", "c", "b"]);
   });
 
   it("narrows to the user's own recipes", () => {
-    expect(combineHouseholdRecipes(own, others, "me", "me").map((recipe) => recipe.id)).toEqual(["a", "b"]);
+    expect(combineHouseholdRecipes(own, others, "me", "me").map((entry) => entry.id)).toEqual(["a", "b"]);
   });
 
   it("narrows to one other member", () => {
-    expect(combineHouseholdRecipes(own, others, "me", { userId: "anna" }).map((recipe) => recipe.id)).toEqual(["c"]);
+    expect(combineHouseholdRecipes(own, others, "me", { userId: "anna" }).map((entry) => entry.id)).toEqual(["c"]);
+  });
+
+  describe("copies of the same recipe", () => {
+    const dal = (id: string, userId: string, createdAt: string, ingredients = "200 g Linsen\n1 Zwiebel") =>
+      recipe(id, userId, createdAt, "Dal", ingredients);
+
+    it("shows the user's own copy once under Alle", () => {
+      const result = combineHouseholdRecipes(
+        [dal("mine", "me", "2026-02-01")],
+        [dal("anna-original", "anna", "2026-01-01"), dal("ben-copy", "ben", "2026-03-01")],
+        "me",
+        "all",
+      );
+      expect(result.map((entry) => entry.id)).toEqual(["mine"]);
+    });
+
+    it("otherwise keeps the oldest, ignoring case and spacing", () => {
+      const result = combineHouseholdRecipes(
+        [],
+        [dal("ben-copy", "ben", "2026-03-01", "200 g linsen  1 Zwiebel"), dal("anna-original", "anna", "2026-01-01")],
+        "me",
+        "all",
+      );
+      expect(result.map((entry) => entry.id)).toEqual(["anna-original"]);
+    });
+
+    it("keeps recipes that only share a name", () => {
+      const result = combineHouseholdRecipes(
+        [dal("mine", "me", "2026-02-01")],
+        [dal("anna", "anna", "2026-01-01", "Rote Linsen, Kokosmilch")],
+        "me",
+        "all",
+      );
+      expect(result).toHaveLength(2);
+    });
+
+    it("still shows each person's own copy when filtering by person", () => {
+      const others = [dal("anna-original", "anna", "2026-01-01")];
+      expect(combineHouseholdRecipes([dal("mine", "me", "2026-02-01")], others, "me", { userId: "anna" })).toHaveLength(1);
+    });
   });
 });
