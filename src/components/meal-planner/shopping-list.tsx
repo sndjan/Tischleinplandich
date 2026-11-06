@@ -18,10 +18,15 @@ import { cn } from "@/lib/utils";
 import { showUndoToast } from "@/lib/undo-toast";
 import { useEntrance } from "@/hooks/use-entrance";
 import { useSelectedWeek } from "@/hooks/use-selected-week";
+import { customItemOp, markOp, useLocalShoppingStore, type ShoppingStore } from "@/hooks/use-shopping-store";
+import type { ShoppingOp } from "@/lib/shopping-state";
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
   pantryStaples: string[];
+  // Where checks, own items and settings live (see useShoppingStore). Without
+  // one the list keeps them in this browser, or only in memory with `persist` off.
+  store?: ShoppingStore;
   // Off for the landing page demo, so it never touches a real list on this device.
   persist?: boolean;
   // Keep the header card on large screens too, e.g. in the demo's phone frame.
@@ -35,8 +40,6 @@ interface ShoppingListProps {
   onRemoveExtra?: (id: string) => void;
 }
 
-type CustomItem = { id: string; label: string; amount?: string };
-
 type Row = {
   key: string;
   label: string;
@@ -46,29 +49,6 @@ type Row = {
   basic: boolean;
   customId?: string;
 };
-
-const CHECKED_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:checked-items";
-const HIDE_BASICS_STORAGE_KEY = "weekly-meal-planner:shopping-list:hide-basics";
-const CUSTOM_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:custom-items";
-const SECTION_ORDER_STORAGE_KEY = "weekly-meal-planner:shopping-list:section-order";
-const REMOVED_ITEMS_STORAGE_KEY = "weekly-meal-planner:shopping-list:removed-items";
-
-function readStorage<T>(key: string, fallback: T): T {
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored === null ? fallback : (JSON.parse(stored) as T);
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStorage(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage unavailable; the list still works for this session.
-  }
-}
 
 const getItemKey = (item: ShoppingListItem) =>
   `${item.ingredient.trim().toLowerCase()}|${item.unit.trim().toLowerCase()}`;
@@ -89,6 +69,7 @@ function buildShareText(sections: { label: string; emoji: string; rows: Row[] }[
 export function ShoppingList({
   items,
   pantryStaples,
+  store: providedStore,
   persist = true,
   alwaysCard = false,
   recipes = [],
@@ -96,21 +77,17 @@ export function ShoppingList({
   extras = [],
   onRemoveExtra,
 }: ShoppingListProps) {
-  const { weekKey, monday, label: weekLabel, isCurrentWeek } = useSelectedWeek();
+  const { monday, label: weekLabel, isCurrentWeek } = useSelectedWeek();
   const weekRange = formatWeekRange(monday);
-  // Checks belong to one week's list, so switching weeks doesn't clear them. The
-  // planner remounts the list for each week, so the key is fixed while mounted.
-  const checkedStorageKey = `${CHECKED_ITEMS_STORAGE_KEY}:${weekKey}`;
+  const localStore = useLocalShoppingStore(!providedStore && persist);
+  const store = providedStore ?? localStore;
+  const { state, apply } = store;
+  const checkedKeys = useMemo(() => new Set(state.checked), [state.checked]);
   // Items from planned recipes the user already has at home. Kept per week by
   // ingredient and unit, so they stay off the list when the plan changes.
-  const removedStorageKey = `${REMOVED_ITEMS_STORAGE_KEY}:${weekKey}`;
-  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(new Set());
-  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
+  const removedKeys = useMemo(() => new Set(state.removed), [state.removed]);
+  const { customItems, hideBasics, sectionOrder } = state;
   const [showRemoved, setShowRemoved] = useState(false);
-  const [customItems, setCustomItems] = useState<CustomItem[]>([]);
-  const [hideBasics, setHideBasics] = useState(true);
-  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
-  const [hydrated, setHydrated] = useState(false);
   const [adding, setAdding] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [newItem, setNewItem] = useState("");
@@ -118,39 +95,9 @@ export function ShoppingList({
   const addFormRef = useRef<HTMLFormElement>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!persist) return;
-    // Checks from before lists were kept per week belong to this week.
-    const storedChecked = readStorage<unknown>(
-      checkedStorageKey,
-      isCurrentWeek ? readStorage<unknown>(CHECKED_ITEMS_STORAGE_KEY, []) : [],
-    );
-    setCheckedKeys(
-      new Set(Array.isArray(storedChecked) ? storedChecked.filter((key) => typeof key === "string") : []),
-    );
-    const storedRemoved = readStorage<unknown>(removedStorageKey, []);
-    setRemovedKeys(
-      new Set(Array.isArray(storedRemoved) ? storedRemoved.filter((key) => typeof key === "string") : []),
-    );
-    const storedCustom = readStorage<unknown>(CUSTOM_ITEMS_STORAGE_KEY, []);
-    setCustomItems(Array.isArray(storedCustom) ? (storedCustom as CustomItem[]) : []);
-    setHideBasics(readStorage<unknown>(HIDE_BASICS_STORAGE_KEY, true) !== false);
-    const storedOrder = readStorage<unknown>(SECTION_ORDER_STORAGE_KEY, []);
-    setSectionOrder(Array.isArray(storedOrder) ? storedOrder.filter((id) => typeof id === "string") : []);
-    setHydrated(true);
-  }, [persist, checkedStorageKey, removedStorageKey, isCurrentWeek]);
-
-  useEffect(() => {
-    if (persist && hydrated) writeStorage(checkedStorageKey, Array.from(checkedKeys));
-  }, [checkedKeys, hydrated, persist, checkedStorageKey]);
-
-  useEffect(() => {
-    if (persist && hydrated) writeStorage(removedStorageKey, Array.from(removedKeys));
-  }, [removedKeys, hydrated, persist, removedStorageKey]);
-
-  useEffect(() => {
-    if (persist && hydrated) writeStorage(CUSTOM_ITEMS_STORAGE_KEY, customItems);
-  }, [customItems, hydrated, persist]);
+  const send = (op: ShoppingOp | null) => {
+    if (op) apply(op);
+  };
 
   useEffect(() => {
     if (adding) addInputRef.current?.focus();
@@ -181,14 +128,11 @@ export function ShoppingList({
 
   // Forget checks for items that left the list (e.g. a meal was removed). An
   // empty list is most likely a week still loading, so its checks are kept.
+  const { forgetChecks } = store;
   useEffect(() => {
-    if ((persist && !hydrated) || items.length === 0) return;
-    const validKeys = new Set(rows.map((row) => row.key));
-    setCheckedKeys((prev) => {
-      const next = new Set([...prev].filter((key) => validKeys.has(key)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [rows, items.length, hydrated, persist]);
+    if (!forgetChecks || items.length === 0) return;
+    forgetChecks(new Set(rows.map((row) => row.key)));
+  }, [rows, items.length, forgetChecks]);
 
   const removedRows = rows.filter((row) => removedKeys.has(row.key));
   const listedRows = rows.filter((row) => !removedKeys.has(row.key));
@@ -210,20 +154,10 @@ export function ShoppingList({
 
   const toggle = (key: string) => {
     if (navigator.vibrate) navigator.vibrate(8);
-    setCheckedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    send(markOp("checked", key, !checkedKeys.has(key)));
   };
 
-  const toggleHideBasics = () => {
-    setHideBasics((prev) => {
-      if (persist) writeStorage(HIDE_BASICS_STORAGE_KEY, !prev);
-      return !prev;
-    });
-  };
+  const toggleHideBasics = () => send({ type: "settings", hideBasics: !hideBasics });
 
   const addCustomItem = (event: React.FormEvent) => {
     event.preventDefault();
@@ -232,8 +166,7 @@ export function ShoppingList({
       setAdding(false);
       return;
     }
-    const amount = newAmount.trim();
-    setCustomItems((prev) => [...prev, { id: crypto.randomUUID(), label, ...(amount && { amount }) }]);
+    send(customItemOp(label, newAmount));
     setNewItem("");
     setNewAmount("");
     addInputRef.current?.focus();
@@ -250,26 +183,16 @@ export function ShoppingList({
     const target = index + delta;
     if (target < 0 || target >= ids.length) return;
     [ids[index], ids[target]] = [ids[target], ids[index]];
-    setSectionOrder(ids);
-    if (persist) writeStorage(SECTION_ORDER_STORAGE_KEY, ids);
+    send({ type: "settings", sectionOrder: ids });
   };
 
-  const resetSectionOrder = () => {
-    setSectionOrder([]);
-    if (persist) writeStorage(SECTION_ORDER_STORAGE_KEY, []);
+  const resetSectionOrder = () => send({ type: "settings", sectionOrder: [] });
+
+  const removeCustomItem = (id: string) => send({ type: "remove-item", id });
+
+  const setRemoved = (key: string, removed: boolean) => {
+    if (removedKeys.has(key) !== removed) send(markOp("removed", key, removed));
   };
-
-  const removeCustomItem = (id: string) =>
-    setCustomItems((prev) => prev.filter((item) => item.id !== id));
-
-  const setRemoved = (key: string, removed: boolean) =>
-    setRemovedKeys((prev) => {
-      if (prev.has(key) === removed) return prev;
-      const next = new Set(prev);
-      if (removed) next.add(key);
-      else next.delete(key);
-      return next;
-    });
 
   // Removing applies right away; the toast only offers to bring the item back,
   // since the row's own button sits close to the checkbox.

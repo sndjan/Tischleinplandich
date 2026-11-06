@@ -424,19 +424,24 @@ export type Database = {
       pantry_staples: {
         Row: {
           id: string;
-          user_id: string;
+          // Who added it; null once their account is gone. Migration 031.
+          user_id: string | null;
+          // Staples belong to a household. Migration 031.
+          household_id?: string;
           name: string;
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
+          household_id?: string;
           name: string;
           created_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          user_id?: string | null;
+          household_id?: string;
           name?: string;
           created_at?: string;
         };
@@ -602,6 +607,9 @@ export type Database = {
           default_servings: number | null;
           invite_token: string | null;
           invite_expires_at: string | null;
+          // Shared list settings. Migration 031.
+          shopping_hide_basics?: boolean;
+          shopping_section_order?: string[];
           created_at: string;
         };
         Insert: {
@@ -611,6 +619,8 @@ export type Database = {
           default_servings?: number | null;
           invite_token?: string | null;
           invite_expires_at?: string | null;
+          shopping_hide_basics?: boolean;
+          shopping_section_order?: string[];
           created_at?: string;
         };
         Update: {
@@ -620,6 +630,75 @@ export type Database = {
           default_servings?: number | null;
           invite_token?: string | null;
           invite_expires_at?: string | null;
+          shopping_hide_basics?: boolean;
+          shopping_section_order?: string[];
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // Checked, removed and left-off entries of a household's weekly shopping
+      // list. Rows are only added and removed. Migration 031.
+      shopping_marks: {
+        Row: {
+          id: string;
+          household_id: string;
+          week_start_date: string;
+          kind: ShoppingMarkKind;
+          item_key: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          week_start_date: string;
+          kind: ShoppingMarkKind;
+          item_key: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          week_start_date?: string;
+          kind?: ShoppingMarkKind;
+          item_key?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // Own items (no week) and a recipe's ingredients put on one week's list
+      // (extras). Migration 031.
+      shopping_items: {
+        Row: {
+          id: string;
+          household_id: string;
+          week_start_date: string | null;
+          kind: "custom" | "extra";
+          label: string;
+          amount: string | null;
+          lines: Json | null;
+          multiplier: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          household_id: string;
+          week_start_date?: string | null;
+          kind: "custom" | "extra";
+          label: string;
+          amount?: string | null;
+          lines?: Json | null;
+          multiplier?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          household_id?: string;
+          week_start_date?: string | null;
+          kind?: "custom" | "extra";
+          label?: string;
+          amount?: string | null;
+          lines?: Json | null;
+          multiplier?: number | null;
           created_at?: string;
         };
         Relationships: [];
@@ -717,6 +796,11 @@ export type Database = {
         Args: { p_household_id: string };
         Returns: Json;
       };
+      // Migration 031; null leaves a setting unchanged.
+      set_shopping_settings: {
+        Args: { p_household_id: string; p_hide_basics?: boolean | null; p_section_order?: string[] | null };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;
@@ -746,6 +830,7 @@ export type FoodColor = 'red' | 'yellow' | 'green' | 'purple' | 'brown';
 export type FeedbackCategory = 'bug' | 'idea' | 'other';
 export type FeedbackRewardSize = 'small' | 'medium' | 'large';
 export type HouseholdRole = 'owner' | 'member';
+export type ShoppingMarkKind = 'checked' | 'removed' | 'excluded_recipe';
 
 export type NutritionValues = {
   calories: number;

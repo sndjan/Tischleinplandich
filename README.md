@@ -59,7 +59,7 @@ Migration `030_households.sql` (im SQL Editor ausführen) bringt Haushalte. Jede
 
 Ohne die Migration läuft die App wie bisher allein weiter; Profil → „Haushalt“ fehlt dann. Die Migration fügt `planned_meals` und `meal_plans` der Publikation `supabase_realtime` hinzu; falls Realtime im Projekt aus ist, aktualisiert sich der Plan beim Zurückkehren in die App.
 
-Einkaufsliste und Grundzutaten sind noch pro Gerät bzw. pro Person; sie ziehen in einem zweiten Schritt in den Haushalt um.
+Migration `031_household_shopping.sql` (danach ausführen) legt Einkaufsliste und Grundzutaten in den Haushalt: Haken, entfernte Artikel, weggelassene Rezepte, eigene Artikel, Zutaten „ohne Einplanen“, „Grundzutaten ausblenden“ und die Reihenfolge der Bereiche teilen alle Mitglieder live. Ohne Netz merkt sich die App Änderungen im Browser und schickt sie der Reihe nach, sobald sie wieder online ist. Beim ersten Start mit der Migration übernimmt jeder Browser einmal seine bisherige Liste (die letzten vier Wochen) in den persönlichen Haushalt. Ein neuer gemeinsamer Haushalt bekommt eine Kopie der Grundzutaten und Listeneinstellungen der Person, die ihn anlegt. Ohne Migration 031 bleibt die Liste wie bisher im Browser.
 
 ## Feedback lesen
 

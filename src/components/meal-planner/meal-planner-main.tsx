@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/context";
 import { useMealPlanData, useProfileQuery, useRecipesQuery } from "@/hooks/use-planner-data";
 import { SelectedWeekProvider, useSelectedWeek } from "@/hooks/use-selected-week";
-import { useShoppingWeek } from "@/hooks/use-shopping-week";
+import { markOp, useShoppingRealtime, useShoppingStore } from "@/hooks/use-shopping-store";
 import { useWeekRealtime } from "@/hooks/use-week-realtime";
 import { useHouseholdGoneNotice } from "@/hooks/use-households";
 import { getDefaultServings, householdLabel } from "@/lib/households";
@@ -109,15 +109,23 @@ function MealPlanner() {
   useHouseholdGoneNotice();
   const panelTab = desktopRightPanelTab === "household" && !isSharedHousehold ? "mine" : desktopRightPanelTab;
 
-  const shoppingWeek = useShoppingWeek();
+  // Checks, own items and settings of the list, shared live in the household.
+  const shoppingStore = useShoppingStore();
+  useShoppingRealtime();
+  const { excludedRecipeIds, extras: shoppingExtras } = shoppingStore.state;
+  const toggleShoppingRecipe = (recipeId: string) => {
+    const op = markOp("excluded_recipe", recipeId, !excludedRecipeIds.includes(recipeId));
+    if (op) shoppingStore.apply(op);
+  };
+  const removeShoppingExtra = (id: string) => shoppingStore.apply({ type: "remove-item", id });
 
   const shoppingListItems = useMemo(
     () =>
       generateShoppingListFromPlannedMeals(mealPlanData.plannedMeals, mealPlanData.recipes, {
-        excludedRecipeIds: shoppingWeek.excludedRecipeIds,
-        extras: shoppingWeek.extras,
+        excludedRecipeIds,
+        extras: shoppingExtras,
       }),
-    [mealPlanData.plannedMeals, mealPlanData.recipes, shoppingWeek.excludedRecipeIds, shoppingWeek.extras],
+    [mealPlanData.plannedMeals, mealPlanData.recipes, excludedRecipeIds, shoppingExtras],
   );
 
   // Each planned recipe once, in plan order, for leaving it off the list.
@@ -127,10 +135,10 @@ function MealPlanner() {
     return ids.flatMap((id) => {
       const recipe = recipesById.get(id);
       return recipe
-        ? [{ id, name: recipe.name, excluded: shoppingWeek.excludedRecipeIds.includes(id) }]
+        ? [{ id, name: recipe.name, excluded: excludedRecipeIds.includes(id) }]
         : [];
     });
-  }, [mealPlanData.plannedMeals, mealPlanData.recipes, shoppingWeek.excludedRecipeIds]);
+  }, [mealPlanData.plannedMeals, mealPlanData.recipes, excludedRecipeIds]);
 
   const ingredientSuggestions = useMemo(
     () => collectIngredientNames(mealPlanData.recipes),
@@ -450,10 +458,11 @@ function MealPlanner() {
                       key={selectedWeek.weekKey}
                       items={shoppingListItems}
                       pantryStaples={pantryStaples}
+                      store={shoppingStore}
                       recipes={shoppingRecipes}
-                      onToggleRecipe={shoppingWeek.toggleRecipe}
-                      extras={shoppingWeek.extras}
-                      onRemoveExtra={shoppingWeek.removeExtra}
+                      onToggleRecipe={toggleShoppingRecipe}
+                      extras={shoppingExtras}
+                      onRemoveExtra={removeShoppingExtra}
                     />
                   ) : (
                     <RecipeLibrary tab={panelTab} />
@@ -483,10 +492,11 @@ function MealPlanner() {
                     key={selectedWeek.weekKey}
                     items={shoppingListItems}
                     pantryStaples={pantryStaples}
+                    store={shoppingStore}
                     recipes={shoppingRecipes}
-                    onToggleRecipe={shoppingWeek.toggleRecipe}
-                    extras={shoppingWeek.extras}
-                    onRemoveExtra={shoppingWeek.removeExtra}
+                    onToggleRecipe={toggleShoppingRecipe}
+                    extras={shoppingExtras}
+                    onRemoveExtra={removeShoppingExtra}
                   />
                 </>
               )}

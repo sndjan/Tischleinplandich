@@ -30,7 +30,9 @@ export const queryKeys = {
   households: (userId: string) => ["households", userId] as const,
   householdRecipes: (householdId: string) => ["household-recipes", householdId] as const,
   nutritionTargets: (userId: string) => ["nutrition-targets", userId] as const,
-  pantryStaples: (userId: string) => ["pantry-staples", userId] as const,
+  // householdKey: the household's id, or "own" before migration 031.
+  pantryStaples: (userId: string, householdKey: string) => ["pantry-staples", userId, householdKey] as const,
+  shopping: (householdId: string, weekStart: string) => ["shopping", householdId, weekStart] as const,
   profile: (userId: string) => ["profile", userId] as const,
   discover: (search: string) => ["discover", search] as const,
 };

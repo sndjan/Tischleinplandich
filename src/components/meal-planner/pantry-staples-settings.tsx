@@ -7,7 +7,9 @@ import toast from "react-hot-toast";
 import { createClient, getSessionUser } from "@/lib/supabase/client";
 import { normalizePantryStapleName } from "@/lib/shopping-list";
 import { SubPage } from "./sub-page";
-import { queryKeys, useUserId } from "@/hooks/use-planner-data";
+import { queryKeys, useActiveHousehold, useUserId } from "@/hooks/use-planner-data";
+import type { PantryData } from "@/hooks/use-shopping-store";
+import { householdLabel, isMissingHouseholdsError } from "@/lib/households";
 
 const FORM_ID = "pantry-staple-form";
 
@@ -17,38 +19,66 @@ const sortStaples = (staples: string[]) =>
   [...staples].sort((a, b) => a.localeCompare(b, "de"));
 
 /**
- * Loads the user's pantry staples, the basic ingredients the shopping list can hide.
+ * Where staples are kept: the active household's (migration 031), or the
+ * user's own before that. Null while the household is still loading.
+ */
+function usePantryScope() {
+  const userId = useUserId();
+  const { household, data: households } = useActiveHousehold();
+  const householdId = households?.ready ? household?.id ?? null : null;
+  return {
+    userId,
+    householdId,
+    resolved: households !== undefined,
+    queryKey: queryKeys.pantryStaples(userId ?? "", householdId ?? "own"),
+  };
+}
+
+async function fetchPantry(userId: string, householdId: string | null): Promise<PantryData> {
+  const query = createClient().from("pantry_staples").select("id, name");
+  let { data: rows, error } = await (householdId ? query.eq("household_id", householdId) : query.eq("user_id", userId));
+  let byHousehold = Boolean(householdId);
+
+  // Migration 031 missing: staples still belong to the user.
+  if (householdId && (error?.code === "42703" || isMissingHouseholdsError(error))) {
+    byHousehold = false;
+    ({ data: rows, error } = await createClient().from("pantry_staples").select("id, name").eq("user_id", userId));
+  }
+
+  if (error) {
+    toast.error("Grundzutaten konnten nicht geladen werden");
+    throw error;
+  }
+
+  const sorted = [...(rows ?? [])].sort((a, b) => a.name.localeCompare(b.name, "de"));
+  return { names: sorted.map((row) => row.name), ids: sorted.map((row) => row.id), byHousehold };
+}
+
+/**
+ * Loads the pantry staples of the active household, the basic ingredients the
+ * shopping list can hide. Everyone in a shared household shares them.
  */
 export function usePantryStaples() {
-  const userId = useUserId();
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.pantryStaples(userId ?? "");
+  const { userId, householdId, resolved, queryKey } = usePantryScope();
 
   const { data } = useQuery({
     queryKey,
-    enabled: Boolean(userId),
-    queryFn: async () => {
-      const { data: rows, error } = await createClient()
-        .from("pantry_staples")
-        .select("name")
-        .eq("user_id", userId!);
-
-      if (error) {
-        toast.error("Grundzutaten konnten nicht geladen werden");
-        throw error;
-      }
-
-      return sortStaples((rows ?? []).map((row) => row.name));
-    },
+    enabled: Boolean(userId) && resolved,
+    queryFn: () => fetchPantry(userId!, householdId),
   });
 
   const setStaples = useCallback(
-    (staples: string[]) => queryClient.setQueryData(queryKey, staples),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [queryClient, userId],
+    (staples: string[]) =>
+      queryClient.setQueryData<PantryData>(queryKey, (current) => ({
+        names: staples,
+        ids: current?.ids ?? [],
+        byHousehold: current?.byHousehold ?? false,
+      })),
+    [queryClient, queryKey],
   );
 
-  return [data ?? EMPTY_STAPLES, setStaples] as const;
+  return [data?.names ?? EMPTY_STAPLES, setStaples] as const;
 }
 
 interface PantryStaplesScreenProps {
@@ -65,6 +95,12 @@ export function PantryStaplesScreen({
   const [input, setInput] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const supabase = createClient();
+  const queryClient = useQueryClient();
+  const scope = usePantryScope();
+  const { queryKey } = scope;
+  // Written where they were read from, so this works while migration 031 is missing.
+  const householdId = queryClient.getQueryData<PantryData>(queryKey)?.byHousehold ? scope.householdId : null;
+  const { household, isShared } = useActiveHousehold();
 
   const normalizedInput = normalizePantryStapleName(input);
   // The input doubles as a filter so the long default list stays searchable.
@@ -98,11 +134,18 @@ export function PantryStaplesScreen({
 
       const { error } = await supabase
         .from("pantry_staples")
-        .insert({ user_id: user.id, name: normalizedInput });
+        .insert({ user_id: user.id, name: normalizedInput, ...(householdId && { household_id: householdId }) });
 
+      // Someone else in the household added it a moment ago.
+      if (error?.code === "23505") {
+        void queryClient.invalidateQueries({ queryKey });
+        setInput("");
+        return;
+      }
       if (error) throw error;
 
       onChange(sortStaples([...staples, normalizedInput]));
+      void queryClient.invalidateQueries({ queryKey });
       setInput("");
     } catch (err) {
       console.error(err);
@@ -121,11 +164,9 @@ export function PantryStaplesScreen({
         return;
       }
 
-      const { error } = await supabase
-        .from("pantry_staples")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("name", staple);
+      const { error } = await (householdId
+        ? supabase.from("pantry_staples").delete().eq("household_id", householdId).eq("name", staple)
+        : supabase.from("pantry_staples").delete().eq("user_id", user.id).eq("name", staple));
 
       if (error) throw error;
 
@@ -139,7 +180,11 @@ export function PantryStaplesScreen({
   return (
     <SubPage
       title="Grundzutaten"
-      description="Zutaten, die du immer zu Hause hast. Die Einkaufsliste blendet sie aus."
+      description={
+        isShared && household
+          ? `Zutaten, die ihr immer zu Hause habt. Gilt für alle in „${householdLabel(household)}“; die Einkaufsliste blendet sie aus.`
+          : "Zutaten, die du immer zu Hause hast. Die Einkaufsliste blendet sie aus."
+      }
       tone="muted"
       onBack={onBack}
     >

@@ -66,7 +66,7 @@ export function HouseholdsScreen({ onBack }: { onBack: () => void }) {
   return (
     <SubPage
       title="Haushalt"
-      description="Im gemeinsamen Haushalt plant ihr dieselbe Woche und seht Änderungen der anderen sofort."
+      description="Im gemeinsamen Haushalt plant ihr dieselbe Woche, kauft mit derselben Liste ein und seht Änderungen der anderen sofort."
       tone="muted"
       onBack={onBack}
     >

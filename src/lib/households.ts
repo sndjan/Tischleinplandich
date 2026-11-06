@@ -20,6 +20,9 @@ export type Household = {
   // The signed-in user's role.
   role: HouseholdRole;
   defaultServings: number | null;
+  // Shared list settings (migration 031); defaults until it has run.
+  shoppingHideBasics: boolean;
+  shoppingSectionOrder: string[];
   members: HouseholdMember[];
 };
 
@@ -71,6 +74,10 @@ export function parseHouseholds(value: unknown): HouseholdsData {
       isPersonal: entry.is_personal === true,
       role: entry.role === "owner" ? "owner" : "member",
       defaultServings: entry.default_servings != null && Number.isFinite(servings) ? servings : null,
+      shoppingHideBasics: entry.shopping_hide_basics !== false,
+      shoppingSectionOrder: Array.isArray(entry.shopping_section_order)
+        ? entry.shopping_section_order.filter((id): id is string => typeof id === "string")
+        : [],
       members,
     });
   }
