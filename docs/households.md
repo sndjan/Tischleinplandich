@@ -39,7 +39,9 @@ implementation; the code follows them.
   the personal household too, so deleting a recipe no longer empties past weeks.
 - The "Haushalt" tab shows the user's own recipes together with the other
   members', so search and filters work across all of them, with chips to show
-  only one person's. It is hidden while the personal household is active.
+  only one person's. Under "Alle", copies with the same name and ingredients
+  show once (the user's own, else the original). It is hidden while the
+  personal household is active.
 
 ## Plan
 
