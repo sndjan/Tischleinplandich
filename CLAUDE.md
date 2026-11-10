@@ -45,3 +45,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on every P
 - When a change affects what data is processed or which service receives it, update `src/app/datenschutz/page.tsx` too.
 - Add unit tests for new pure logic in `src/lib/`.
 - User-facing changes get a `changelog` row (see README, "Was ist neu?").
+
+## Session title
+
+Every session in this repo gets a title in the format `<Project> · <Topic>: <short description>`, in German, for example `Tischlein · Rezept-KI: Schema-Größenlimit`. Set it with `set_session_title` as soon as the first user message shows what the work is about, and rename it if the topic changes substantially. Use the project name `Tischlein` exactly. Keep the title under 60 characters.
