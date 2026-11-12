@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { isInviteToken } from '@/lib/households';
 import { JoinHousehold, type InvitePreview } from './join-household';
 
-type PageProps = { params: { token: string } };
+type PageProps = { params: Promise<{ token: string }> };
 
 export const metadata: Metadata = {
   title: 'Einladung',
@@ -32,7 +32,7 @@ function Message({ emoji, title, text, href, linkLabel }: { emoji: string; title
  * the household's name is only shown to signed-in people.
  */
 export default async function InvitePage({ params }: PageProps) {
-  const { token } = params;
+  const { token } = await params;
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

@@ -1,6 +1,5 @@
 import { renderAppIcon } from "@/components/pwa/app-icon";
 
-export const runtime = "edge";
 export const contentType = "image/png";
 
 export function generateImageMetadata() {
@@ -11,6 +10,8 @@ export function generateImageMetadata() {
   }));
 }
 
-export default function Icon({ id }: { id: string }) {
-  return renderAppIcon(Number(id));
+// Not on the edge runtime: Next.js prerenders the sizes above at build time,
+// which the edge runtime can't do.
+export default async function Icon({ id }: { id: Promise<string> }) {
+  return renderAppIcon(Number(await id));
 }

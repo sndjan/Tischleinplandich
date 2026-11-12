@@ -6,7 +6,7 @@ import type { SharedRecipe } from '@/lib/recipe-sharing';
 import { PublicRecipe } from './public-recipe';
 import { withSafeLinks } from '@/lib/safe-links';
 
-type PageProps = { params: { shareId: string } };
+type PageProps = { params: Promise<{ shareId: string }> };
 
 // Called by both the page and its metadata; cached so it runs once per request.
 const loadSharedRecipe = cache(async (shareId: string) => {
@@ -25,7 +25,7 @@ const loadSharedRecipe = cache(async (shareId: string) => {
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { shareId } = params;
+  const { shareId } = await params;
   const recipe = await loadSharedRecipe(shareId);
 
   if (!recipe) return { title: 'Rezept nicht gefunden', robots: { index: false } };
@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function SharedRecipePage({ params }: PageProps) {
-  const { shareId } = params;
+  const { shareId } = await params;
   const [recipe, supabase] = await Promise.all([loadSharedRecipe(shareId), createServerSupabaseClient()]);
 
   if (!recipe) {

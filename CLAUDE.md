@@ -4,7 +4,7 @@ German-language web app (PWA) for planning meals per week, with AI recipe import
 
 ## Stack
 
-- Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Radix UI
+- Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Radix UI
 - Supabase: Postgres with RLS, magic-link/OTP auth, Storage bucket `recipe-images` (files under `<user id>/`)
 - TanStack Query with a localStorage persister (`src/lib/query-provider.tsx`)
 - Claude API via `@anthropic-ai/sdk` for recipe import/refine (`src/lib/server/recipe-ai.ts`), Haiku with low effort, 30 requests per user per day
@@ -24,7 +24,7 @@ German-language web app (PWA) for planning meals per week, with AI recipe import
 
 ```bash
 npm run dev        # local dev server
-npm run lint       # ESLint (next/core-web-vitals)
+npm run lint       # ESLint (eslint.config.mjs, next/core-web-vitals)
 npm run typecheck  # tsc --noEmit
 npm test           # Vitest unit tests (src/**/*.test.ts)
 npm run build      # production build
