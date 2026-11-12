@@ -165,7 +165,7 @@ Schützt Anmeldung und Warteliste vor Bots, die massenhaft Mails auslösen. Reih
 2. In Vercel `NEXT_PUBLIC_TURNSTILE_SITE_KEY` und `TURNSTILE_SECRET_KEY` setzen und neu deployen.
 3. Erst danach in Supabase unter **Authentication → Attack Protection** „Enable CAPTCHA protection“ einschalten, Anbieter Turnstile, Secret Key eintragen.
 
-Ohne die Schlüssel ist der Captcha aus und beide Formulare funktionieren wie bisher.
+Ohne die Schlüssel ist der Captcha aus und beide Formulare funktionieren wie bisher. Ist nur `NEXT_PUBLIC_TURNSTILE_SITE_KEY` gesetzt, lehnt die Warteliste jede Anmeldung ab, bis auch `TURNSTILE_SECRET_KEY` da ist.
 
 ## Grenzen für Inhalte
 
@@ -174,3 +174,10 @@ Migration `016_limit_user_content.sql` (im SQL Editor ausführen) setzt Grenzen,
 - **Fotos**: nur JPEG, PNG oder WebP, höchstens 5 MB (prüft Supabase Storage). Andere Formate wandelt die App vor dem Hochladen in JPEG um.
 - **Links**: `source_url` nur `http(s)://`, `image_url` nur aus dem Bucket `recipe-images`. Die App zeigt zusätzlich nur Bilder aus dem eigenen Supabase-Projekt.
 - **Längen**: Name 200, Zutaten und Schritte je 10.000 Zeichen, Tags 50; höchstens 2000 Rezepte pro Konto.
+
+Migration `032_security_hardening.sql` (im SQL Editor ausführen) schließt Lücken aus einer Sicherheitsprüfung:
+
+- **Eigene Nutzerzeile**: Über die API lässt sich nur noch der Anzeigename ändern, nicht mehr die E-Mail.
+- **Haushalt**: Entfernt die Besitzerin jemanden, wird der Einladungslink ungültig.
+- **Öffentliche Rezepte**: nur noch für Angemeldete lesbar; Teilen-Links funktionieren weiter ohne Konto.
+- **Weitere Grenzen**: Grundzutat 100 Zeichen; je Haushalt höchstens 1000 Grundzutaten und 1000 Wochen, je Woche 300 Mahlzeiten, je Konto 1000 Tags und 20 Feedbacks pro Tag.

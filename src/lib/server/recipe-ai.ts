@@ -450,9 +450,15 @@ export async function consumeAiQuota(supabase: SupabaseClient) {
   const { data, error } = await supabase.rpc("consume_ai_quota", { daily_limit: DAILY_AI_LIMIT });
 
   if (error) {
-    // Until the ai_usage migration is applied the limit is simply not enforced.
-    console.warn("AI quota check unavailable", error.message);
-    return;
+    // Until the ai_usage migration is applied (function not found) the limit is
+    // simply not enforced. Any other failure stops the request: an unchecked one
+    // would cost money without counting.
+    if (error.code === "PGRST202" || error.code === "42883") {
+      console.warn("AI quota check unavailable", error.message);
+      return;
+    }
+    console.error("AI quota check failed", error.message);
+    throw new UserFacingError("Das hat nicht geklappt, bitte erneut versuchen", 503);
   }
 
   if (data === false) {

@@ -100,8 +100,9 @@ export function FeedbackPopover({ context, onClose }: FeedbackPopoverProps) {
         user_id: user.id,
         category,
         message: trimmed,
-        context,
-        user_agent: navigator.userAgent,
+        // The database caps both at 1000 characters (migration 032).
+        context: context.slice(0, 1000),
+        user_agent: navigator.userAgent.slice(0, 1000),
       });
       if (error) throw error;
 
