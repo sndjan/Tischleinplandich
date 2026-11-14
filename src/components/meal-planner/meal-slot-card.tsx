@@ -13,6 +13,8 @@ interface MealSlotCardProps {
   recipe: Recipe;
   mealType: MealType;
   servingSize: number;
+  // The planned meal, so its portions can be changed from the recipe view.
+  mealId?: string;
   nutritionTargets: NutritionTargetSettings;
   // Added a moment ago and still being saved.
   pending?: boolean;
@@ -29,6 +31,7 @@ export function MealSlotCard({
   recipe,
   mealType,
   servingSize,
+  mealId,
   nutritionTargets,
   pending = false,
   onRemove,
@@ -38,7 +41,7 @@ export function MealSlotCard({
   const { openScreen } = useScreenStack();
 
   const openRecipe = () => {
-    if (openable) openScreen({ kind: "recipe-preview", recipe, servings: servingSize });
+    if (openable) openScreen({ kind: "recipe-preview", recipe, servings: servingSize, plannedMealId: mealId });
   };
 
   const facts = [

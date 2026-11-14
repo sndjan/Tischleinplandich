@@ -159,6 +159,7 @@ export function DayCard({
                   recipe={recipe}
                   mealType={mealType}
                   servingSize={meal.serving_size}
+                  mealId={meal.id}
                   nutritionTargets={nutritionTargets}
                   pending={isPendingId(meal.id)}
                   onRemove={() => onRemoveMeal(meal)}
@@ -187,6 +188,7 @@ export function DayCard({
                 recipe={recipe}
                 mealType="extra"
                 servingSize={meal.serving_size}
+                mealId={meal.id}
                 nutritionTargets={nutritionTargets}
                 pending={isPendingId(meal.id)}
                 onRemove={() => onRemoveMeal(meal)}

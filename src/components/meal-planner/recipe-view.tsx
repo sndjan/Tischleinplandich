@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarPlus, ChefHat, ChevronLeft, Copy, Loader2, Pencil, Share2, ShoppingCart, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarPlus, ChefHat, ChevronLeft, Copy, Loader2, Pencil, Share2, ShoppingCart, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import type { Recipe } from "@/types/database";
 import { useRecipesQuery, useUserId, type HouseholdRecipe } from "@/hooks/use-planner-data";
+import { useUpdateMealServings } from "@/hooks/use-planner-mutations";
 import { findOwnCopy, useSaveSharedRecipe } from "@/lib/recipe-sharing";
 import { SharedByLine } from "./shared-recipe-screen";
 import { HeroButton, RecipeBody } from "./recipe-body";
@@ -20,6 +21,8 @@ interface RecipeViewProps {
   tags: string[];
   // Servings to start with, e.g. how many were planned for this meal.
   initialServings?: number;
+  // Opened from a planned meal: changed portions can be saved to the plan.
+  plannedMealId?: string;
   onBack: () => void;
   onEdit: (recipe: Recipe) => void;
   onDelete: (recipe: Recipe) => void;
@@ -32,6 +35,7 @@ export function RecipeView({
   recipe: initialRecipe,
   tags,
   initialServings,
+  plannedMealId,
   onBack,
   onEdit,
   onDelete,
@@ -49,6 +53,10 @@ export function RecipeView({
   const [copying, setCopying] = useState(false);
   const baseServings = recipe.serving_size > 0 ? recipe.serving_size : 1;
   const [servings, setServings] = useState(initialServings ?? baseServings);
+  // What the plan holds now; the stepper alone only changes this view.
+  const [plannedServings, setPlannedServings] = useState(initialServings ?? baseServings);
+  const updateMealServings = useUpdateMealServings();
+  const canSaveToPlan = Boolean(plannedMealId) && servings !== plannedServings;
   const [sheet, setSheet] = useState<"plan" | "share" | "list" | null>(null);
   const rateRecipe = useRateRecipe();
   const showNutrition = useShowNutrition();
@@ -129,6 +137,25 @@ export function RecipeView({
       </div>
 
       <footer className="sticky bottom-0 z-30 border-t border-brand-card-border bg-white shadow-[0_-6px_16px_rgba(28,43,34,0.06)]">
+        {canSaveToPlan && (
+          <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-4 pt-2.5">
+            <p className="min-w-0 flex-1 text-[13px] font-semibold text-brand-muted">
+              Geplant für {plannedServings.toLocaleString("de-DE")}{" "}
+              {plannedServings === 1 ? "Portion" : "Portionen"}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                updateMealServings(plannedMealId!, servings);
+                setPlannedServings(servings);
+              }}
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-brand-accent-bg px-4 text-sm font-bold text-brand-accent-dark transition-transform active:scale-[0.97]"
+            >
+              <CalendarCheck className="size-4" />
+              Im Plan auf {servings.toLocaleString("de-DE")} ändern
+            </button>
+          </div>
+        )}
         <div className="mx-auto flex w-full max-w-2xl gap-2.5 px-4 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <button
             type="button"

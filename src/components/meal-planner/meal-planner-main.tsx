@@ -255,6 +255,7 @@ function MealPlanner() {
             recipe={screen.recipe}
             tags={mealPlanData.tagsById[screen.recipe.id] ?? []}
             initialServings={screen.servings}
+            plannedMealId={screen.plannedMealId}
             onBack={closeScreen}
             // Replace so saving the form returns to the list, not a stale preview.
             onEdit={(recipe) => replaceScreen({ kind: "recipe-form", recipe })}
