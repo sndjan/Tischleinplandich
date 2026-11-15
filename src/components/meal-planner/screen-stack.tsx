@@ -21,7 +21,8 @@ export type Screen =
   // sharedContent: shared into the app from another app; reading starts right away.
   | { kind: "recipe-create"; sharedContent?: SharedContent }
   // servings: portions to show, e.g. how many were planned for a meal.
-  | { kind: "recipe-preview"; recipe: Recipe; servings?: number }
+  // plannedMealId: opened from the plan, so the portions can be saved back to it.
+  | { kind: "recipe-preview"; recipe: Recipe; servings?: number; plannedMealId?: string }
   | { kind: "cooking-mode"; recipe: Recipe; servings?: number }
   // Someone else's recipe from "Entdecken".
   | { kind: "shared-recipe"; recipe: SharedRecipe }

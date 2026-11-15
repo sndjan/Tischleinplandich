@@ -167,6 +167,58 @@ export function useAddMeal() {
 }
 
 /**
+ * Changes how many portions a planned meal has. The week (and with it the day
+ * totals and the shopping list) shows the new count immediately.
+ */
+export function useUpdateMealServings() {
+  const queryClient = useQueryClient();
+  const { queryKey: weekKey } = useWeekScope();
+
+  const mutation = useMutation({
+    mutationFn: async ({ mealId, servingSize }: { mealId: string; servingSize: number }) => {
+      const { error } = await createClient()
+        .from("planned_meals")
+        .update({ serving_size: servingSize })
+        .eq("id", mealId);
+      if (error) throw error;
+    },
+    onMutate: async ({ mealId, servingSize }) => {
+      await queryClient.cancelQueries({ queryKey: weekKey });
+      const previous = queryClient.getQueryData<WeekData>(weekKey);
+      queryClient.setQueryData<WeekData>(weekKey, (current) =>
+        current
+          ? {
+              ...current,
+              meals: current.meals.map((meal) =>
+                meal.id === mealId ? { ...meal, serving_size: servingSize } : meal,
+              ),
+            }
+          : current,
+      );
+      return { previous };
+    },
+    onSuccess: (_data, { servingSize }) => {
+      toast.success(`Im Plan auf ${servingSize.toLocaleString("de-DE")} Portionen geändert`);
+    },
+    onError: (error, _input, context) => {
+      console.error(error);
+      if (context?.previous) queryClient.setQueryData(weekKey, context.previous);
+      toast.error("Ändern fehlgeschlagen");
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: weekKey }),
+  });
+
+  return useCallback(
+    (mealId: string, servingSize: number) => {
+      // Still being saved: there is no server row to change yet.
+      if (isPendingId(mealId)) return;
+      mutation.mutate({ mealId, servingSize });
+    },
+    [mutation],
+  );
+}
+
+/**
  * Removes a meal right away and offers undo; the delete is sent once the undo
  * window has passed.
  */

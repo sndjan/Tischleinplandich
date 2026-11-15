@@ -237,7 +237,7 @@ export function WeekAgenda({
                           // Eating out has no recipe to open; the day has its details.
                           onClick={() =>
                             isRecipe
-                              ? openScreen({ kind: "recipe-preview", recipe, servings: meal.serving_size })
+                              ? openScreen({ kind: "recipe-preview", recipe, servings: meal.serving_size, plannedMealId: meal.id })
                               : onSelectDay(dayIndex)
                           }
                           className="flex min-w-0 flex-1 touch-manipulation items-center gap-2.5 py-1.5 text-left transition-transform active:scale-[0.98]"
